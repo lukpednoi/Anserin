@@ -1,0 +1,17 @@
+{
+  "versions": [
+    {
+      "version": "0.0.1",
+      "date": "2026-11-16",
+      "posts": [
+        {
+          "id": "first-release",
+          "tag": "feature",
+          "title": "Anserin is out",
+          "image": "docs/preview/1-bubble.jpg",
+          "details": "The first public version of Anserin. It comes with the Anserin interface, the left panel with Bubble, Control Center on the right edge, the corner revolver, the duck and the Simple lock screen.\n\nInstall it with the installer, and update with anserin -up."
+        }
+      ]
+    }
+  ]
+}

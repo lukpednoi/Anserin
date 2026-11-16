@@ -67,6 +67,7 @@ singleton FirstLaunch 1.0 singletons/system/FirstLaunch.qml
 singleton I18n 1.0 singletons/system/I18n.qml
 singleton NiriState 1.0 singletons/system/NiriState.qml
 singleton SysNotif 1.0 singletons/system/SysNotif.qml
+singleton Updates 1.0 singletons/system/Updates.qml
 singleton TimerState 1.0 singletons/system/TimerState.qml
 singleton PanelLayout 1.0 blankpanel/PanelLayout.qml
 PanelEditor 1.0 blankpanel/PanelEditor.qml

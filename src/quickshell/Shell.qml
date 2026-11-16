@@ -119,5 +119,7 @@ ShellRoot {
         // weather warnings from the forecast, and official warnings for this location (Settings → Weather)
         WeatherAlerts.isQuietNow();
         GovAlerts.refresh();
+        // update posts: checks GitHub a minute after start, then every 6 hours (Settings → Update)
+        Updates.localVersion;
     }
 }
