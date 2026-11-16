@@ -112,12 +112,6 @@ PanelWindow {
             cmd = cmd || "";
             targetWidget = targetWidget || "";
             arg = arg || "";
-            // the calendar opens as the Dashboard (calendar/CalendarDashboard.qml) when that style is chosen
-            if (Config.getSetting("calendar.style", "popup") === "dashboard") {
-                if (targetWidget === "calendar") targetWidget = "dashboard";
-                if (cmd === "calendar") cmd = "dashboard";
-            }
-
             if (cmd === "clearNotifications" || cmd === "clear_notifications" || cmd === "clearNotifs") {
                 NotificationManager.clearNotifications();
                 return;
@@ -749,8 +743,7 @@ PanelWindow {
     function opens(name) { return name === "guide" || !!getLayout(name); }
 
     function switchWidget(newWidget, arg) {
-        // There is no Bar, so no popups of its own: Network and Music open as pages of the left panel, and the
-        // old Bar's Volume, Calendar and Dashboard popups do not open.
+        // There is no Bar, so no popups of its own: Network and Music open as pages of the left panel.
         const panelPage = ({ network: "network", music: "music" })[newWidget];
         if (panelPage) {
             newWidget = "blankpanel";
@@ -759,8 +752,6 @@ PanelWindow {
                 widgetCache.blankpanel.gotoTab(panelPage);
                 return;
             }
-        } else if (["volume", "calendar", "dashboard"].indexOf(newWidget) !== -1) {
-            return;
         }
         // There is no Settings window: its pages live in Control Center > Control.
         if (newWidget === "guide") {

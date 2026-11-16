@@ -1346,32 +1346,6 @@ Item {
                         }
                     }
 
-                    // what clicking the clock opens: the classic calendar, or the Dashboard (calendar/CalendarDashboard.qml)
-                    SettingsRow {
-                        rootObj: barModulesRoot.rootObj
-                        settingId: "bar_calendar_style"
-                        searchKeywords: "calendar dashboard sun arc hourly forecast clock popup style"
-                        baseColor: Qt.alpha(ThemeBackend.surface1, 0.35)
-                        icon: "󰸗"
-                        title: "Calendar"
-                        description: "Classic, or the Dashboard with the sun's arc and an hourly strip"
-
-                        Switch {
-                            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                            implicitWidth: rootObj.s(200)
-                            implicitHeight: rootObj.s(32)
-                            options: ["Classic", "Dashboard"]
-                            currentIndex: Config.getSetting("calendar.style", "popup") === "dashboard" ? 1 : 0
-                            accentColor: ThemeBackend.mauve
-                            baseColor: ThemeBackend.surface0
-                            textColor: ThemeBackend.subtext0
-                            activeTextColor: ThemeBackend.crust
-                            cornerRadius: ThemeBackend.borderRadius
-                            fontPixelSize: rootObj.s(11)
-                            onToggled: (index) => Config.setSetting("calendar.style", index === 1 ? "dashboard" : "popup")
-                        }
-                    }
-
                     SettingsRow {
                         rootObj: barModulesRoot.rootObj
                         baseColor: Qt.alpha(ThemeBackend.surface1, 0.35)

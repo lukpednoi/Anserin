@@ -25,15 +25,10 @@ PanelWindow {
     onIsVisibleChanged: {
         if (isVisible) {
             rootContainer.forceActiveFocus();
-            updateNightLightState();
         } else {
             openAnim.stop();
             closeAnim.restart();
         }
-    }
-
-    Component.onCompleted: {
-        updateNightLightState();
     }
 
     mask: Region {
@@ -53,7 +48,6 @@ PanelWindow {
     property bool isWidgetMode: DesktopMenuController.mode === "widget"
     property real targetX: DesktopMenuController.targetX - frameInset
     property real targetY: DesktopMenuController.targetY - frameInset
-    property bool isNightLightActive: false
 
     property int configRevision: 0
 
@@ -74,15 +68,6 @@ PanelWindow {
         ignoreUnknownSignals: true
         function onSettingsLoaded() {
             desktopMenuWindow.configRevision++;
-            desktopMenuWindow.updateNightLightState();
-        }
-    }
-
-    Connections {
-        target: (typeof BlueLight !== "undefined") ? BlueLight : null
-        ignoreUnknownSignals: true
-        function onSettingsChanged() {
-            desktopMenuWindow.updateNightLightState();
         }
     }
 
@@ -151,175 +136,6 @@ PanelWindow {
     property bool alignRight: (targetX + menuWidth > desktopMenuWindow.width - s(8))
 
     visible: isVisible || menuContainer.animProgress > 0.001
-
-    Timer {
-        id: reloadTimer
-        interval: 50
-        repeat: false
-        onTriggered: desktopMenuWindow.reloadShell()
-    }
-
-    Process {
-        id: shuffleProcess
-        running: false
-        property string targetScreenName: ""
-        property real originX: 0.5
-        property real originY: 0.5
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let picked = this.text.trim();
-                if (picked && picked !== "") {
-                    desktopMenuWindow.applyWallpaper(shuffleProcess.targetScreenName, picked, {
-                        type: 2,
-                        originX: shuffleProcess.originX,
-                        originY: shuffleProcess.originY
-                    });
-                }
-            }
-        }
-    }
-
-    function updateNightLightState() {
-        let anyEnabled = false;
-        if (typeof BlueLight !== "undefined" && typeof BlueLight.isAnyEnabled === "function") {
-            anyEnabled = BlueLight.isAnyEnabled();
-        } else if (typeof Config !== "undefined" && typeof Config.getSetting === "function") {
-            let ds = Config.getSetting("display", {"monitors": {}});
-            let mons = (ds && ds.monitors) ? ds.monitors : {};
-            for (let mName in mons) {
-                if (mons[mName] && mons[mName].enabled) {
-                    anyEnabled = true;
-                    break;
-                }
-            }
-        }
-        isNightLightActive = anyEnabled;
-    }
-
-    function toggleNightLight() {
-        if (typeof Sounds !== "undefined" && typeof Sounds.playSfx === "function") {
-            Sounds.playSfx("system/quick_click.wav");
-        }
-        let target = !isNightLightActive;
-        isNightLightActive = target;
-
-        let monNames = [];
-        let ds = (typeof Config !== "undefined" && typeof Config.getSetting === "function") ? Config.getSetting("display", {"monitors": {}}) : {"monitors": {}};
-        let mons = (ds && ds.monitors) ? ds.monitors : {};
-        for (let m in mons) {
-            if (monNames.indexOf(m) === -1) {
-                monNames.push(m);
-            }
-        }
-        if (typeof Quickshell !== "undefined" && Quickshell.screens) {
-            for (let i = 0; i < Quickshell.screens.length; i++) {
-                let scr = Quickshell.screens[i];
-                if (scr && scr.name && monNames.indexOf(scr.name) === -1) {
-                    monNames.push(scr.name);
-                }
-            }
-        }
-
-        if (typeof BlueLight !== "undefined" && typeof BlueLight.setEnabled === "function") {
-            if (monNames.length > 0) {
-                for (let i = 0; i < monNames.length; i++) {
-                    BlueLight.setEnabled(monNames[i], target);
-                }
-            } else {
-                BlueLight.setEnabled("", target);
-            }
-        }
-        updateNightLightState();
-    }
-
-    function applyWallpaper(scrName, path, transitionData) {
-        if (!path) return;
-        let mon = scrName || "all";
-        let trans = transitionData !== undefined ? transitionData : "fade";
-
-        if (typeof Wallpaper !== "undefined") {
-            if (typeof Wallpaper.setWallpaper === "function") {
-                Wallpaper.setWallpaper(mon, path, trans);
-            } else if (typeof Wallpaper.changeWallpaper === "function") {
-                Wallpaper.changeWallpaper(mon, path, trans);
-            } else if (typeof Wallpaper.wallpaperChanged === "function") {
-                Wallpaper.wallpaperChanged(mon, path, trans);
-            }
-        }
-    }
-
-    function shuffleWallpaper() {
-        let scr = desktopMenuWindow.screen || DesktopMenuController.screen;
-        let scrName = (scr && scr.name) ? scr.name : "all";
-        let cacheDir = (typeof Caching !== "undefined" && typeof Caching.getCacheDir === "function") ? Caching.getCacheDir("wallpaper") : "";
-        let stateFile = cacheDir ? (cacheDir + "/current_" + scrName) : "";
-        let customDir = "";
-        if (typeof Wallpaper !== "undefined") {
-            if (Wallpaper.wallpaperDir) customDir = Wallpaper.wallpaperDir;
-            else if (Wallpaper.directory) customDir = Wallpaper.directory;
-            else if (Wallpaper.folder) customDir = Wallpaper.folder;
-        }
-        if (!customDir && typeof Config !== "undefined") {
-            if (Config.wallpaperDir) customDir = Config.wallpaperDir;
-            else if (Config.wallpapersDir) customDir = Config.wallpapersDir;
-        }
-
-        let scrW = desktopMenuWindow.width > 0 ? desktopMenuWindow.width : ((scr && scr.geometry && scr.geometry.width) ? scr.geometry.width : 1920);
-        let scrH = desktopMenuWindow.height > 0 ? desktopMenuWindow.height : ((scr && scr.geometry && scr.geometry.height) ? scr.geometry.height : 1080);
-        let posX = Math.max(desktopMenuWindow.clampedX, Math.min(desktopMenuWindow.clampedX + desktopMenuWindow.menuWidth, desktopMenuWindow.targetX));
-        let posY = Math.max(desktopMenuWindow.clampedY, Math.min(desktopMenuWindow.clampedY + desktopMenuWindow.menuHeight, desktopMenuWindow.targetY));
-        let normX = scrW > 0 ? Math.max(0.0, Math.min(1.0, posX / scrW)) : 0.5;
-        let normY = scrH > 0 ? Math.max(0.0, Math.min(1.0, posY / scrH)) : 0.5;
-
-        shuffleProcess.originX = normX;
-        shuffleProcess.originY = normY;
-        DesktopMenuController.menuOriginX = normX;
-        DesktopMenuController.menuOriginY = normY;
-        DesktopMenuController.isMenuShuffle = true;
-
-        let cmd =
-            "STATE_FILE='" + stateFile + "'; " +
-            "CUSTOM_DIR='" + customDir + "'; " +
-            "DIR=''; " +
-            "if [ -n \"$CUSTOM_DIR\" ] && [ -d \"$CUSTOM_DIR\" ]; then " +
-            "    DIR=\"$CUSTOM_DIR\"; " +
-            "elif [ -f \"$STATE_FILE\" ]; then " +
-            "    CUR=$(cat \"$STATE_FILE\" 2>/dev/null); " +
-            "    if [ -n \"$CUR\" ]; then " +
-            "        CANDIDATE=$(dirname \"$CUR\"); " +
-            "        if [ -d \"$CANDIDATE\" ]; then DIR=\"$CANDIDATE\"; fi; " +
-            "    fi; " +
-            "fi; " +
-            "if [ -z \"$DIR\" ] || [ ! -d \"$DIR\" ]; then " +
-            "    for d in \"$HOME/Pictures/Wallpapers\" \"$HOME/Pictures/wallpapers\" \"$HOME/Wallpapers\" \"$HOME/Pictures\" \"$HOME/.config/anserin/wallpapers\" \"/usr/share/backgrounds\"; do " +
-            "        if [ -d \"$d\" ]; then DIR=\"$d\"; break; fi; " +
-            "    done; " +
-            "fi; " +
-            "if [ -n \"$DIR\" ] && [ -d \"$DIR\" ]; then " +
-            "    find -L \"$DIR\" -maxdepth 2 -type f \\( -iname \"*.jpg\" -o -iname \"*.jpeg\" -o -iname \"*.png\" -o -iname \"*.webp\" -o -iname \"*.bmp\" -o -iname \"*.avif\" \\) 2>/dev/null | shuf -n 1; " +
-            "fi";
-
-        shuffleProcess.targetScreenName = scrName;
-        shuffleProcess.command = ["bash", "-c", cmd];
-        shuffleProcess.running = false;
-        shuffleProcess.running = true;
-    }
-
-    function lockScreen() {
-        DesktopMenuController.hide();
-        let dir = (typeof Caching !== "undefined" && Caching.anserinDir) ? Caching.anserinDir : "";
-        let scriptPath = dir ? (dir + "/scripts/lock.sh") : "lock.sh";
-        Quickshell.execDetached(["bash", scriptPath]);
-    }
-
-    function reloadShell() {
-        let dir = (typeof Caching !== "undefined" && Caching.anserinDir) ? Caching.anserinDir : "";
-        let cmd = (dir ? "if [ -f '" + dir + "/scripts/reload.sh' ]; then bash '" + dir + "/scripts/reload.sh'; else " : "")
-            + "if command -v anserin >/dev/null 2>&1; then anserin reload; elif command -v qs_manager.sh >/dev/null 2>&1; then qs_manager.sh reload; else exit 1; fi"
-            + (dir ? "; fi" : "");
-        Quickshell.execDetached(["bash", "-c", cmd]);
-    }
 
     function openRedactor(selectedWidgetId) {
         DesktopMenuController.hide();
@@ -455,71 +271,6 @@ PanelWindow {
                                 }
                             }
 
-                            IconButton {
-                                visible: !desktopMenuWindow.isWidgetMode
-                                width: desktopMenuWindow.s(36)
-                                height: desktopMenuWindow.s(36)
-                                size: height
-                                cornerRadius: desktopMenuWindow.s(8)
-                                accentColor: desktopMenuWindow.primaryButtonColor
-                                textColor: desktopMenuWindow.primaryTextColor
-                                buttonIcon: "󰒝"
-                                iconFontSize: desktopMenuWindow.s(16)
-                                onClicked: {
-                                    desktopMenuWindow.shuffleWallpaper();
-                                    DesktopMenuController.hide();
-                                }
-                            }
-
-                            IconButton {
-                                id: nightLightBtn
-                                visible: !desktopMenuWindow.isWidgetMode
-                                width: desktopMenuWindow.s(36)
-                                height: desktopMenuWindow.s(36)
-                                size: height
-                                cornerRadius: desktopMenuWindow.s(8)
-                                accentColor: desktopMenuWindow.isNightLightActive ? ((typeof ThemeBackend !== "undefined" && ThemeBackend.peach) ? ThemeBackend.peach : "#fab387") : desktopMenuWindow.buttonColor
-                                textColor: desktopMenuWindow.isNightLightActive ? ((typeof ThemeBackend !== "undefined" && ThemeBackend.crust) ? ThemeBackend.crust : ((typeof ThemeBackend !== "undefined" && ThemeBackend.base) ? ThemeBackend.base : "#1e1e2e")) : ((typeof ThemeBackend !== "undefined" && ThemeBackend.text) ? ThemeBackend.text : "#cdd6f4")
-                                buttonIcon: "󰖔"
-                                iconFontSize: desktopMenuWindow.s(16)
-                                onClicked: {
-                                    desktopMenuWindow.toggleNightLight();
-                                }
-                            }
-
-                            IconButton {
-                                id: reloadBtn
-                                visible: !desktopMenuWindow.isWidgetMode
-                                width: desktopMenuWindow.s(36)
-                                height: desktopMenuWindow.s(36)
-                                size: height
-                                cornerRadius: desktopMenuWindow.s(8)
-                                accentColor: desktopMenuWindow.buttonColor
-                                textColor: ThemeBackend.text
-                                buttonIcon: "󰑐"
-                                iconFontSize: desktopMenuWindow.s(16)
-                                onClicked: {
-                                    DesktopMenuController.hide();
-                                    reloadTimer.restart();
-                                }
-                            }
-
-                            IconButton {
-                                id: lockBtn
-                                visible: !desktopMenuWindow.isWidgetMode
-                                width: desktopMenuWindow.s(36)
-                                height: desktopMenuWindow.s(36)
-                                size: height
-                                cornerRadius: desktopMenuWindow.s(8)
-                                accentColor: desktopMenuWindow.buttonColor
-                                textColor: ThemeBackend.text
-                                buttonIcon: ""
-                                iconFontSize: desktopMenuWindow.s(16)
-                                onClicked: {
-                                    desktopMenuWindow.lockScreen();
-                                }
-                            }
-
                             DeleteButton {
                                 visible: desktopMenuWindow.isWidgetMode
                                 width: desktopMenuWindow.s(36)
@@ -599,61 +350,6 @@ PanelWindow {
                             }
                         }
 
-                        ClickButton {
-                            visible: !desktopMenuWindow.isWidgetMode
-                            width: parent.width
-                            height: desktopMenuWindow.s(29)
-                            cornerRadius: desktopMenuWindow.s(8)
-                            contentAlignment: Qt.AlignLeft
-                            horizontalPadding: desktopMenuWindow.s(10)
-                            buttonIcon: "󰸉"
-                            iconFontSize: desktopMenuWindow.s(15)
-                            textFontSize: desktopMenuWindow.s(12)
-                            buttonText: {
-                                if (typeof I18n !== "undefined" && typeof I18n.t === "function") {
-                                    let val = I18n.t("guide.theme.wallpaper.select_wallpaper", "Select Wallpaper");
-                                    if (val && val !== "guide.theme.wallpaper.select_wallpaper") return val;
-                                    return "Select Wallpaper";
-                                }
-                                return "Select Wallpaper";
-                            }
-                            accentColor: desktopMenuWindow.buttonColor
-                            textColor: ThemeBackend.text
-                            onClicked: {
-                                DesktopMenuController.hide();
-                                let dir = (typeof Caching !== "undefined" && Caching.anserinDir) ? Caching.anserinDir : "";
-                                if (dir) {
-                                    Quickshell.execDetached(["bash", "-c", dir + "/scripts/qs_manager.sh toggle wallpaper"]);
-                                } else {
-                                    Quickshell.execDetached(["bash", "-c", "qs_manager.sh toggle wallpaper"]);
-                                }
-                            }
-                        }
-
-                        ClickButton {
-                            visible: !desktopMenuWindow.isWidgetMode
-                            width: parent.width
-                            height: desktopMenuWindow.s(29)
-                            cornerRadius: desktopMenuWindow.s(8)
-                            contentAlignment: Qt.AlignLeft
-                            horizontalPadding: desktopMenuWindow.s(10)
-                            buttonIcon: "󰕰"
-                            iconFontSize: desktopMenuWindow.s(15)
-                            textFontSize: desktopMenuWindow.s(12)
-                            buttonText: {
-                                if (typeof I18n !== "undefined" && typeof I18n.t === "function") {
-                                    let val = I18n.t("guide.display.widgets.open", "Widget Redactor");
-                                    if (val && val !== "guide.display.widgets.open") return val;
-                                    return "Widget Redactor";
-                                }
-                                return "Widget Redactor";
-                            }
-                            accentColor: desktopMenuWindow.buttonColor
-                            textColor: ThemeBackend.text
-                            onClicked: {
-                                desktopMenuWindow.openRedactor("");
-                            }
-                        }
                     }
                 }
 

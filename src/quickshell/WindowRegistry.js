@@ -33,25 +33,11 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰤨"
         },
         {
-            id: "volume",
-            name: tr("widgets.volume.name", "Volume & Audio"),
-            description: tr("widgets.volume.desc", "Manage sound devices and volume levels"),
-            icon: "audio-volume-high",
-            fontIcon: "󰕾"
-        },
-        {
             id: "guide",
             name: tr("widgets.guide.name", "Settings"),
             description: tr("widgets.guide.desc", "Anserin settings"),
             icon: "help-browser",
             fontIcon: "󰋖"
-        },
-        {
-            id: "calendar",
-            name: tr("widgets.calendar.name", "Calendar & Clock"),
-            description: tr("widgets.calendar.desc", "View date, time, and schedule"),
-            icon: "x-office-calendar",
-            fontIcon: "󰸗"
         },
         {
             id: "music",
@@ -83,37 +69,6 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
                 "left": { anchor: "bottom-left", ml: 52, mb: 4 }, 
                 "right": { anchor: "bottom-right", mr: 52, mb: 4 } 
             } 
-        },
-        "volume": { 
-            w: 410, h: 580, comp: "volume/VolumePopup.qml", 
-            pos: { 
-                "top": { anchor: "top-right", mt: 52, mr: 5 }, 
-                "bottom": { anchor: "bottom-right", mb: 52, mr: 5 }, 
-                "left": { anchor: "bottom-left", ml: 52, mb: 5 }, 
-                "right": { anchor: "bottom-right", mr: 52, mb: 5 } 
-            } 
-        },
-        "calendar": { 
-            w: 1360, h: 510, comp: "calendar/CalendarPopup.qml", 
-            pos: { 
-                "top": { anchor: "top-center", mt: 52 }, 
-                "bottom": { anchor: "bottom-center", mb: 52 }, 
-                "left": { anchor: "top-center", mt: 12 }, 
-                "right": { anchor: "top-center", mt: 12 } 
-            } 
-        },
-        // the calendar as the Dashboard: clock with the sun's arc, curved hourly strip, forecast and month;
-        // tall and narrow beside a side bar
-        "dashboard": {
-            w: (barPosition === "left" || barPosition === "right") ? 380 : 1080,
-            h: (barPosition === "left" || barPosition === "right") ? Math.min(980, Math.floor((mh - 24) / scale)) : 420,
-            comp: "calendar/CalendarDashboard.qml",
-            pos: {
-                "top": { anchor: "top-center", mt: 52 },
-                "bottom": { anchor: "bottom-center", mb: 52 },
-                "left": { anchor: "top-left", mt: 12, ml: 52 },
-                "right": { anchor: "top-right", mt: 12, mr: 52 }
-            }
         },
         "wallpaper": { 
             w: "fill", h: 650, comp: "wallpaper/WallpaperPicker.qml", 
