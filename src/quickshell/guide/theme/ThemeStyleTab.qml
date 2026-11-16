@@ -216,66 +216,6 @@ Item {
                 }
             }
             Text {
-                visible: !AnserinMode.active
-                text: "Window border"
-                color: ThemeBackend.text
-                font { family: ThemeBackend.fontFamily; pixelSize: rootObj.s(16); bold: true }
-            }
-            SettingsRow {
-                rootObj: root.rootObj
-                visible: !AnserinMode.active
-                title: "Style"
-                description: "Modern connects panels to the screen frame and opens Quick Actions on hover."
-                icon: "󰕰"
-                Switch {
-                    id: windowBorderSwitch
-                    objectName: "theme-window-border"
-                    implicitWidth: rootObj.s(192)
-                    implicitHeight: rootObj.s(32)
-                    options: ["Classic", "Modern"]
-                    currentIndex: ScreenEdges.modern ? 1 : 0
-                    accentColor: ThemeBackend.mauve
-                    baseColor: ThemeBackend.surface0
-                    textColor: ThemeBackend.subtext0
-                    activeTextColor: ThemeBackend.crust
-                    cornerRadius: ThemeBackend.borderRadius
-                    fontPixelSize: rootObj.s(11)
-                    onToggled: index => Config.setSetting("theme.windowBorder", index === 1 ? "modern" : "classic")
-                    Connections {
-                        target: ScreenEdges
-                        function onModernChanged() { windowBorderSwitch.currentIndex = ScreenEdges.modern ? 1 : 0; }
-                    }
-                }
-            }
-            SettingsRow {
-                rootObj: root.rootObj
-                title: "Border thickness"
-                icon: "󰝤"
-                visible: ScreenEdges.modern && !AnserinMode.active
-                NumberSelector {
-                    id: borderThicknessSelector
-                    objectName: "theme-window-border-thickness"
-                    implicitWidth: rootObj.s(160)
-                    implicitHeight: rootObj.s(32)
-                    from: 2; to: 32; stepSize: 1
-                    value: ScreenEdges.thickness
-                    suffix: " px"
-                    baseColor: ThemeBackend.surface0
-                    buttonColor: ThemeBackend.surface1
-                    buttonTextColor: ThemeBackend.text
-                    textColor: ThemeBackend.text
-                    accentColor: ThemeBackend.mauve
-                    cornerRadius: ThemeBackend.borderRadius
-                    fontFamily: ThemeBackend.fontFamily
-                    fontPixelSize: rootObj.s(11)
-                    onTriggered: Config.setSetting("theme.windowBorderThickness", value)
-                    Connections {
-                        target: ScreenEdges
-                        function onThicknessChanged() { borderThicknessSelector.value = ScreenEdges.thickness; }
-                    }
-                }
-            }
-            Text {
                 text: "Wallpaper"
                 color: ThemeBackend.text
                 font { family: ThemeBackend.fontFamily; pixelSize: rootObj.s(16); bold: true }

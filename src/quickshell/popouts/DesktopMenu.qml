@@ -654,39 +654,13 @@ PanelWindow {
                                 desktopMenuWindow.openRedactor("");
                             }
                         }
-
-                        ClickButton {
-                            visible: !desktopMenuWindow.isWidgetMode && !AnserinMode.active
-                            width: parent.width
-                            height: desktopMenuWindow.s(29)
-                            cornerRadius: desktopMenuWindow.s(8)
-                            contentAlignment: Qt.AlignLeft
-                            horizontalPadding: desktopMenuWindow.s(10)
-                            buttonIcon: "󰏘"
-                            iconFontSize: desktopMenuWindow.s(15)
-                            textFontSize: desktopMenuWindow.s(12)
-                            buttonText: {
-                                if (typeof I18n !== "undefined" && typeof I18n.t === "function") {
-                                    let val = I18n.t("guide.tabs.theme", "Theme");
-                                    if (val && val !== "guide.tabs.theme") return val;
-                                    return "Theme";
-                                }
-                                return "Theme";
-                            }
-                            accentColor: desktopMenuWindow.buttonColor
-                            textColor: ThemeBackend.text
-                            onClicked: {
-                                desktopMenuWindow.openGuide("ThemeOrbit", true);
-                            }
-                        }
                     }
                 }
 
-                // Settings; the Anserin interface's desktop menu has no box here (no Settings window, and files open
-                // from the left panel's File page)
+                // Settings: only in a widget's menu (no Settings window, and files open from the left panel's File page)
                 Rectangle {
                     id: settingsBox
-                    visible: !AnserinMode.active || desktopMenuWindow.isWidgetMode
+                    visible: desktopMenuWindow.isWidgetMode
                     width: parent.width
                     height: settingsCol.implicitHeight + desktopMenuWindow.s(8)
                     color: settingsBoxGlass.active ? "transparent" : desktopMenuWindow.menuBackgroundColor

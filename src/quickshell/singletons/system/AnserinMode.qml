@@ -1,79 +1,46 @@
 pragma Singleton
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Io
 import "../../"
 
-// Which Settings "UI interface" is active (Display > General): "default" or "anserin".
-// Features that belong only to the Anserin interface check `active`.
-// Switching either way plays SwitchTransition; the style and the per-interface settings
-// are swapped when the screen is fully covered.
+// Anserin is the only interface. `active` and `style` stay for the code that still reads them.
+// Settings used to be kept separately for a "default" and an "anserin" interface: the active one in the normal keys,
+// the other parked in display.styleSettings.<style>.<key> (desktop widget positions as widgetLayouts). Someone who was
+// still on the Default interface is moved over once at start: Anserin's parked values come back into the normal keys
+// and the Default ones are parked, as the old switch did, so nothing is lost.
 Singleton {
     id: root
 
     readonly property var display: (Config.rawSettings && Config.rawSettings.display) || ({})
-    readonly property string style: display.settingsStyle === "anserin" ? "anserin" : "default"
-    readonly property bool active: style === "anserin"
+    readonly property string style: "anserin"
+    readonly property bool active: true
     // when the corner revolver's Lock was fired (Date.now()): the Simple lock screen's Bullet animation sweeps in
     // diagonally after it, any other lock comes down from the top
     property real lockShotAt: 0
 
-    // Settings kept separately for each interface. The active interface's values stay in their
-    // normal keys, so existing readers need no change; the other interface's copy is parked in
-    // display.styleSettings.<style>.<key>; desktop widget positions are parked there as widgetLayouts.
-    // An interface with nothing parked yet keeps the current values, except for these Anserin defaults.
     readonly property var separatedKeys: ["bar", "dock", "launcher", "notifications", "osd", "theme", "widgets"]
-    // Theme values that describe the whole system, so both interfaces always share them.
-    // machine-wide, so the same in both interfaces: the SDDM style and the apps that follow Anserin colours
+    // machine-wide, so never swapped: the SDDM style and the apps that follow Anserin colours
     readonly property var sharedThemeKeys: ["sddmStyle", "preparedApp", "apps"]
     readonly property var colorKeys: ["matugen", "activePreset", "colors", "mode", "schemeType"]
-    // Settings only the Default interface has (the Anserin interface has no Quick Actions): they stay parked
-    // for Default while Anserin is in use, and Anserin never keeps a copy of its own.
+    // Default-only settings (Quick Actions): parked for Default, never kept for Anserin
     readonly property var defaultOnlyKeys: ["quickactions"]
-
-    property bool busy: false
-    property string pendingStyle: ""
     property string screenName: ""
-    property point origin: Qt.point(0, 0)
-    signal playRequested()
 
-    // Both directions play the animation; the circle always grows from the screen centre.
-    function requestSwitch(next, screen, x, y) {
-        if (busy || next === style) return;
-        // The Settings window does not always report its screen; fall back to the focused one.
-        const target = screen || (Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : "")
-            || (Quickshell.screens.length > 0 ? Quickshell.screens[0].name : "");
-        if (!target) { applyStyle(next); return; }
-        pendingStyle = next;
-        screenName = target;
-        origin = Qt.point(x, y);
-        busy = true;
-        safety.restart();
-        playRequested();
+    // the one-time move from the Default interface
+    Connections {
+        target: Config
+        function onSettingsLoaded() { root.migrate(); }
     }
-
-    function commit() {
-        if (pendingStyle) applyStyle(pendingStyle);
-        pendingStyle = "";
-    }
-
-    function finish() {
-        safety.stop();
-        commit();
-        busy = false;
-    }
-
-    // Reads the widget positions first; the swap itself happens once they are known.
-    function applyStyle(next) {
-        if (next === style || layoutReader.running) return;
-        layoutReader.next = next;
+    Component.onCompleted: if (Config.dataReady) migrate()
+    function migrate() {
+        if (!Config.dataReady || display.settingsStyle === "anserin" || layoutReader.running) return;
+        screenName = Quickshell.screens.length > 0 ? Quickshell.screens[0].name : "";
         layoutReader.running = true;
     }
 
-    function swapSettings(next, layouts) {
-        const prev = style;
-        if (next === prev) return;
+    function swapSettings(layouts) {
+        const prev = "default", next = "anserin";
         const stash = JSON.parse(JSON.stringify(display.styleSettings || {}));
         const themeBefore = Config.getSetting("theme", {});
         stash[prev] = stash[prev] || {};
@@ -85,13 +52,9 @@ Singleton {
             if (saved !== undefined) updates[key] = saved;
         }
         for (const key of defaultOnlyKeys) {
-            if (next === "anserin") {
-                const current = Config.getSetting(key, null);
-                if (current !== null) stash.default = Object.assign(stash.default || {}, { [key]: current });
-                updates[key] = undefined;
-            } else if (stash.default && stash.default[key] !== undefined) {
-                updates[key] = stash.default[key];
-            }
+            const current = Config.getSetting(key, null);
+            if (current !== null) stash.default = Object.assign(stash.default || {}, { [key]: current });
+            updates[key] = undefined;
             if (stash.anserin) delete stash.anserin[key];
         }
         if (updates.theme) for (const key of sharedThemeKeys) {
@@ -131,7 +94,6 @@ Singleton {
 
     Process {
         id: layoutReader
-        property string next: ""
         command: ["python3", Caching.anserinDir + "/scripts/config-profile-widgets.py", "layouts", Caching.stateDir]
         stdout: StdioCollector { id: layoutOutput }
         stderr: StdioCollector { id: layoutReadErrors }
@@ -141,9 +103,9 @@ Singleton {
                 if (code !== 0) throw new Error(layoutReadErrors.text.trim());
                 layouts = JSON.parse(layoutOutput.text).widgets;
             } catch (failure) {
-                console.warn("Interface switch kept the widget positions: " + failure);
+                console.warn("Moving to the Anserin interface kept the widget positions: " + failure);
             }
-            root.swapSettings(next, layouts);
+            root.swapSettings(layouts);
         }
     }
 
@@ -153,10 +115,7 @@ Singleton {
         stderr: StdioCollector { id: layoutWriteErrors }
         onExited: code => {
             if (code === 0) ConfigProfiles.refreshWidgets(target);
-            else console.warn("Interface switch could not place the widgets: " + layoutWriteErrors.text.trim());
+            else console.warn("Moving to the Anserin interface could not place the widgets: " + layoutWriteErrors.text.trim());
         }
     }
-
-    // If no overlay answers (e.g. the screen name is unknown), still apply the choice.
-    Timer { id: safety; interval: 6000; onTriggered: root.finish() }
 }

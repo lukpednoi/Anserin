@@ -87,7 +87,7 @@ Item {
         width: 144 * root.unit; height: 41 * root.unit
         x: ring.x + ring.width + 44 * root.unit; y: ring.y + (ring.height-height)/2
         radius: ThemeBackend.clampedBorderRadius * root.unit; color: ThemeBackend.surface0
-        Caption { anchors.centerIn: parent; text: AnserinMode.active ? "Pet" : "Music" }
+        Caption { anchors.centerIn: parent; text: "Pet" }
     }
     Rectangle {
         id: theme

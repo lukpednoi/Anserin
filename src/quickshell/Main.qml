@@ -176,7 +176,7 @@ PanelWindow {
                 if (targetWidget === effectivelyActive) {
                     let currentItem = widgetCache[targetWidget] || widgetStack.currentItem;
 
-                    if (arg !== "" && (arg !== masterWindow.activeArg || (cmd === "open" && targetWidget === "guide" && arg === "ThemeOrbit"))) {
+                    if (arg !== "" && arg !== masterWindow.activeArg) {
                         masterWindow.activeArg = arg;
                         if (currentItem && currentItem.activeMode !== undefined) {
                             currentItem.activeMode = arg;
@@ -187,10 +187,10 @@ PanelWindow {
                     } else if (cmd === "toggle") {
                         switchWidget("hidden", "");
                     }
-                } else if (getLayout(targetWidget)) {
+                } else if (opens(targetWidget)) {
                     switchWidget(targetWidget, arg);
                 }
-            } else if (getLayout(cmd)) {
+            } else if (opens(cmd)) {
                 let legacyArg = targetWidget;
 
                 if (cmd === effectivelyActive) {
@@ -234,8 +234,7 @@ PanelWindow {
     visible: isVisible
 
     readonly property Item popupOverlay: contentItem ? contentItem.Overlay.overlay : null
-    readonly property bool needsPopupInput: (currentActive === "guide" && !!widgetCache.guide && popupOverlay !== null && popupOverlay.visible)
-                                            || lockPicker.active
+    readonly property bool needsPopupInput: lockPicker.active
 
     mask: Region {
         item: masterWindow.needsPopupInput ? masterWindow.contentItem : (masterWindow.isCurrentDraggable ? animContainer : topBarHole)
@@ -245,7 +244,7 @@ PanelWindow {
     property var rawBarSettings: (typeof Config !== "undefined" && Config.rawSettings && Config.rawSettings.bar) ? Config.rawSettings.bar : ({})
     property string barPosition: (rawBarSettings && rawBarSettings.position !== undefined) ? rawBarSettings.position : "top"
     // the Anserin interface has no Bar: nothing keeps room for it
-    property bool barAutohide: AnserinMode.active || ((rawBarSettings && rawBarSettings.autohide !== undefined) ? Boolean(rawBarSettings.autohide) : false)
+    property bool barAutohide: true
 
     readonly property bool isFullscreenActive: {
         if (ScreenEdges.modern) return ScreenEdges.fullscreen(screen);
@@ -259,16 +258,9 @@ PanelWindow {
 
     readonly property bool isBarEffectivelyHidden: isFullscreenActive || (barAutohide && popupBarScreen === "")
     readonly property bool screenReady: masterWindow.width >= 100 && masterWindow.height >= 100
-    readonly property bool isOrbitFixed: currentActive === "guide" && !!widgetCache.guide && widgetCache.guide.orbitOnly && widgetCache.guide.orbitLanding
-    onIsOrbitFixedChanged: {
-        if (isOrbitFixed && targetLayout) {
-            masterWindow._animX = targetLayout.x;
-            masterWindow._animY = targetLayout.y;
-        }
-    }
     readonly property bool isCurrentDraggable: {
         let t = getLayout(masterWindow.currentActive);
-        return Boolean(t && t.draggable) || masterWindow.currentActive === "guide";
+        return Boolean(t && t.draggable);
     }
 
     Item {
@@ -417,8 +409,6 @@ PanelWindow {
         reportWidgetState();
         Qt.callLater(function() {
             if (masterWindow.currentActive === "hidden") {
-                let t = masterWindow.getLayout("guide");
-                if (t) masterWindow.ensureWidgetItem("guide", t);
                 let w = masterWindow.getLayout("wallpaper");
                 if (w) masterWindow.ensureWidgetItem("wallpaper", w);
             }
@@ -513,7 +503,7 @@ PanelWindow {
         if (!result) return null;
 
         let scale = masterWindow.globalUiScale || 1.0;
-        let isFixed = (name === "guide" || name === "wallpaper" || name === "notifications" || name === "system" || name === "controlcenter" || name === "blankpanel" || name === "hidden");
+        let isFixed = (name === "wallpaper" || name === "notifications" || name === "system" || name === "controlcenter" || name === "blankpanel" || name === "hidden");
 
         if (effHidden && !isFixed) {
             let offsetAdjustment = Math.round(46 * scale);
@@ -576,7 +566,7 @@ PanelWindow {
 
     onTargetLayoutChanged: {
         if (!targetLayout || masterWindow.currentActive === "hidden" || !masterWindow.isVisible) return;
-        if (!masterWindow.userMoved || !masterWindow.isCurrentDraggable || masterWindow.isOrbitFixed) {
+        if (!masterWindow.userMoved || !masterWindow.isCurrentDraggable) {
             masterWindow._animX = targetLayout.x;
             masterWindow._animY = targetLayout.y;
         }
@@ -594,18 +584,6 @@ PanelWindow {
                 let it = widgetCache[k];
                 if (it) it.visible = false;
             }
-        }
-    }
-
-    Loader {
-        anchors.fill: parent
-        active: masterWindow.isVisible && masterWindow.currentActive === "guide" && !!masterWindow.widgetCache.guide && masterWindow.widgetCache.guide.orbitOnly
-        sourceComponent: ShaderEffect {
-            anchors.fill: parent
-            property vector2d itemSize: Qt.vector2d(width, height)
-            property color vignetteColor: "#000000"
-            property vector4d params: Qt.vector4d(0.25, 0.6, 0.75, 0)
-            fragmentShader: "file://" + Caching.anserinDir + "/assets/shaders/effects/vignette.frag.qsb"
         }
     }
 
@@ -633,7 +611,7 @@ PanelWindow {
                 parent: windowDragRegion
                 target: null
                 acceptedButtons: Qt.LeftButton
-                enabled: masterWindow.isCurrentDraggable && !masterWindow.isOrbitFixed
+                enabled: masterWindow.isCurrentDraggable
 
                 property real startX: 0
                 property real startY: 0
@@ -767,24 +745,25 @@ PanelWindow {
         }
     }
 
+    // a window that can be asked for: a layout of its own, or Settings ("guide"), shown in Control Center > Control
+    function opens(name) { return name === "guide" || !!getLayout(name); }
+
     function switchWidget(newWidget, arg) {
-        // The Anserin interface has no Bar, so no popups of its own: Network and Music open as pages of the
-        // left panel, and the Bar's Volume, Calendar and Dashboard popups do not open.
-        if (AnserinMode.active) {
-            const panelPage = ({ network: "network", music: "music" })[newWidget];
-            if (panelPage) {
-                newWidget = "blankpanel";
-                arg = panelPage;
-                if (masterWindow.currentActive === "blankpanel" && !masterWindow.isClosing && widgetCache.blankpanel) {
-                    widgetCache.blankpanel.gotoTab(panelPage);
-                    return;
-                }
-            } else if (["volume", "calendar", "dashboard"].indexOf(newWidget) !== -1) {
+        // There is no Bar, so no popups of its own: Network and Music open as pages of the left panel, and the
+        // old Bar's Volume, Calendar and Dashboard popups do not open.
+        const panelPage = ({ network: "network", music: "music" })[newWidget];
+        if (panelPage) {
+            newWidget = "blankpanel";
+            arg = panelPage;
+            if (masterWindow.currentActive === "blankpanel" && !masterWindow.isClosing && widgetCache.blankpanel) {
+                widgetCache.blankpanel.gotoTab(panelPage);
                 return;
             }
+        } else if (["volume", "calendar", "dashboard"].indexOf(newWidget) !== -1) {
+            return;
         }
-        // The Anserin interface has no Settings window: its pages live in Control Center > Control.
-        if (newWidget === "guide" && AnserinMode.active) {
+        // There is no Settings window: its pages live in Control Center > Control.
+        if (newWidget === "guide") {
             masterWindow.pendingControl = arg || "";
             newWidget = "controlcenter";
             arg = "";
@@ -802,9 +781,7 @@ PanelWindow {
         let gen = masterWindow.switchGeneration;
         masterWindow.targetActive = newWidget;
 
-        if (newWidget !== "guide") {
-            masterWindow.userMoved = false;
-        }
+        masterWindow.userMoved = false;
 
         if (delayedClear.running) {
             delayedClear.stop();
@@ -897,7 +874,7 @@ PanelWindow {
         let finalX = (finalW !== t.w) ? recenterX(t, finalW) : t.rx;
         let finalY = t.ry;
 
-        if (!masterWindow.userMoved || !masterWindow.isCurrentDraggable || masterWindow.isOrbitFixed) {
+        if (!masterWindow.userMoved || !masterWindow.isCurrentDraggable) {
             masterWindow._animX = finalX;
             masterWindow._animY = finalY;
         }

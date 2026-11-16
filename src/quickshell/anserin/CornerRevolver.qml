@@ -19,7 +19,7 @@ import "../reusables"
 Variants {
     id: root
     signal lockRequested()
-    model: AnserinMode.active ? Quickshell.screens : []
+    model: Quickshell.screens
 
     PanelWindow {
         id: win

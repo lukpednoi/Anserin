@@ -153,11 +153,7 @@ Singleton {
     // after the settings have settled (writing them while they are being read loops their bindings)
     Connections {
         target: Config
-        function onSettingsLoaded() { if (AnserinMode.active) Qt.callLater(root.copyMusic); }
-    }
-    Connections {
-        target: AnserinMode
-        function onActiveChanged() { if (AnserinMode.active) Qt.callLater(root.copyMusic); }
+        function onSettingsLoaded() { Qt.callLater(root.copyMusic); }
     }
 
     // ---------- Workspace only ----------

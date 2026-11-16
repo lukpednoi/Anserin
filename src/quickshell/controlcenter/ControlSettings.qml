@@ -22,11 +22,8 @@ Item {
     readonly property color ink: ThemeBackend.crust
     function s(v) { return Scaler.s(v); }
 
-    // the Anserin interface: Panel in Bar's place, and no Theme → Music (its Music is set in Edit panel)
-    readonly property var cats: GuideTabs.tabs.map(t => !AnserinMode.active ? t
-        : t.id === "Bar" ? { id: "Panel", key: "panel", name: "Panel", icon: "󰕮", file: "bar/BarModulesTab.qml", panelPage: true }
-        : t.id === "Theme" ? Object.assign({}, t, { subtabs: t.subtabs.filter(st => st.id !== "ThemeMusic") })
-        : t)
+    // no Theme → Pet here: it is a board page only
+    readonly property var cats: GuideTabs.tabs.map(t => t.id === "Theme" ? Object.assign({}, t, { subtabs: t.subtabs.filter(st => st.id !== "ThemePet") }) : t)
     readonly property var curCat: cats[Math.min(cat, cats.length - 1)]
     readonly property bool hasSubs: !!curCat.subtabs && curCat.subtabs.length > 0
     readonly property var curSub: hasSubs ? curCat.subtabs[Math.min(sub, curCat.subtabs.length - 1)] : null

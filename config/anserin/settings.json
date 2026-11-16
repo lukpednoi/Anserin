@@ -138,6 +138,7 @@
     "soundFile": ""
   },
   "display": {
+    "settingsStyle": "anserin",
     "monitors": {
       "eDP-1": {
         "enabled": false,

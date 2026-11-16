@@ -760,13 +760,9 @@ ShellRoot {
                         onCanceled: { panAllowed = false; drawAllowed = false; drawing = false; TerminalAppearance.panEnd(); }
                         onClicked: mouse => {
                             if (panning || drew) return;
-                            // the Anserin interface has no desktop menu: its actions are in the bottom-left corner
-                            // (anserin/CornerRevolver.qml); a widget's own right-click menu stays
-                            if (mouse.button === Qt.RightButton) {
-                                if (!AnserinMode.active) DesktopMenuController.toggle(barWindow.screen, mouse.x, mouse.y, "desktop");
-                            } else {
-                                DesktopMenuController.hide();
-                            }
+                            // no desktop menu: its actions are in the bottom-left corner (anserin/CornerRevolver.qml);
+                            // a widget's own right-click menu stays
+                            if (mouse.button !== Qt.RightButton) DesktopMenuController.hide();
                         }
                     }
                 }

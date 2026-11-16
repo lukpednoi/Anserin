@@ -10,7 +10,7 @@ Singleton {
     id: root
 
     readonly property var theme: Config.getSetting("theme", {}) || {}
-    readonly property bool duck: AnserinMode.active && theme.pet === "duck"
+    readonly property bool duck: theme.pet === "duck"
     readonly property bool desktopOn: duck && theme.petMode === true
 
     readonly property var duckDefaults: ({ breed: "call", colour: "white", size: 128, sound: true, recall: true, scene: "grass" })

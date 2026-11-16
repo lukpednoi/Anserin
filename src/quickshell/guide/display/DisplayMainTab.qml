@@ -73,35 +73,6 @@ Item {
             width: parent.width - (parent.contentHeight > parent.height ? rootObj.s(6) : 0)
             spacing: rootObj.s(12)
 
-            SettingsRow {
-                rootObj: displayTabRoot.rootObj
-                baseColor: Qt.alpha(ThemeBackend.surface1, 0.35)
-                icon: "󰙵"
-                title: I18n.t("guide.display.interface.title", "UI interface")
-                description: I18n.t("guide.display.interface.desc", "Choose the Settings interface style")
-
-                Switch {
-                    objectName: "settings-interface-style"
-                    implicitWidth: rootObj.s(200)
-                    implicitHeight: rootObj.s(32)
-                    options: ["Default", "Anserin"]
-                    currentIndex: (displayTabRoot.displaySettings.settingsStyle === "anserin") ? 1 : 0
-                    accentColor: ThemeBackend.mauve
-                    baseColor: ThemeBackend.surface0
-                    textColor: ThemeBackend.subtext0
-                    activeTextColor: ThemeBackend.crust
-                    cornerRadius: ThemeBackend.borderRadius
-                    fontPixelSize: rootObj.s(11)
-                    onToggled: function(index) {
-                        const point = mapToItem(null, (index + 0.5) * width / 2, height / 2);
-                        const window = Window.window;
-                        const inset = window && window.screen ? ScreenEdges.inset(window.screen) : 0;
-                        AnserinMode.requestSwitch(index === 1 ? "anserin" : "default",
-                            window && window.screen ? window.screen.name : "", point.x + inset, point.y + inset);
-                    }
-                }
-            }
-
             Repeater {
                 model: displayTabRoot.monitorsList
                 delegate: Rectangle {

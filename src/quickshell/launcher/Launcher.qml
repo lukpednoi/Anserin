@@ -86,7 +86,7 @@ PanelWindow {
     }
 
     // the Anserin interface has no Bar: nothing keeps room for it
-    property bool barAutohide: AnserinMode.active || ((rawBarSettings && rawBarSettings.autohide !== undefined) ? Boolean(rawBarSettings.autohide) : false)
+    property bool barAutohide: true   // there is no Bar
 
     readonly property bool isOsdFullscreen: (typeof OsdController !== "undefined") ? Boolean(OsdController.isFullscreen) : false
 

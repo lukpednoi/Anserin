@@ -6,14 +6,9 @@ import Quickshell.Hyprland
 import "../../"
 
 QtObject {
-    // The Anserin interface always uses the Modern frame at 10 px; the saved Classic/Modern and
-    // thickness values are kept untouched for the default interface.
-    readonly property bool modern: AnserinMode.active || Config.getSetting("theme.windowBorder", "classic") === "modern"
-    readonly property int thickness: {
-        if (AnserinMode.active) return 10;
-        const value = Config.getSetting("theme.windowBorderThickness", 10);
-        return typeof value === "number" && isFinite(value) ? Math.round(Math.max(2, Math.min(32, value))) : 10;
-    }
+    // Anserin always uses the Modern frame at 10 px
+    readonly property bool modern: true
+    readonly property int thickness: 10
     readonly property real rounding: ThemeBackend.clampedBorderRadius
     property var docks: ({})
 

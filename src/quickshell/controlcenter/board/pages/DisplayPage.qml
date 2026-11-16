@@ -6,7 +6,7 @@ import "../../../widgets"
 import ".."
 
 // Display → General as a board. It runs the Settings page's own logic (guide/display/DisplayLogic.qml): the
-// interface switch (AnserinMode), and for every monitor its power (with more than one), night light, schedule
+// monitors: for every monitor its power (with more than one), night light, schedule
 // and warmth (BlueLight) and its UI scale (the compositor, a second after the last move), and the desktop
 // widgets (WidgetsLogic: the redactor, each screen's presets as the real preview cards, its widgets).
 BoardPage {
@@ -18,23 +18,6 @@ BoardPage {
                           onSaveRequested: function(presetName, monName, widgetsList) { wlogic.saveCustomPreset(presetName, monName, widgetsList); } }
     ]
     readonly property var ds: logic.displaySettings
-
-    BoardCard {
-        title: I18n.t("guide.display.interface.title", "UI interface"); icon: "󰙵"; accent: page.accent
-        BoardCell {
-            id: iface
-            kind: "seg"; icon: "󰙵"; title: I18n.t("guide.display.interface.title", "UI interface")
-            options: ["Default", "Anserin"]; values: ["default", "anserin"]
-            value: page.ds.settingsStyle === "anserin" ? "anserin" : "default"
-            onPicked: (v) => {
-                // the switch's animation starts where it was clicked, as on the Settings page
-                const point = iface.mapToItem(null, iface.width / 2, iface.height / 2);
-                const window = iface.Window.window;
-                const inset = window && window.screen ? ScreenEdges.inset(window.screen) : 0;
-                AnserinMode.requestSwitch(v, window && window.screen ? window.screen.name : "", point.x + inset, point.y + inset);
-            }
-        }
-    }
 
     Repeater {
         model: logic.monitorsList

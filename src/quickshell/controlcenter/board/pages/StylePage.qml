@@ -47,15 +47,6 @@ BoardPage {
         BoardCell { kind: "seg"; icon: "󰖩"; title: "Rings"; options: ["Pulse", "Lightning"]; values: ["original", "wifi"]
                     value: page.ts.orbitRingStyle === "wifi" ? "wifi" : "original"; onPicked: (v) => Config.setSetting("theme.orbitRingStyle", v) }
     }
-    BoardCard {
-        title: "Window border"; icon: "󰕰"; accent: page.accent
-        visible: !AnserinMode.active
-        BoardCell { kind: "seg"; icon: "󰕰"; title: "Style"; options: ["Classic", "Modern"]; values: ["classic", "modern"]
-                    value: ScreenEdges.modern ? "modern" : "classic"; onPicked: (v) => Config.setSetting("theme.windowBorder", v) }
-        BoardCell { kind: "stepper"; icon: "󰝤"; title: "Border thickness"; hidden: !ScreenEdges.modern
-                    from: 2; to: 32; step: 1; suffix: " px"; value: ScreenEdges.thickness
-                    onPicked: (v) => Config.setSetting("theme.windowBorderThickness", v) }
-    }
     // the wallpaper picker's layout and the transition (guide/theme/WallpaperTransitions.qml): the previews are
     // the real ones, the choices are cells
     readonly property var transition: Wallpaper.transitionSettings()

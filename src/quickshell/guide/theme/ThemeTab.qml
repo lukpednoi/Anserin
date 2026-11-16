@@ -527,13 +527,13 @@ Item {
                     x: orbitRing.x + orbitRing.width + wpPreviewContainer.toolGap
                     y: orbitRing.y + (orbitRing.height-height)/2
                     // the Anserin interface's Music lives in Edit panel: this place is Pet's, a Control Center board page
-                    buttonText: AnserinMode.active ? "Pet" : "Music"
+                    buttonText: "Pet"
                     readonly property rect movingRect: signals.movingTargets[1] || Qt.rect(x, y, width, height)
                     transform: Translate { x: musicButton.movingRect.x - musicButton.x; y: musicButton.movingRect.y - musicButton.y }
                     textFontSize: rootObj.s(14)
                     cornerRadius: ThemeBackend.clampedBorderRadius
                     accentColor: ThemeBackend.surface0; textColor: ThemeBackend.text
-                    onClicked: themeTabRoot.rootObj.gotoTab(AnserinMode.active ? "ThemePet" : "ThemeMusic")
+                    onClicked: themeTabRoot.rootObj.gotoTab("ThemePet")
                 }
                 ClickButton {
                     id: themeButton

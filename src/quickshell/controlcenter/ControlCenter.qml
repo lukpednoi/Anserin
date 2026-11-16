@@ -688,7 +688,7 @@ Item {
                                 }
                                 onRightClicked: {
                                     closeSequence.start();
-                                    Quickshell.execDetached(["bash", Caching.anserinDir + "/scripts/qs_manager.sh", "toggle"].concat(AnserinMode.active ? ["blankpanel", "network"] : ["network", "wifi"]));
+                                    Quickshell.execDetached(["bash", Caching.anserinDir + "/scripts/qs_manager.sh", "toggle"].concat(["blankpanel", "network"]));
                                 }
                             }
 
@@ -704,7 +704,7 @@ Item {
                                 }
                                 onRightClicked: {
                                     closeSequence.start();
-                                    Quickshell.execDetached(["bash", Caching.anserinDir + "/scripts/qs_manager.sh", "toggle"].concat(AnserinMode.active ? ["blankpanel", "network"] : ["network", "bt"]));
+                                    Quickshell.execDetached(["bash", Caching.anserinDir + "/scripts/qs_manager.sh", "toggle"].concat(["blankpanel", "network"]));
                                 }
                             }
 

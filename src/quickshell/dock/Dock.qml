@@ -443,7 +443,7 @@ Variants {
 
                 property string barPosition: (rawBarSettings && rawBarSettings.position !== undefined) ? rawBarSettings.position : "top"
                 // the Anserin interface has no Bar: nothing keeps room for it
-                property bool barAutohide: AnserinMode.active || ((rawBarSettings && rawBarSettings.autohide !== undefined) ? Boolean(rawBarSettings.autohide) : false)
+                property bool barAutohide: true   // there is no Bar
                 property real barHeight: (rawBarSettings && rawBarSettings.height !== undefined) ? s(rawBarSettings.height) : s(40)
 
                 property string barStyle: {

@@ -8,23 +8,17 @@ import "../../reusables"
 // Across the top a dial of the Settings categories (wheel, drag or click; the one in the middle is chosen), the
 // category's sub-pages as chips under it, and the page below, scrolling on its own. Pages ported to the board
 // (pages/) draw their options as cards of cells; every other page is the real Settings page, hosted as the classic
-// Control tab hosts it, so nothing is ever missing. Categories come from guide/GuideTabs.js, Bar becoming Panel.
+// Control tab hosts it, so nothing is ever missing. Categories come from guide/GuideTabs.js.
 Item {
     id: root
     property bool active: true
     signal closeRequested()
     function s(v) { return Scaler.s(v); }
 
-    // the Anserin interface: Panel in Bar's place, and Theme → Pet in Music's place (its Music is set in Edit panel);
-    // Pet is a board page only (no Settings window page), and only the Anserin interface has it
-    readonly property var cats: GuideTabs.tabs.map(t => !AnserinMode.active ? t
-        : t.id === "Bar" ? { id: "Panel", key: "panel", name: "Panel", icon: "󰕮", file: "bar/BarModulesTab.qml", panelPage: true }
-        : t.id === "Theme" ? Object.assign({}, t, { subtabs: t.subtabs.map(st => st.id !== "ThemeMusic" ? st
-                                : { id: "ThemePet", key: "pet", name: "Pet", icon: "\u{F03E9}", file: "" }) })
-        : t)
+    readonly property var cats: GuideTabs.tabs
     // pages drawn as boards; the rest are the real Settings pages
     readonly property var boardPages: ({ Welcome: "pages/WelcomePage.qml", General: "pages/GeneralPage.qml",
-                                         ThemeMusic: "pages/MusicPage.qml", ThemePet: "pages/PetPage.qml",
+                                         ThemePet: "pages/PetPage.qml",
                                          ThemeStyle: "pages/StylePage.qml",
                                          ThemeLockscreen: "pages/LockscreenPage.qml",
                                          DisplayGeneral: "pages/DisplayPage.qml", DisplayPresets: "pages/PresetsPage.qml",

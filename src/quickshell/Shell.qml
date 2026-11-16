@@ -6,7 +6,6 @@ import "anserin"
 
 ShellRoot {
     readonly property bool performanceMode: !!(Config.getSetting("general", {}).performance)
-    readonly property bool quickactionsEnabled: Config.getSetting("general", {}).quickactions !== false
     readonly property bool dockEnabled: Config.getSetting("dock", {}).enabled !== false
 
     Connections {
@@ -17,7 +16,6 @@ ShellRoot {
 
     ScreenshotOverlay {}
     Main { id: mainWindow }
-    SwitchOverlay {}
     EdgeBatteryTrigger { onTriggered: function(screenName) { mainWindow.openFromEdge("controlcenter", screenName); } }
     // the left edge: the full panel, or in Workspace only the small workspace capsule first
     EdgeBatteryTrigger {
@@ -31,7 +29,7 @@ ShellRoot {
     // the bottom-left corner: the desktop's quick actions in a revolver's cylinder (Anserin interface)
     CornerRevolver { onLockRequested: sessionLock.lock() }
     Loader {
-        active: PanelLayout.capsuleScreen !== "" && AnserinMode.active
+        active: PanelLayout.capsuleScreen !== ""
         sourceComponent: WorkspaceCapsule { checkEdge: done => mainWindow.checkPointerOnEdge("left", done) }
     }
     ScreenBorder {}
@@ -39,12 +37,6 @@ ShellRoot {
     Loader {
         active: TerminalAppearance.infiniteActive
         sourceComponent: PanCursor {}
-    }
-    // The Anserin interface has no Bar and no Quick Actions; the edge panels take their place.
-    Loader {
-        // waits for the settings, so the interface is known before a Bar is made
-        active: Config.dataReady && !AnserinMode.active
-        sourceComponent: Bar {}
     }
     Lock { id: sessionLock }
     LockRedactor { id: nativeLockEditor; sessionLocked: sessionLock.isLocked }
@@ -102,11 +94,6 @@ ShellRoot {
         active: !performanceMode
         sourceComponent: WallpaperEngine {}
     }
-    Loader {
-        // hidden while inf desktop is on, so it never covers the canvas
-        active: !performanceMode && quickactionsEnabled && Config.dataReady && !AnserinMode.active && !TerminalAppearance.infiniteActive
-        sourceComponent: Floating {}
-    }
 
     Component.onCompleted: {
         Qt.application.organization = "anserin";
@@ -116,6 +103,8 @@ ShellRoot {
         FirstLaunch.checkFirstLaunch();
         TerminalAppearance.initialize();
         SysNotif.checkBattery();
+        // anyone still on the old Default interface moves to Anserin once (its settings are kept)
+        AnserinMode.migrate();
         // weather warnings from the forecast, and official warnings for this location (Settings → Weather)
         WeatherAlerts.isQuietNow();
         GovAlerts.refresh();

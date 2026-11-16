@@ -20,14 +20,10 @@ Item {
     property bool previewMode: false
     property string previewAppearance: "original"
     property string previewCover: ""
-    // the Anserin interface keeps its own Music settings (panel.music, set in Edit panel); the Default one theme.music
-    readonly property var appearanceSettings: AnserinMode.active ? PanelLayout.music : (Config.getSetting("theme", {}).music || ({}))
-    // the section a style opens on (0 Equalizer, 1 Lyrics): the Anserin interface's choice per style, else the
-    // lyrics for Ambient and the equalizer for the others
-    function firstSection() {
-        if (AnserinMode.active) return PanelLayout.firstPage(appearance) === "eq" ? 0 : 1;
-        return appearance === "m5" ? 1 : 0;
-    }
+    // Music's settings (panel.music, set in Edit panel)
+    readonly property var appearanceSettings: PanelLayout.music
+    // the section a style opens on (0 Equalizer, 1 Lyrics), chosen per style in Edit panel
+    function firstSection() { return PanelLayout.firstPage(appearance) === "eq" ? 0 : 1; }
     readonly property string appearance: previewMode ? previewAppearance : (["original", "m3", "m5"].indexOf(appearanceSettings.style) >= 0 ? appearanceSettings.style : "original")
     readonly property bool originalM3Background: appearance === "m3" && appearanceSettings.m3Background === "original"
     readonly property string coverMode: {
@@ -176,7 +172,7 @@ Item {
     }
 
     onActiveChanged: {
-        if (active && AnserinMode.active) bottomSectionSwitch.currentIndex = root.firstSection();
+        if (active) bottomSectionSwitch.currentIndex = root.firstSection();
         updateLyricsSubscription();
         if (active) {
             forceActiveFocus();

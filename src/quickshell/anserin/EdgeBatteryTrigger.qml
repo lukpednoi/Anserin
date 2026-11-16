@@ -8,7 +8,7 @@ Variants {
     id: root
     property string edge: "right"
     signal triggered(string screenName)
-    model: AnserinMode.active ? Quickshell.screens : []
+    model: Quickshell.screens
 
     PanelWindow {
         required property var modelData

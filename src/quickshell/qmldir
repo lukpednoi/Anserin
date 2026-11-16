@@ -1,19 +1,15 @@
 Dock 1.0 dock/Dock.qml
 Dim 1.0 Dim.qml
 Main 1.0 Main.qml
-GuidePopup 1.0 guide/GuidePopup.qml
 RecordTonearm 1.0 media/RecordTonearm.qml
 ThemeLayoutPreview 1.0 guide/theme/ThemeLayoutPreview.qml
 OrbitSignals 1.0 guide/theme/OrbitSignals.qml
 OrbitBackdrop 1.0 guide/theme/OrbitBackdrop.qml
 WallpaperGrid 1.0 wallpaper/WallpaperGrid.qml
-DistroLogo 1.0 guide/DistroLogo.qml
 
-Bar 1.0 bar/Bar.qml
 ScreenBorder 1.0 ScreenBorder.qml
 PanCursor 1.0 PanCursor.qml
 singleton ScreenEdges 1.0 singletons/theme/ScreenEdges.qml
-Floating 1.0 quickactions/Floating.qml
 Clipboard 1.0 clipboard/Clipboard.qml
 Launcher 1.0 launcher/Launcher.qml
 LauncherContent 1.0 launcher/LauncherContent.qml
@@ -85,7 +81,6 @@ singleton TrayMenuController 1.0 singletons/widgetcontrols/TrayMenuController.qm
 singleton WidgetSync 1.0 singletons/widgetcontrols/WidgetSync.qml
 singleton DesktopMenuController singletons/widgetcontrols/DesktopMenuController.qml
 
-CompactNavigation 1.0 guide/CompactNavigation.qml
 WelcomeTab 1.0 guide/WelcomeTab.qml
 
 singleton AppTheming 1.0 singletons/theme/AppTheming.qml

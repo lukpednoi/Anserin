@@ -93,15 +93,6 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
                 "right": { anchor: "bottom-right", mr: 52, mb: 5 } 
             } 
         },
-        "guide": { 
-            w: 880, h: 580, comp: "guide/GuidePopup.qml", draggable: true,
-            pos: { 
-                "top": { anchor: "center" }, 
-                "bottom": { anchor: "center" }, 
-                "left": { anchor: "center" }, 
-                "right": { anchor: "center" } 
-            } 
-        },
         "calendar": { 
             w: 1360, h: 510, comp: "calendar/CalendarPopup.qml", 
             pos: { 
