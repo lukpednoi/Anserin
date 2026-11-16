@@ -9,10 +9,6 @@
   </tr>
 </table>
 
-# Anserin
-
-A desktop shell for Hyprland, built with Quickshell. Forked from [Serpantinum](https://github.com/ilyamiro/serpantinum).
-
 ## What it runs on
 
 **Hyprland 0.56 or newer only, for now.**
