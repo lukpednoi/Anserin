@@ -4,11 +4,10 @@ import "../../"
 import "../../guide/GuideTabs.js" as GuideTabs
 import "../../reusables"
 
-// The Control Center's Control tab, "Board" layout (controlcenter.layout; "classic" keeps ControlSettings.qml).
+// The Control Center's Control tab.
 // Across the top a dial of the Settings categories (wheel, drag or click; the one in the middle is chosen), the
 // category's sub-pages as chips under it, and the page below, scrolling on its own. Pages ported to the board
-// (pages/) draw their options as cards of cells; every other page is the real Settings page, hosted as the classic
-// Control tab hosts it, so nothing is ever missing. Categories come from guide/GuideTabs.js.
+// (pages/) draw their options as cards of cells; every other page (Wellbeing, Update) is its Settings page. Categories come from guide/GuideTabs.js.
 Item {
     id: root
     property bool active: true
@@ -78,7 +77,7 @@ Item {
         if (dial.currentIndex !== c) dial.currentIndex = c;
     }
 
-    // What the Settings pages expect from the Settings window they live in (as in ControlSettings.qml).
+    // What the Settings pages expect from the window they live in.
     Item {
         id: shim
         visible: root.active

@@ -900,13 +900,12 @@ Item {
                     visible: root.page === "control"
                     opacity: root.pageFade
 
-                    // Settings live only while the Control tab is open. controlcenter.layout: "board" (the dial and
-                    // board cards, board/) or "classic" (category chips over the Settings pages, ControlSettings.qml)
+                    // Settings live only while the Control tab is open: the dial and board cards (board/)
                     Loader {
                         id: controlLoader
                         anchors.fill: parent
                         active: root.visible && root.page === "control"
-                        sourceComponent: Config.getSetting("controlcenter.layout", "board") === "classic" ? classicControl : boardControl
+                        sourceComponent: boardControl
                         function showRequested() {
                             if (!item || root.requestedSettings === "") return;
                             item.gotoKey(root.requestedSettings);
@@ -914,13 +913,6 @@ Item {
                         }
                         onLoaded: showRequested()
                         Connections { target: root; function onRequestedSettingsChanged() { controlLoader.showRequested(); } }
-                    }
-                    Component {
-                        id: classicControl
-                        ControlSettings {
-                            active: root.visible && root.page === "control"
-                            onCloseRequested: closeSequence.start()
-                        }
                     }
                     Component {
                         id: boardControl
