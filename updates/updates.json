@@ -1,6 +1,24 @@
 {
   "versions": [
     {
+      "version": "0.0.4",
+      "date": "2026-11-16",
+      "posts": [
+        {
+          "id": "old-bar-popups-gone",
+          "tag": "removed",
+          "title": "The old Bar popups and desktop menu are gone",
+          "details": "The Volume popup, the classic Calendar and the Calendar Dashboard could only be opened from the old Bar, so they are removed. Volume, music and network live in Control Center and the left panel.\n\nRight-clicking the desktop no longer has a hidden old menu behind it. Right-clicking a widget still opens its menu, and the desktop's actions are in the corner revolver."
+        },
+        {
+          "id": "classic-control-gone",
+          "tag": "removed",
+          "title": "Control has one layout now",
+          "details": "Control Center → Control always uses the dial and cards. The older \"classic\" layout, and the Settings pages only it used, are removed. It could only be turned on by editing the settings file by hand."
+        }
+      ]
+    },
+    {
       "version": "0.0.3",
       "date": "2026-11-16",
       "posts": [
@@ -32,7 +50,6 @@
           "id": "update-page",
           "tag": "feature",
           "title": "See what's new in Update",
-          "image": "docs/updates/0.0.2-update-page.jpg",
           "details": "Control Center → Update now lists every release: Latest, All, and Not installed.\n\nWhen a new version is out, Anserin tells you once and can update itself with one click. It checks GitHub a minute after you log in and then every 6 hours.\n\nSome new features will arrive turned off. Open one and press Turn on to try it, and Turn off to go back.",
           "resources": {
             "ram": "~10 MB",
