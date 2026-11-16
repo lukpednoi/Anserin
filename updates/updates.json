@@ -1,6 +1,30 @@
 {
   "versions": [
     {
+      "version": "0.0.3",
+      "date": "2026-11-16",
+      "posts": [
+        {
+          "id": "update-tabs-centred",
+          "tag": "improved",
+          "title": "Update's tabs sit in the middle",
+          "image": "docs/updates/0.0.3-update-tabs.jpg",
+          "details": "Before: the Latest, All and Not installed buttons sat on the left, and the version and date were on a separate line under them.\n\nNow: the buttons are in the middle, with the version on their left and the date on their right, all on one line."
+        },
+        {
+          "id": "no-false-update-alert",
+          "tag": "fixbug",
+          "title": "No more alerts for the version you already have",
+          "details": "Anserin could tell you a version was out when you already had it. Fixed.",
+          "report": {
+            "where": "Right after logging in or restarting Anserin",
+            "wrong": "The update alert sometimes named the version you already had",
+            "changed": "Anserin now waits until it knows which version you have before it compares"
+          }
+        }
+      ]
+    },
+    {
       "version": "0.0.2",
       "date": "2026-11-16",
       "posts": [
