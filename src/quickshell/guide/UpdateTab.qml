@@ -5,7 +5,8 @@ import "../"
 import "../reusables"
 import "../pet"
 
-// Settings / Control → Update: Anserin's update posts (Updates.qml). Three tabs:
+// Settings / Control → Update: Anserin's update posts (Updates.qml). Three tabs, centred (Latest shows its version
+// on the left of them and its date on the right):
 //   Latest — the newest version's posts. All — every version (a row of versions, then that version's posts).
 //   Not installed — versions newer than this copy, the same way, with Update (anserin -up); empty, the duck dives.
 // A card is the post's title with its tag below on the left, and on the right ✓ / ✕ when it has a switch.
@@ -88,9 +89,24 @@ Item {
                     Behavior on x { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
                     Behavior on width { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
                 }
+                // Latest: its version on the left and its date on the right, the tabs in the middle
+                Text {
+                    visible: page.tab === 0 && page.current !== null
+                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                    text: page.current ? "v" + page.current.version : ""
+                    font.family: ThemeBackend.fontFamily; font.pixelSize: page.s(12); font.bold: true
+                    color: ThemeBackend.subtext0
+                }
+                Text {
+                    visible: page.tab === 0 && page.current !== null && page.current.date !== undefined
+                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    text: page.current ? page.dateText(page.current.date) : ""
+                    font.family: ThemeBackend.fontFamily; font.pixelSize: page.s(12); font.bold: true
+                    color: ThemeBackend.subtext0
+                }
                 Row {
                     id: tabRow
-                    x: page.s(3); anchors.verticalCenter: parent.verticalCenter
+                    x: (parent.width - width) / 2; anchors.verticalCenter: parent.verticalCenter
                     height: page.s(26)
                     Repeater {
                         id: tabRep
@@ -125,13 +141,7 @@ Item {
                 }
             }
 
-            // Latest: which version; All / Not installed: the row of versions (Update beside it when not installed)
-            Text {
-                visible: page.tab === 0 && page.current !== null
-                text: page.meta(page.current)
-                font.family: ThemeBackend.fontFamily; font.pixelSize: page.s(12); font.bold: true
-                color: ThemeBackend.subtext0
-            }
+            // All / Not installed: the row of versions (Update beside it when not installed)
             Item {
                 visible: page.tab !== 0 && page.tabVersions.length > 0
                 width: parent.width; height: page.s(28)
