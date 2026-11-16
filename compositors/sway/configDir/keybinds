@@ -1,0 +1,76 @@
+bindsym $mod+Return exec $terminal
+bindsym $mod+F exec firefox
+bindsym $mod+E exec nautilus
+bindsym $mod+BackSpace scratchpad show
+bindsym $mod+Q kill
+bindsym $mod+Shift+F floating toggle
+
+bindsym XF86MonBrightnessDown exec anserin brightness lower
+bindsym XF86MonBrightnessUp exec anserin brightness raise
+
+bindsym Print exec anserin screenshot
+bindsym Shift+Print exec anserin screenshot --edit
+bindsym $mod+Print exec anserin screenshot --full
+bindsym $mod+Shift+Print exec anserin screenshot --full --edit
+
+bindsym XF86PowerOff exec anserin lock
+bindsym $mod+L exec anserin lock
+
+bindsym $mod+space exec playerctl play-pause
+bindsym XF86AudioPause exec playerctl play-pause
+bindsym XF86AudioPlay exec playerctl play-pause
+bindsym XF86AudioPrev exec playerctl previous
+bindsym XF86AudioNext exec playerctl next
+bindsym XF86AudioMicMute exec anserin volume mic-toggle
+bindsym XF86AudioMute exec anserin volume mute-toggle
+bindsym XF86AudioLowerVolume exec anserin volume lower
+bindsym XF86AudioRaiseVolume exec anserin volume raise
+
+bindsym $mod+R exec anserin reload
+bindsym $mod+C exec anserin msg toggle clipboard
+bindsym $mod+D exec anserin msg toggle launcher
+bindsym $mod+M exec anserin msg toggle music
+bindsym $mod+B exec anserin msg toggle system
+bindsym $mod+W exec anserin msg toggle wallpaper
+bindsym $mod+S exec anserin msg toggle calendar
+bindsym $mod+N exec anserin msg toggle network
+bindsym $mod+V exec anserin msg toggle volume
+bindsym $mod+H exec anserin msg toggle guide
+bindsym $mod+A exec anserin msg toggle autohide
+
+bindsym $mod+Left focus left
+bindsym $mod+Right focus right
+bindsym $mod+Up workspace prev
+bindsym $mod+Down workspace next
+
+bindsym $mod+Ctrl+Left move left
+bindsym $mod+Ctrl+Right move right
+bindsym $mod+Ctrl+Up move container to workspace prev; workspace prev
+bindsym $mod+Ctrl+Down move container to workspace next; workspace next
+
+bindsym $mod+Shift+Left resize shrink width 5 ppt
+bindsym $mod+Shift+Right resize grow width 5 ppt
+bindsym $mod+Shift+Up resize shrink height 5 ppt
+bindsym $mod+Shift+Down resize grow height 5 ppt
+
+bindsym $mod+1 exec anserin msg workspace 1
+bindsym $mod+2 exec anserin msg workspace 2
+bindsym $mod+3 exec anserin msg workspace 3
+bindsym $mod+4 exec anserin msg workspace 4
+bindsym $mod+5 exec anserin msg workspace 5
+bindsym $mod+6 exec anserin msg workspace 6
+bindsym $mod+7 exec anserin msg workspace 7
+bindsym $mod+8 exec anserin msg workspace 8
+bindsym $mod+9 exec anserin msg workspace 9
+bindsym $mod+0 exec anserin msg workspace 10
+
+bindsym $mod+Shift+1 exec anserin msg workspace 1 move
+bindsym $mod+Shift+2 exec anserin msg workspace 2 move
+bindsym $mod+Shift+3 exec anserin msg workspace 3 move
+bindsym $mod+Shift+4 exec anserin msg workspace 4 move
+bindsym $mod+Shift+5 exec anserin msg workspace 5 move
+bindsym $mod+Shift+6 exec anserin msg workspace 6 move
+bindsym $mod+Shift+7 exec anserin msg workspace 7 move
+bindsym $mod+Shift+8 exec anserin msg workspace 8 move
+bindsym $mod+Shift+9 exec anserin msg workspace 9 move
+bindsym $mod+Shift+0 exec anserin msg workspace 10 move

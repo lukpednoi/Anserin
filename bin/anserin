@@ -1,0 +1,303 @@
+#!/usr/bin/env bash
+
+if [[ $# == 0 ]]; then
+    printf 'Usage: anserin -start | -end | -up | -ver\n' >&2
+    exit 2
+fi
+case "$1" in
+    -up)
+        [[ $# == 1 ]] || { printf 'Usage: anserin -start | -end | -up | -ver\n' >&2; exit 2; }
+        exec bash "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../install/update.sh"
+        ;;
+    -start|-end|-ver)
+        if [[ $# != 1 ]]; then
+            printf 'Usage: anserin -start | -end | -up | -ver\n' >&2
+            exit 2
+        fi
+        case "$1" in
+            -start) set -- swap-in ;;
+            -end) set -- swap-out ;;
+            -ver) set -- --version ;;
+        esac
+        ;;
+esac
+
+BIN_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+case "${1:-}" in
+    -V|--version)
+        printf '%s v%s\n' "Anserin" "$(cat "$BIN_DIR/../version.txt")"
+        exit 0
+        ;;
+esac
+export ANSERIN_DIR="$(dirname "$BIN_DIR")/src"
+export PATH="$BIN_DIR:$PATH"
+
+case "${1:-}" in
+    swap-in|swap-out|login)
+        exec python3 "$BIN_DIR/../scripts/swap-shell.py" "$1"
+        ;;
+esac
+
+source "$ANSERIN_DIR/scripts/caching.sh"
+source "$ANSERIN_DIR/scripts/config.sh"
+source "$ANSERIN_DIR/scripts/i18n.sh"
+
+if [ -z "$MAIN_QML" ]; then
+    export MAIN_QML="$(find "$ANSERIN_DIR/quickshell" -type f \( -name "Shell.qml" -o -name "Bar.qml" \) 2>/dev/null | head -n 1)"
+fi
+
+get_installed_version() {
+    cat "$BIN_DIR/../version.txt"
+}
+
+current_lang_setting="$(get_setting "general" '{}' | jq -r '.language // empty')"
+if [ -z "$current_lang_setting" ]; then
+    env_lang="${LANGUAGE:-${LANG:-en}}"
+    env_lang_short="${env_lang:0:2}"
+    current_general="$(get_setting "general" '{}')"
+    new_general="$(printf '%s' "$current_general" | jq -c --arg lang "$env_lang_short" '. + {language: $lang}')"
+    set_setting "general" "$new_general"
+fi
+
+show_help() {
+    echo "$(t "cli.usage")"
+    echo ""
+    echo "$(t "cli.description")"
+    echo ""
+    echo "$(t "cli.commands")"
+    echo "  launch <target> [args...]   $(t "cli.launch_desc")"
+    echo "  msg <action|workspace> ...  $(t "cli.msg_desc")"
+    echo "  ipc ...                      $(t "cli.ipc_desc")"
+    echo "  kill                         $(t "cli.kill_desc")"
+    echo "  -start / -end                Start / stop Anserin in Hyprland"
+    echo "  -up                          Update Anserin from GitHub"
+    echo ""
+    echo "$(t "cli.script_commands")"
+    echo "  exit                         $(t "cli.scripts.exit")"
+    echo "  lock                         $(t "cli.scripts.lock")"
+    echo "  volume                       $(t "cli.scripts.volume")"
+    echo "  reload                       $(t "cli.scripts.reload")"
+    echo "  weather                      $(t "cli.scripts.weather")"
+    echo "  location                     $(t "cli.scripts.location")"
+    echo "  screenshot                   $(t "cli.scripts.screenshot")"
+    echo "  brightness                   $(t "cli.scripts.brightness")"
+    echo "  current_focus                $(t "cli.scripts.current_focus")"
+    echo "  monitors_detect              $(t "cli.scripts.monitors_detect")"
+    echo "  location_manual              $(t "cli.scripts.location_manual")"
+    echo "  blue_light_filter            $(t "cli.scripts.blue_light_filter")"
+    echo ""
+    echo "$(t "cli.options")"
+    echo "  -v, --verbose                $(t "cli.verbose_desc")"
+    echo "  -V, --version                $(t "cli.version_desc")"
+    echo "  -h, --help                   $(t "cli.help_desc")"
+    echo ""
+    echo "$(t "cli.examples")"
+    echo "  anserin launch widgetredactor"
+    echo "  anserin msg workspace 1"
+    echo "  anserin msg workspace 2 move"
+    echo "  anserin msg open network wifi"
+    echo "  anserin msg toggle launcher"
+    echo "  anserin msg toggle clipboard"
+    echo "  anserin weather --current-temp"
+    echo "  anserin kill"
+    echo ""
+}
+
+show_launch_help() {
+    echo "$(t "cli.launch_help.usage")"
+    echo ""
+    echo "$(t "cli.launch_help.description")"
+    echo ""
+    echo "$(t "cli.launch_help.available_targets")"
+    echo "  widgetredactor  $(t "cli.launch_help.target_widgetredactor")"
+    echo ""
+    echo "$(t "cli.options")"
+    echo "  -h, --help      $(t "cli.help_desc")"
+    echo ""
+}
+
+show_msg_help() {
+    echo "$(t "cli.msg_help.usage")"
+    echo ""
+    echo "$(t "cli.msg_help.description")"
+    echo ""
+    echo "$(t "cli.msg_help.available_commands")"
+    echo "  workspace <num> [move]   $(t "cli.msg_help.cmd_workspace")"
+    echo "  open <target> [sub]      $(t "cli.msg_help.cmd_open")"
+    echo "  toggle <target> [sub]    $(t "cli.msg_help.cmd_toggle")"
+    echo "  close                    $(t "cli.msg_help.cmd_close")"
+    echo ""
+    echo "$(t "cli.options")"
+    echo "  -h, --help               $(t "cli.help_desc")"
+    echo ""
+}
+
+show_ipc_help() {
+    echo "$(t "cli.ipc_help.usage")"
+    echo ""
+    echo "$(t "cli.ipc_help.description")"
+    echo ""
+    echo "$(t "cli.options")"
+    echo "  -h, --help               $(t "cli.help_desc")"
+    echo ""
+}
+
+ensure_daemon() {
+    if ! mo_pid_valid "$QS_RUN_DIR/anserind.pid"; then
+        "$BIN_DIR/anserind" start > /dev/null 2>&1 &
+        local count=0
+        while [ "$count" -lt 15 ]; do
+            mo_pid_valid "$QS_RUN_DIR/anserind.pid" && return 0
+            sleep 0.1
+            ((count++))
+        done
+        echo "anserind did not start" >&2
+        exit 1
+    fi
+}
+
+VERBOSE=false
+
+while [[ "$1" == -* ]]; do
+    case "$1" in
+        -v|--verbose)
+            VERBOSE=true
+            export ANSERIN_VERBOSE=true
+            shift
+            ;;
+        -V|--version)
+            echo "Anserin v$(get_installed_version)"
+            exit 0
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            printf 'Unknown option: %s\n' "$1" >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [ $# -eq 0 ]; then
+    show_help
+    exit 0
+fi
+
+if [[ "$1" == "kill" ]]; then
+    exec "$BIN_DIR/anserind" stop
+fi
+
+if [[ "$1" == "launch" ]]; then
+    if [[ "$2" == "-h" || "$2" == "--help" ]]; then
+        show_launch_help
+        exit 0
+    fi
+    if [ -z "$2" ]; then
+        echo "$(t "cli.error_missing_qml")"
+        echo "$(t "cli.launch_usage")"
+        exit 1
+    fi
+
+    TARGET="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')"
+    case "$TARGET" in
+        widgetredactor)
+            QML_NAME="WidgetRedactor"
+            ;;
+        *)
+            echo "$(t "cli.error_unknown_target" TARGET="$2")"
+            show_launch_help
+            exit 1
+            ;;
+    esac
+
+    shift 2
+    export ANSERIN_LAUNCH_ARGS="$*"
+
+    QML_FILE=$(find "$ANSERIN_DIR/quickshell" -type f -name "${QML_NAME}.qml" 2>/dev/null | head -n 1)
+
+    if [ -n "$QML_FILE" ]; then
+        ensure_daemon
+        export ANSERIN_TARGET_FILE="$QML_FILE"
+        exec quickshell -p "$ANSERIN_DIR/quickshell/Runner.qml"
+    else
+        echo "$(t "cli.error_qml_not_found" NAME="${QML_NAME}" DIR="$ANSERIN_DIR/quickshell/")"
+        exit 1
+    fi
+fi
+
+if [[ "$1" == "msg" ]]; then
+    if [[ "$2" == "-h" || "$2" == "--help" || -z "$2" ]]; then
+        show_msg_help
+        exit 0
+    fi
+    ensure_daemon
+    shift
+    if [[ "$1" == "workspace" ]]; then
+        shift
+    fi
+    exec "$ANSERIN_DIR/scripts/qs_manager.sh" "$@"
+fi
+
+if [[ "$1" == "ipc" ]]; then
+    if [[ "$2" == "-h" || "$2" == "--help" ]]; then
+        show_ipc_help
+        exit 0
+    fi
+
+    ensure_daemon
+
+    SHELL_QML=$(find "$ANSERIN_DIR/quickshell" -type f -name "Shell.qml" 2>/dev/null | head -n 1)
+
+    if [ -z "$SHELL_QML" ] && [ -n "$MAIN_QML" ]; then
+        SHELL_QML="$MAIN_QML"
+    fi
+
+    if [ -z "$SHELL_QML" ]; then
+        echo "$(t "cli.error_shell_qml_not_found" DIR="$ANSERIN_DIR/quickshell/")"
+        exit 1
+    fi
+
+    shift
+    exec quickshell -p "$SHELL_QML" ipc "$@"
+fi
+
+ALLOWED_SCRIPTS=(
+    "exit"
+    "lock"
+    "volume"
+    "reload"
+    "weather"
+    "location"
+    "screenshot"
+    "brightness"
+    "current_focus"
+    "monitors_detect"
+    "location_manual"
+    "blue_light_filter"
+)
+
+COMMAND="$1"
+IS_ALLOWED=false
+for s in "${ALLOWED_SCRIPTS[@]}"; do
+    if [[ "$COMMAND" == "$s" ]]; then
+        IS_ALLOWED=true
+        break
+    fi
+done
+
+SCRIPT_PATH="$ANSERIN_DIR/scripts/${COMMAND}.sh"
+
+if [ "$IS_ALLOWED" = true ] && [ -f "$SCRIPT_PATH" ]; then
+    shift
+    if [ "$VERBOSE" = true ]; then
+        exec "$SCRIPT_PATH" --verbose "$@"
+    else
+        exec "$SCRIPT_PATH" "$@"
+    fi
+else
+    echo "$(t "cli.error_unknown_command" CMD="$COMMAND")"
+    show_help
+    exit 1
+fi

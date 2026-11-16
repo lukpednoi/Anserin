@@ -1,0 +1,9 @@
+SavePresetPopup 1.0 SavePresetPopup.qml
+DisplayWidgetsTab 1.0 DisplayWidgetsTab.qml
+
+DisplayPresetsTab 1.0 DisplayPresetsTab.qml
+PresetCard 1.0 PresetCard.qml
+DisplayLogic 1.0 DisplayLogic.qml
+PresetSaver 1.0 PresetSaver.qml
+WidgetsLogic 1.0 WidgetsLogic.qml
+WidgetPresetGrid 1.0 WidgetPresetGrid.qml

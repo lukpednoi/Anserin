@@ -1,0 +1,15 @@
+/.private/
+/.lab-data/
+/_to_delete/
+settings.json
+!/config/anserin/settings.json
+seeds/
+seed*.json
+wallpapers/
+avatars/
+__pycache__/
+*.pyc
+/src/quickshell/native/video/libanserinvideo.so
+
+/src/quickshell/native/audio/anserin-audio
+/src/quickshell/native/audio/*.bin

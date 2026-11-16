@@ -1,0 +1,43 @@
+{
+  "name": "Emacs",
+  "category": "editors",
+  "icon": "",
+  "hint": "emacs",
+  "detect": {
+    "bin": [
+      "emacs"
+    ]
+  },
+  "templates": [
+    {
+      "input": "anserin-theme.el",
+      "output": "$XDG_CONFIG_HOME/emacs/anserin-theme.el",
+      "when": {
+        "path": [
+          "$XDG_CONFIG_HOME/emacs"
+        ]
+      }
+    },
+    {
+      "input": "anserin-theme.el",
+      "output": "$HOME/.emacs.d/anserin-theme.el",
+      "when": {
+        "path": [
+          "$HOME/.emacs.d"
+        ]
+      }
+    },
+    {
+      "input": "anserin-theme.el",
+      "output": "$XDG_CONFIG_HOME/doom/themes/anserin-theme.el",
+      "when": {
+        "path": [
+          "$XDG_CONFIG_HOME/doom"
+        ]
+      }
+    }
+  ],
+  "reload": [
+    "command -v emacsclient >/dev/null 2>&1 && timeout 3 emacsclient -e \"(when (custom-theme-enabled-p 'anserin) (load-theme 'anserin t))\" >/dev/null 2>&1; true"
+  ]
+}

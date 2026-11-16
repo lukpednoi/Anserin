@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 400 300">
+  <!-- White Call duck, three-quarter view (turned toward the viewer, facing right). Same look as duck-design.svg:
+       only paths, linear/radial gradients and opacity, so it can be redrawn with Qt Shapes later. -->
+  <defs>
+    <radialGradient id="plumage" cx="236" cy="150" r="178" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#f6f4ee"/>
+      <stop offset="0.82" stop-color="#e2e3e4"/>
+      <stop offset="1" stop-color="#c6c9d0"/>
+    </radialGradient>
+    <radialGradient id="headLight" cx="262" cy="80" r="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="0.7" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="breastLight" cx="272" cy="192" r="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rearShade" x1="108" y1="0" x2="156" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b3b9c3" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#b3b9c3" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="belly" x1="0" y1="206" x2="0" y2="260" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b9bfc9" stop-opacity="0"/>
+      <stop offset="1" stop-color="#b9bfc9" stop-opacity="0.85"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="0" y1="150" x2="0" y2="202" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fdfcf9"/>
+      <stop offset="1" stop-color="#dfe2e7"/>
+    </linearGradient>
+    <linearGradient id="primaries" x1="108" y1="0" x2="196" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cdd2da"/>
+      <stop offset="1" stop-color="#f3f2ee"/>
+    </linearGradient>
+    <linearGradient id="billTop" x1="0" y1="100" x2="0" y2="134" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffc35e"/>
+      <stop offset="1" stop-color="#ec8f2c"/>
+    </linearGradient>
+    <linearGradient id="leg" x1="0" y1="246" x2="0" y2="280" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f6a23a"/>
+      <stop offset="1" stop-color="#e07b22"/>
+    </linearGradient>
+    <radialGradient id="eye" cx="268" cy="90" r="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#34405a"/>
+      <stop offset="0.6" stop-color="#151a24"/>
+      <stop offset="1" stop-color="#07090d"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ground shadow: wider, since we now look a little from the front -->
+  <ellipse cx="194" cy="276" rx="106" ry="12" fill="#000" opacity="0.22"/>
+
+  <!-- far leg and foot, behind the body and a bit darker -->
+  <path d="M 214 246 C 215 252 216 258 216 264" fill="none" stroke="#d27420" stroke-width="6" stroke-linecap="round"/>
+  <path d="M 214 262 C 222 262 232 266 238 271 C 230 275 222 274 216 272 C 210 274 204 272 200 268 C 204 264 209 262 214 262 Z" fill="#d27420"/>
+
+  <!-- tail, smaller and further back -->
+  <path d="M 122 154 C 114 144 108 134 104 122 C 98 136 98 152 106 166 C 116 168 120 162 122 154 Z" fill="url(#plumage)"/>
+  <path d="M 118 154 C 112 146 108 138 106 128 M 112 160 C 106 152 104 144 102 136" fill="none" stroke="#c3c7ce" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- body, neck and head as one silhouette; the breast swells toward us -->
+  <path d="M 112 162
+           C 124 144 152 132 186 132
+           C 204 132 214 134 222 138
+           C 218 124 218 110 222 98
+           C 228 68 250 48 276 48
+           C 302 48 324 66 326 94
+           C 327 108 322 118 314 126
+           C 306 134 300 142 300 152
+           C 314 174 310 214 282 238
+           C 254 260 190 264 152 250
+           C 124 240 108 218 108 196
+           C 108 184 108 172 112 162 Z"
+        fill="url(#plumage)" stroke="#aeb3bb" stroke-width="1.1" stroke-opacity="0.7"/>
+
+  <!-- light on the head and the breast that faces us, shade on the far rear and under the belly -->
+  <path d="M 232 92 C 236 66 254 56 274 58 C 296 60 312 76 310 98 C 300 114 276 118 258 114 C 240 110 230 104 232 92 Z" fill="url(#headLight)"/>
+  <path d="M 226 176 C 236 150 284 150 300 170 C 310 196 298 222 276 234 C 252 244 228 230 222 210 C 220 198 222 186 226 176 Z" fill="url(#breastLight)"/>
+  <path d="M 112 162 C 124 150 148 140 172 136 C 158 170 158 214 172 258 C 164 256 158 253 152 250 C 124 240 108 218 108 196 C 108 184 108 172 112 162 Z" fill="url(#rearShade)"/>
+  <path d="M 124 232 C 156 250 222 256 276 230 C 266 246 250 254 234 258 C 200 264 166 260 152 250 C 140 244 130 238 124 232 Z" fill="url(#belly)"/>
+
+  <!-- chin and throat turning toward us -->
+  <path d="M 312 122 C 304 132 298 140 298 150 C 292 144 286 140 278 138 C 290 136 302 130 312 122 Z" fill="#c4c9d1" opacity="0.5"/>
+  <path d="M 236 146 C 250 154 270 158 296 152" fill="none" stroke="#c9cdd4" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- breast feathers, curving round the front -->
+  <g fill="none" stroke="#cfd3d9" stroke-width="1" stroke-linecap="round" opacity="0.75">
+    <path d="M 276 172 q 6 4 12 0 M 286 188 q 6 4 12 0 M 270 192 q 6 4 12 0 M 284 206 q 6 4 12 0 M 266 210 q 6 4 12 0 M 276 224 q 6 4 12 0"/>
+    <path d="M 250 214 q 6 4 12 0 M 240 228 q 6 4 12 0 M 222 238 q 6 4 12 0 M 202 242 q 6 4 12 0"/>
+  </g>
+
+  <!-- the far wing's edge, just showing over the back -->
+  <path d="M 160 138 C 184 130 208 130 220 138 C 204 138 182 140 166 144 Z" fill="#e6e8ec" opacity="0.9"/>
+
+  <!-- long primaries tucked under the near wing -->
+  <path d="M 196 172 C 166 166 136 160 108 152 C 120 170 146 188 196 190 Z" fill="url(#primaries)" stroke="#bfc4cc" stroke-width="1"/>
+  <path d="M 192 180 C 166 176 138 170 114 160 M 188 186 C 164 182 142 176 120 166" fill="none" stroke="#bfc4cc" stroke-width="0.9"/>
+
+  <!-- near wing, a little shorter as it turns away -->
+  <path d="M 236 166 C 220 152 182 150 156 160 C 144 165 136 170 126 172 C 142 188 166 200 192 202 C 218 202 234 190 236 166 Z"
+        fill="url(#wing)" stroke="#c3c8cf" stroke-width="1.1"/>
+  <g fill="none" stroke="#c6cad1" stroke-width="1.1" stroke-linecap="round">
+    <path d="M 230 172 C 214 164 190 164 168 170"/>
+    <path d="M 224 184 C 206 178 182 178 158 182"/>
+    <path d="M 212 194 C 196 191 174 189 154 186"/>
+  </g>
+  <g fill="none" stroke="#c6cad1" stroke-width="1" opacity="0.8">
+    <path d="M 218 160 q 6 5 12 1 M 206 157 q 6 5 12 1 M 194 156 q 6 5 12 1 M 182 156 q 6 5 12 1"/>
+  </g>
+
+  <!-- far eye, just round the forehead -->
+  <ellipse cx="313" cy="88" rx="3.8" ry="6.6" fill="#ece8df"/>
+  <ellipse cx="313.4" cy="88" rx="2.7" ry="5.4" fill="#10141c"/>
+  <ellipse cx="314" cy="85.6" rx="0.9" ry="1.3" fill="#ffffff" opacity="0.8"/>
+
+  <!-- bill seen from three-quarters: short, pointing toward us, its broad top showing -->
+  <path d="M 292 120 C 302 130 318 138 330 138 C 326 144 306 144 294 132 Z" fill="#d97a22"/>
+  <path d="M 290 108 C 298 100 312 98 320 104 C 328 110 338 116 340 124 C 342 132 334 138 324 137 C 310 136 296 128 290 118 Z"
+        fill="url(#billTop)" stroke="#c46c22" stroke-width="0.9"/>
+  <path d="M 304 106 C 316 110 328 116 336 124" fill="none" stroke="#ffd58c" stroke-width="1.4" stroke-linecap="round" opacity="0.8"/>
+  <path d="M 290 118 C 300 128 314 135 326 137" fill="none" stroke="#a85a1c" stroke-width="1.1" stroke-linecap="round"/>
+  <ellipse cx="308" cy="114" rx="2.8" ry="1.4" fill="#a6591d" transform="rotate(30 308 114)"/>
+  <ellipse cx="320" cy="110" rx="2.2" ry="1.1" fill="#a6591d" opacity="0.7" transform="rotate(30 320 110)"/>
+  <path d="M 333 126 C 339 126 342 131 338 135 C 335 134 333 130 333 126 Z" fill="#f6cf91" opacity="0.9"/>
+  <path d="M 290 106 C 287 112 287 116 291 121" fill="none" stroke="#d9dce1" stroke-width="1.4" stroke-linecap="round"/>
+
+  <!-- near eye: large and dark, a touch narrower as the face turns -->
+  <ellipse cx="268" cy="90" rx="7.8" ry="9" fill="#ece8df"/>
+  <ellipse cx="268.4" cy="90" rx="6.2" ry="7.4" fill="url(#eye)"/>
+  <ellipse cx="271" cy="86.8" rx="2.1" ry="2.3" fill="#ffffff"/>
+  <ellipse cx="266" cy="93.4" rx="0.9" ry="0.9" fill="#ffffff" opacity="0.6"/>
+
+  <!-- near leg and foot, toes pointing toward us -->
+  <path d="M 180 250 C 180 256 179 262 178 268" fill="none" stroke="url(#leg)" stroke-width="7" stroke-linecap="round"/>
+  <path d="M 176 266 C 186 266 198 270 206 276 C 198 281 188 280 180 279 C 172 280 162 278 156 274 C 160 269 168 266 176 266 Z" fill="#f08f2c"/>
+  <path d="M 178 268 L 204 276 M 178 268 L 182 279 M 178 268 L 158 274" fill="none" stroke="#c96a1e" stroke-width="1" stroke-linecap="round" opacity="0.8"/>
+</svg>

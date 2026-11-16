@@ -1,0 +1,6 @@
+IdleLogic 1.0 IdleLogic.qml
+OsdLogic 1.0 OsdLogic.qml
+OsdPositionPicker 1.0 OsdPositionPicker.qml
+ScreenshotDirLogic 1.0 ScreenshotDirLogic.qml
+WeatherAlertsLogic 1.0 WeatherAlertsLogic.qml
+OcrLanguagesLogic 1.0 OcrLanguagesLogic.qml

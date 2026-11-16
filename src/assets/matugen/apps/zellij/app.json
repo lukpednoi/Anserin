@@ -1,0 +1,26 @@
+{
+  "name": "Zellij",
+  "category": "tools",
+  "icon": "",
+  "detect": {
+    "bin": [
+      "zellij"
+    ]
+  },
+  "templates": [
+    {
+      "input": "anserin.kdl",
+      "output": "$XDG_CONFIG_HOME/zellij/themes/anserin.kdl"
+    }
+  ],
+  "integrate": [
+    {
+      "type": "line",
+      "file": "$XDG_CONFIG_HOME/zellij/config.kdl",
+      "line": "theme \"anserin\"",
+      "comment": "//",
+      "disable": "^theme\\s+\"",
+      "create": true
+    }
+  ]
+}

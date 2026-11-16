@@ -1,0 +1,4 @@
+Source: https://github.com/ilyamiro/serpantinum-audio
+Revision: cf81973482c0f1cb7ef144b17afb3714d2c4f96d (0.4.0)
+License: AGPL-3.0, see LICENSE.
+Local changes: Anserin paths and node names; runtime-owned PID/lock; build output stays in this repository.

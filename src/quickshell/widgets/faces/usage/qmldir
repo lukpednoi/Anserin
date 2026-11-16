@@ -1,0 +1,9 @@
+CpuFaceCircle 1.0 CpuFaceCircle.qml
+CpuFace 1.0 CpuFace.qml
+DiskFaceCircle 1.0 DiskFaceCircle.qml
+DiskFace 1.0 DiskFace.qml
+RamFaceCircle 1.0 RamFaceCircle.qml
+RamFace 1.0 RamFace.qml
+TempFaceCircle 1.0 TempFaceCircle.qml
+TempFace 1.0 TempFace.qml
+UsageFaceCircleBase 1.0 UsageFaceCircleBase.qml

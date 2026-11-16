@@ -1,0 +1,7 @@
+PadlockTransition 1.0 PadlockTransition.qml
+LockScreen 1.0 LockScreen.qml
+LockBackdrop 1.0 LockBackdrop.qml
+LockClock 1.0 LockClock.qml
+LockDashboard 1.0 LockDashboard.qml
+LockPowerControls 1.0 LockPowerControls.qml
+PortalTransition 1.0 PortalTransition.qml

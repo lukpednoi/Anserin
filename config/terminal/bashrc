@@ -1,0 +1,16 @@
+# Keep the user's aliases, history and existing shell hooks.
+[[ -f "$HOME/.bashrc" ]] && source "$HOME/.bashrc"
+source "$(dirname "${BASH_SOURCE[0]}")/prompt.bash"
+
+fastfetch() {
+    python3 "${BASH_SOURCE[0]%/*}/../../src/scripts/fastfetch.py" "$@"
+}
+# A CLI toy terminal (inf desktop's right-drag box) runs its program once, then stays an ordinary shell.
+if [[ $- == *i* && -n ${ANSERIN_CLI_TOY:-} ]]; then
+    _mo_toy=$ANSERIN_CLI_TOY
+    unset ANSERIN_CLI_TOY
+    eval "$_mo_toy"
+    unset _mo_toy
+elif [[ $- == *i* ]] && type -P fastfetch >/dev/null; then
+    python3 "${BASH_SOURCE[0]%/*}/../../src/scripts/fastfetch.py" --auto
+fi

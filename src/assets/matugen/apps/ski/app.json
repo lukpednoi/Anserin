@@ -1,0 +1,35 @@
+{
+  "name": "Ski",
+  "category": "apps",
+  "icon": "󰉋",
+  "detect": {
+    "bin": [
+      "ski"
+    ]
+  },
+  "templates": [
+    {
+      "input": "anserin-dark.json",
+      "output": "$XDG_STATE_HOME/ski/themes/anserin-dark.json"
+    },
+    {
+      "input": "anserin-light.json",
+      "output": "$XDG_STATE_HOME/ski/themes/anserin-light.json"
+    }
+  ],
+  "integrate": [
+    {
+      "type": "json",
+      "file": "$XDG_CONFIG_HOME/ski/settings.json",
+      "values_by_mode": {
+        "dark": {
+          "theme": "custom:anserin-dark"
+        },
+        "light": {
+          "theme": "custom:anserin-light"
+        }
+      },
+      "create": true
+    }
+  ]
+}

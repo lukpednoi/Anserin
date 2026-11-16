@@ -1,0 +1,29 @@
+{
+  "name": "Btop",
+  "category": "tools",
+  "icon": "󰄪",
+  "detect": {
+    "bin": [
+      "btop"
+    ]
+  },
+  "templates": [
+    {
+      "input": "anserin.theme",
+      "output": "$XDG_CONFIG_HOME/btop/themes/anserin.theme"
+    }
+  ],
+  "integrate": [
+    {
+      "type": "ini",
+      "file": "$XDG_CONFIG_HOME/btop/btop.conf",
+      "sep": " = ",
+      "values": {
+        "": {
+          "color_theme": "\"anserin\""
+        }
+      },
+      "create": true
+    }
+  ]
+}

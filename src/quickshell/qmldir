@@ -1,0 +1,100 @@
+Dock 1.0 dock/Dock.qml
+Dim 1.0 Dim.qml
+Main 1.0 Main.qml
+GuidePopup 1.0 guide/GuidePopup.qml
+RecordTonearm 1.0 media/RecordTonearm.qml
+ThemeLayoutPreview 1.0 guide/theme/ThemeLayoutPreview.qml
+OrbitSignals 1.0 guide/theme/OrbitSignals.qml
+OrbitBackdrop 1.0 guide/theme/OrbitBackdrop.qml
+WallpaperGrid 1.0 wallpaper/WallpaperGrid.qml
+DistroLogo 1.0 guide/DistroLogo.qml
+
+Bar 1.0 bar/Bar.qml
+ScreenBorder 1.0 ScreenBorder.qml
+PanCursor 1.0 PanCursor.qml
+singleton ScreenEdges 1.0 singletons/theme/ScreenEdges.qml
+Floating 1.0 quickactions/Floating.qml
+Clipboard 1.0 clipboard/Clipboard.qml
+Launcher 1.0 launcher/Launcher.qml
+LauncherContent 1.0 launcher/LauncherContent.qml
+ScreenshotOverlay 1.0 screenshot/ScreenshotOverlay.qml
+WallpaperEngine 1.0 wallpaper/WallpaperEngine.qml
+Idle 1.0 idle/Idle.qml
+Lock 1.0 lock/Lock.qml
+
+
+Osd 1.0 popouts/Osd.qml
+PopoutManager 1.0 popouts/PopoutManager.qml
+SideMusicPopout 1.0 popouts/SideMusicPopout.qml
+TrayBase 1.0 popouts/TrayBase.qml
+DesktopMenu 1.0 popouts/DesktopMenu.qml
+
+WidgetLoader 1.0 widgets/WidgetLoader.qml
+WidgetRedactor 1.0 widgets/WidgetRedactor.qml
+
+Polkit 1.0 polkit/Polkit.qml
+singleton PolkitService 1.0 polkit/PolkitService.qml
+singleton NotificationManager 1.0 notifications/NotificationManager.qml
+
+singleton AudioProcessor 1.0 singletons/audio/AudioProcessor.qml
+singleton Audio 1.0 singletons/audio/Audio.qml
+singleton Cava 1.0 singletons/audio/Cava.qml
+singleton MprisController 1.0 singletons/audio/MprisController.qml
+singleton Sounds 1.0 singletons/audio/Sounds.qml
+singleton FileManager 1.0 singletons/system/FileManager.qml
+singleton CoreTools 1.0 singletons/system/CoreTools.qml
+singleton SurfaceField 1.0 singletons/system/SurfaceField.qml
+singleton Lyrics 1.0 singletons/audio/Lyrics.qml
+
+singleton Matugen 1.0 singletons/theme/Matugen.qml
+singleton Scaler 1.0 singletons/theme/Scaler.qml
+singleton ThemeBackend 1.0 singletons/theme/ThemeBackend.qml
+singleton Wallpaper 1.0 singletons/theme/Wallpaper.qml
+
+singleton Caffeine 1.0 singletons/environment/Caffeine.qml
+singleton BlueLight 1.0 singletons/environment/BlueLight.qml
+singleton Location 1.0 singletons/environment/Location.qml
+singleton Weather 1.0 singletons/environment/Weather.qml
+
+singleton Caching 1.0 singletons/system/Caching.qml
+singleton Config 1.0 singletons/system/Config.qml
+singleton AnserinMode 1.0 singletons/system/AnserinMode.qml
+singleton ConfigProfiles 1.0 singletons/system/ConfigProfiles.qml
+singleton TerminalAppearance 1.0 singletons/system/TerminalAppearance.qml
+singleton CurrentFocus 1.0 singletons/system/CurrentFocus.qml
+singleton DateTime 1.0 singletons/system/DateTime.qml
+singleton FirstLaunch 1.0 singletons/system/FirstLaunch.qml
+singleton I18n 1.0 singletons/system/I18n.qml
+singleton NiriState 1.0 singletons/system/NiriState.qml
+singleton SysNotif 1.0 singletons/system/SysNotif.qml
+singleton TimerState 1.0 singletons/system/TimerState.qml
+singleton PanelLayout 1.0 blankpanel/PanelLayout.qml
+PanelEditor 1.0 blankpanel/PanelEditor.qml
+WorkspaceCapsule 1.0 blankpanel/WorkspaceCapsule.qml
+
+singleton SysData 1.0 singletons/info/SysData.qml
+singleton SystemInfo 1.0 singletons/info/SystemInfo.qml
+
+singleton ClipboardController 1.0 singletons/widgetcontrols/ClipboardController.qml
+singleton FloatingController 1.0 singletons/widgetcontrols/FloatingController.qml
+singleton LauncherController 1.0 singletons/widgetcontrols/LauncherController.qml
+singleton OsdController 1.0 singletons/widgetcontrols/OsdController.qml
+singleton SideMusicController 1.0 singletons/widgetcontrols/SideMusicController.qml
+singleton TrayMenuController 1.0 singletons/widgetcontrols/TrayMenuController.qml
+singleton WidgetSync 1.0 singletons/widgetcontrols/WidgetSync.qml
+singleton DesktopMenuController singletons/widgetcontrols/DesktopMenuController.qml
+
+CompactNavigation 1.0 guide/CompactNavigation.qml
+WelcomeTab 1.0 guide/WelcomeTab.qml
+
+singleton AppTheming 1.0 singletons/theme/AppTheming.qml
+singleton SddmTheming 1.0 singletons/theme/SddmTheming.qml
+singleton WeatherAlerts 1.0 singletons/environment/WeatherAlerts.qml
+singleton GovAlerts 1.0 singletons/environment/GovAlerts.qml
+
+singleton PetState 1.0 pet/PetState.qml
+PetDesktop 1.0 pet/PetDesktop.qml
+PetEditorWindow 1.0 pet/PetEditorWindow.qml
+DuckActor 1.0 pet/DuckActor.qml
+DuckNest 1.0 pet/DuckNest.qml
+DuckDive 1.0 pet/DuckDive.qml

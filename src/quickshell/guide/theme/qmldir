@@ -1,0 +1,13 @@
+FontPicker 1.0 FontPicker.qml
+ThemeEditor 1.0 ThemeEditor.qml
+
+GeneralExtras 1.0 GeneralExtras.qml
+WallpaperTransitions 1.0 WallpaperTransitions.qml
+WallpaperLayoutPreview 1.0 WallpaperLayoutPreview.qml
+SddmPreview 1.0 SddmPreview.qml
+SddmStyles 1.0 SddmStyles.qml
+ThemeLayoutPreview 1.0 ThemeLayoutPreview.qml
+WallpaperLayoutCards 1.0 WallpaperLayoutCards.qml
+TransitionPreview 1.0 TransitionPreview.qml
+ThemeLogic 1.0 ThemeLogic.qml
+ThemePresetGrid 1.0 ThemePresetGrid.qml

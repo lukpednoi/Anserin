@@ -1,0 +1,16 @@
+WeatherCardBackground 1.0 WeatherCardBackground.qml
+WeatherIllustration 1.0 WeatherIllustration.qml
+WxBolt 1.0 WxBolt.qml
+WxCloud 1.0 WxCloud.qml
+WxCrystal 1.0 WxCrystal.qml
+WxFlame 1.0 WxFlame.qml
+WxFog 1.0 WxFog.qml
+WxHero 1.0 WxHero.qml
+WxMoon 1.0 WxMoon.qml
+WxParticles 1.0 WxParticles.qml
+WxPrecip 1.0 WxPrecip.qml
+WxShield 1.0 WxShield.qml
+WxSun 1.0 WxSun.qml
+WxThermo 1.0 WxThermo.qml
+WxWaves 1.0 WxWaves.qml
+WxWind 1.0 WxWind.qml

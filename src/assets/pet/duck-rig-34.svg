@@ -1,0 +1,228 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 400 300">
+  <!-- White Call duck, three-quarter view, as a rig: the locked design (duck-design-34.svg) split into parts that
+       move, plus the parts only some actions show (open wings, open bill, mouth). Each <g id> is one part;
+       rig2qml.py turns it into ../DuckRig.qml. With every part at rest it draws exactly the locked design. -->
+  <defs>
+    <radialGradient id="plumage" cx="236" cy="150" r="178" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#f6f4ee"/>
+      <stop offset="0.82" stop-color="#e2e3e4"/>
+      <stop offset="1" stop-color="#c6c9d0"/>
+    </radialGradient>
+    <radialGradient id="headPlumage" cx="236" cy="150" r="178" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#f6f4ee"/>
+      <stop offset="0.82" stop-color="#e2e3e4"/>
+      <stop offset="1" stop-color="#c6c9d0"/>
+    </radialGradient>
+    <radialGradient id="tailPlumage" cx="236" cy="150" r="178" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#f6f4ee"/>
+      <stop offset="0.82" stop-color="#e2e3e4"/>
+      <stop offset="1" stop-color="#c6c9d0"/>
+    </radialGradient>
+    <radialGradient id="headLight" cx="262" cy="80" r="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="0.7" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="breastLight" cx="272" cy="192" r="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rearShade" x1="108" y1="0" x2="156" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b3b9c3" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#b3b9c3" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="belly" x1="0" y1="206" x2="0" y2="260" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b9bfc9" stop-opacity="0"/>
+      <stop offset="1" stop-color="#b9bfc9" stop-opacity="0.85"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="0" y1="150" x2="0" y2="202" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fdfcf9"/>
+      <stop offset="1" stop-color="#dfe2e7"/>
+    </linearGradient>
+    <linearGradient id="primaries" x1="108" y1="0" x2="196" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cdd2da"/>
+      <stop offset="1" stop-color="#f3f2ee"/>
+    </linearGradient>
+    <linearGradient id="billTop" x1="0" y1="100" x2="0" y2="134" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffc35e"/>
+      <stop offset="1" stop-color="#ec8f2c"/>
+    </linearGradient>
+    <linearGradient id="leg" x1="0" y1="246" x2="0" y2="280" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f6a23a"/>
+      <stop offset="1" stop-color="#e07b22"/>
+    </linearGradient>
+    <radialGradient id="eye" cx="268" cy="90" r="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#34405a"/>
+      <stop offset="0.6" stop-color="#151a24"/>
+      <stop offset="1" stop-color="#07090d"/>
+    </radialGradient>
+    <linearGradient id="wingOpen" x1="0" y1="44" x2="0" y2="170" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e9ebef"/>
+      <stop offset="0.45" stop-color="#fbfaf7"/>
+      <stop offset="1" stop-color="#eceef1"/>
+    </linearGradient>
+    <linearGradient id="farWing" x1="0" y1="36" x2="0" y2="146" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d3d7de"/>
+      <stop offset="1" stop-color="#e9ebee"/>
+    </linearGradient>
+  </defs>
+
+  <g id="shadow">
+    <ellipse cx="194" cy="276" rx="106" ry="12" fill="#000" opacity="0.22"/>
+  </g>
+
+  <!-- far wing, spread: only while flapping; behind the body, it shows above the back -->
+  <g id="farWingOpen">
+    <path d="M 197.8 92.3 C 178.9 84.7 158.0 79.6 147.7 81.7 C 146.6 83.4 154.4 90.7 169.7 96.3 C 181.9 100.3 191.7 102.9 194.2 103.7 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1"/>
+    <path d="M 197.3 90.0 C 177.6 77.9 155.4 68.0 143.8 67.6 C 142.3 69.1 149.9 78.3 165.9 87.5 C 178.7 94.2 189.2 99.1 191.7 100.5 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1"/>
+    <path d="M 196.7 87.8 C 177.8 71.2 155.9 56.2 143.9 53.3 C 142.1 54.5 148.8 65.4 164.3 78.3 C 176.7 88.0 186.9 95.2 189.4 97.2 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1"/>
+    <path d="M 196.0 85.8 C 179.8 65.6 160.4 46.6 148.8 41.3 C 146.9 42.2 151.7 54.4 165.1 70.1 C 175.9 82.1 185.0 91.3 187.2 93.7 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1"/>
+    <path d="M 195.2 83.8 C 183.1 61.7 167.7 40.2 157.3 33.3 C 155.3 33.9 157.8 46.4 167.9 63.8 C 176.3 77.1 183.4 87.5 185.1 90.1 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1"/>
+    <path d="M 194.2 82.0 C 186.9 60.0 176.2 38.2 167.6 30.4 C 165.5 30.6 165.4 42.5 171.8 59.9 C 177.2 73.3 182.1 83.8 183.2 86.5 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1"/>
+    <path d="M 193.0 80.3 C 190.2 60.0 184.1 39.4 177.2 31.5 C 175.1 31.4 172.7 41.8 175.5 57.9 C 178.2 70.4 180.9 80.2 181.4 82.7 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1"/>
+    <path d="M 199.1 95.2 C 182.5 91.1 164.5 90.6 156.1 95.7 C 155.3 98.1 162.5 104.6 175.9 107.2 C 186.4 108.7 195.0 109.2 197.1 109.5 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1"/>
+    <path d="M 203.4 102.5 C 188.4 96.7 171.7 94.3 163.1 98.5 C 162.1 100.7 168.0 108.0 180.1 112.0 C 189.8 114.6 197.7 116.0 199.6 116.5 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1"/>
+    <path d="M 207.6 110.0 C 194.4 102.8 179.1 98.8 170.5 102.0 C 169.3 104.1 173.8 111.9 184.6 117.1 C 193.3 120.6 200.5 122.7 202.2 123.4 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1"/>
+    <path d="M 211.9 117.6 C 200.5 109.3 186.7 104.0 178.2 106.3 C 176.7 108.3 179.9 116.3 189.3 122.4 C 196.9 126.6 203.3 129.3 204.9 130.2 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1"/>
+    <path d="M 216.1 125.2 C 206.6 116.2 194.5 109.9 186.1 111.5 C 184.4 113.3 186.1 121.3 194.1 128.0 C 200.6 132.7 206.3 136.0 207.6 136.9 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1"/>
+    <path d="M 220.2 133.0 C 212.7 123.6 202.1 116.5 194.0 117.4 C 192.1 119.0 192.5 126.9 199.0 133.9 C 204.4 139.0 209.2 142.5 210.3 143.5 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1"/>
+    <path d="M 220.0 148.0 C 209.0 148.3 185.2 103.2 186.4 80.0 C 201.0 86.2 219.5 86.8 226.5 106.0 C 243.3 131.9 228.8 144.8 220.0 148.0 Z" fill="url(#farWing)" stroke="pal:l_b8bdc5" stroke-width="1.1"/>
+    <path d="M 207.6 103.7 q 5 4 10 0 M 212.0 112.9 q 5 4 10 0 M 216.4 122.1 q 5 4 10 0 M 220.8 131.3 q 5 4 10 0" fill="none" stroke="pal:l_c3c8cf" stroke-width="1" opacity="0.8"/>
+  </g>
+
+  <g id="farLeg">
+    <path d="M 214 246 C 215 252 216 258 216 264" fill="none" stroke="#d27420" stroke-width="6" stroke-linecap="round"/>
+    <path d="M 214 262 C 222 262 232 266 238 271 C 230 275 222 274 216 272 C 210 274 204 272 200 268 C 204 264 209 262 214 262 Z" fill="#d27420"/>
+  </g>
+
+  <g id="tail">
+    <path d="M 130.0 157.6 C 127.0 145.9 120.6 135.5 113.5 131.9 C 111.0 132.6 108.7 140.3 111.4 148.9 C 114.2 155.9 117.4 161.0 118.0 162.4 Z" fill="url(#tailPlumage)" stroke="pal:l_c3c7ce" stroke-width="1"/>
+    <path d="M 129.8 156.1 C 123.1 143.2 113.2 132.5 104.6 129.7 C 102.0 131.0 101.9 140.2 107.2 149.6 C 112.2 157.1 117.2 162.4 118.2 163.9 Z" fill="url(#tailPlumage)" stroke="pal:l_c3c7ce" stroke-width="1"/>
+    <path d="M 128.9 155.0 C 118.5 142.6 105.5 133.1 95.8 131.6 C 93.6 133.3 95.9 143.0 104.0 151.9 C 111.2 158.9 117.7 163.6 119.1 165.0 Z" fill="url(#tailPlumage)" stroke="pal:l_c3c7ce" stroke-width="1"/>
+    <path d="M 127.7 154.1 C 115.7 144.6 101.6 138.4 92.2 139.2 C 90.4 141.3 94.4 150.1 103.6 156.8 C 111.6 161.9 118.7 164.9 120.3 165.9 Z" fill="url(#tailPlumage)" stroke="pal:l_c3c7ce" stroke-width="1"/>
+    <path d="M 126.2 153.9 C 114.7 148.0 102.0 145.6 94.2 148.3 C 93.0 150.7 97.6 157.6 106.4 161.6 C 113.9 164.3 120.3 165.6 121.8 166.1 Z" fill="url(#tailPlumage)" stroke="pal:l_c3c7ce" stroke-width="1"/>
+    <path d="M 125.0 154.1 C 115.0 150.9 104.5 151.0 98.5 154.8 C 97.8 157.1 102.4 162.5 110.0 164.6 C 116.4 165.7 121.7 165.7 123.0 165.9 Z" fill="url(#tailPlumage)" stroke="pal:l_c3c7ce" stroke-width="1"/>
+  </g>
+
+  <g id="body">
+    <!-- the body without the neck; its edge across the neck's base is hidden under the neck -->
+    <path d="M 112 162 C 124 144 152 132 186 132 C 204 132 214 134 222 138 C 246 142 280 144 300 152 C 314 174 310 214 282 238 C 254 260 190 264 152 250 C 124 240 108 218 108 196 C 108 184 108 172 112 162 Z"
+          fill="url(#plumage)" stroke="pal:outline" stroke-width="1.1" stroke-opacity="0.7"/>
+    <g id="rearShadeShade">
+      <path d="M 112 162 C 124 150 148 140 172 136 C 158 170 158 214 172 258 C 164 256 158 253 152 250 C 124 240 108 218 108 196 C 108 184 108 172 112 162 Z" fill="url(#rearShade)"/>
+    </g>
+    <g id="bellyShade">
+      <path d="M 124 232 C 156 250 222 256 276 230 C 266 246 250 254 234 258 C 200 264 166 260 152 250 C 140 244 130 238 124 232 Z" fill="url(#belly)"/>
+    </g>
+    <!-- colour patterns: a dark saddle along the back (Magpie) -->
+    <path d="M 112 162 C 124 144 152 132 186 132 C 204 132 214 134 222 138 C 218 152 202 160 180 160 C 150 160 126 168 112 176 Z" fill="pal:back"/>
+  </g>
+
+  <!-- neck and head: the neck reaches down into the body, so the head can turn, dip and stretch without a gap -->
+  <g id="head">
+    <path d="M 222 138 C 218 124 218 110 222 98 C 228 68 250 48 276 48 C 302 48 324 66 326 94 C 327 108 322 118 314 126 C 306 134 300 142 300 152 C 302 162 300 172 296 178 C 276 186 242 184 226 172 C 222 162 222 150 222 138 Z"
+          fill="url(#headPlumage)"/>
+    <path d="M 222 138 C 218 124 218 110 222 98 C 228 68 250 48 276 48 C 302 48 324 66 326 94 C 327 108 322 118 314 126 C 306 134 300 142 300 152"
+          fill="none" stroke="pal:outline" stroke-width="1.1" stroke-opacity="0.7"/>
+    <!-- colour patterns: a dark cap on the crown (Magpie) -->
+    <path d="M 221 104 C 224 72 248 50 276 50 C 300 50 317 62 323 80 C 300 76 272 78 248 90 C 236 96 228 101 221 104 Z" fill="pal:cap"/>
+    <g id="headSheen">
+      <path d="M 232 92 C 236 66 254 56 274 58 C 296 60 312 76 310 98 C 300 114 276 118 258 114 C 240 110 230 104 232 92 Z" fill="url(#headLight)"/>
+    </g>
+    <path d="M 312 122 C 304 132 298 140 298 150 C 292 144 286 140 278 138 C 290 136 302 130 312 122 Z" fill="pal:chin" opacity="0.5"/>
+    <g id="farEye">
+      <ellipse cx="313" cy="88" rx="3.8" ry="6.6" fill="pal:eyeRing"/>
+      <ellipse cx="313.4" cy="88" rx="2.7" ry="5.4" fill="#10141c"/>
+      <ellipse cx="314" cy="85.6" rx="0.9" ry="1.3" fill="#ffffff" opacity="0.8"/>
+    </g>
+    <!-- the inside of the mouth, seen only while the bill is open -->
+    <g id="mouth">
+      <path d="M 291 117 C 302 126 318 133 331 136 C 322 146 304 142 292 128 Z" fill="#b8575a"/>
+      <path d="M 298 124 C 308 130 318 134 326 136" fill="none" stroke="#e08a8c" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <g id="jaw">
+      <path d="M 292 120 C 302 130 318 138 330 138 C 326 144 306 144 294 132 Z" fill="pal:jaw"/>
+    </g>
+    <g id="bill">
+      <path d="M 290 108 C 298 100 312 98 320 104 C 328 110 338 116 340 124 C 342 132 334 138 324 137 C 310 136 296 128 290 118 Z"
+            fill="url(#billTop)" stroke="pal:billEdge" stroke-width="0.9"/>
+      <path d="M 304 106 C 316 110 328 116 336 124" fill="none" stroke="#ffd58c" stroke-width="1.4" stroke-linecap="round" opacity="0.8"/>
+      <path d="M 290 118 C 300 128 314 135 326 137" fill="none" stroke="#a85a1c" stroke-width="1.1" stroke-linecap="round"/>
+      <ellipse cx="308" cy="114" rx="2.8" ry="1.4" fill="#a6591d" transform="rotate(30 308 114)"/>
+      <ellipse cx="320" cy="110" rx="2.2" ry="1.1" fill="#a6591d" opacity="0.7" transform="rotate(30 320 110)"/>
+      <path d="M 333 126 C 339 126 342 131 338 135 C 335 134 333 130 333 126 Z" fill="#f6cf91" opacity="0.9"/>
+    </g>
+    <path d="M 290 106 C 287 112 287 116 291 121" fill="none" stroke="pal:billBase" stroke-width="1.4" stroke-linecap="round"/>
+    <g id="nearEye">
+      <ellipse cx="268" cy="90" rx="7.8" ry="9" fill="pal:eyeRing"/>
+      <ellipse cx="268.4" cy="90" rx="6.2" ry="7.4" fill="url(#eye)"/>
+      <ellipse cx="271" cy="86.8" rx="2.1" ry="2.3" fill="#ffffff"/>
+      <ellipse cx="266" cy="93.4" rx="0.9" ry="0.9" fill="#ffffff" opacity="0.6"/>
+    </g>
+    <g id="lids">
+      <path d="M 260.5 90.5 Q 268 96.5 275.5 90.5 M 310.4 89 Q 313 92.6 315.6 89" fill="none" stroke="#3b4150" stroke-width="1.7" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <g id="breast">
+    <!-- colour patterns: the breast (chestnut on a Mallard), a white bib (Bibbed), the white neck ring -->
+    <path d="M 224 160 C 250 170 282 170 301 160 C 312 178 312 202 302 218 C 280 228 248 224 231 208 C 222 194 221 176 224 160 Z" fill="pal:breast"/>
+    <path d="M 266 132 C 284 140 298 146 302 156 C 309 172 307 192 297 204 C 284 198 274 186 270 170 C 266 158 263 144 266 132 Z" fill="pal:bib"/>
+    <path d="M 223 149 C 248 160 278 162 300 155 L 301 162 C 278 170 246 168 223 157 Z" fill="pal:ring"/>
+    <g id="breastSheen">
+      <path d="M 226 176 C 236 150 284 150 300 170 C 310 196 298 222 276 234 C 252 244 228 230 222 210 C 220 198 222 186 226 176 Z" fill="url(#breastLight)"/>
+    </g>
+    <path d="M 236 146 C 250 154 270 158 296 152" fill="none" stroke="pal:l_c9cdd4" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+    <g fill="none" stroke="pal:l_cfd3d9" stroke-width="1" stroke-linecap="round" opacity="0.75">
+      <path d="M 276 172 q 6 4 12 0 M 286 188 q 6 4 12 0 M 270 192 q 6 4 12 0 M 284 206 q 6 4 12 0 M 266 210 q 6 4 12 0 M 276 224 q 6 4 12 0"/>
+      <path d="M 250 214 q 6 4 12 0 M 240 228 q 6 4 12 0 M 222 238 q 6 4 12 0 M 202 242 q 6 4 12 0"/>
+    </g>
+  </g>
+
+  <!-- folded wings: the far wing's edge over the back, the primaries, the near wing -->
+  <g id="wingFolded">
+    <path d="M 160 138 C 184 130 208 130 220 138 C 204 138 182 140 166 144 Z" fill="pal:farEdge" opacity="0.9"/>
+    <path d="M 196 172 C 166 166 136 160 108 152 C 120 170 146 188 196 190 Z" fill="url(#primaries)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 192 180 C 166 176 138 170 114 160 M 188 186 C 164 182 142 176 120 166" fill="none" stroke="pal:l_bfc4cc" stroke-width="0.9"/>
+    <path d="M 236 166 C 220 152 182 150 156 160 C 144 165 136 170 126 172 C 142 188 166 200 192 202 C 218 202 234 190 236 166 Z"
+          fill="url(#wing)" stroke="pal:l_c3c8cf" stroke-width="1.1"/>
+    <g fill="none" stroke="pal:l_c6cad1" stroke-width="1.1" stroke-linecap="round">
+      <path d="M 230 172 C 214 164 190 164 168 170"/>
+      <path d="M 224 184 C 206 178 182 178 158 182"/>
+      <path d="M 212 194 C 196 191 174 189 154 186"/>
+    </g>
+    <g fill="none" stroke="pal:l_c6cad1" stroke-width="1" opacity="0.8">
+      <path d="M 218 160 q 6 5 12 1 M 206 157 q 6 5 12 1 M 194 156 q 6 5 12 1 M 182 156 q 6 5 12 1"/>
+    </g>
+    <!-- colour patterns: the speculum, the bright band on the folded wing -->
+    <path d="M 216 189 C 198 188 174 186 152 182 L 149 189 C 172 194 196 196 215 196 Z" fill="pal:speculum"/>
+  </g>
+
+  <!-- near wing, spread: only while flapping; it turns round the shoulder -->
+  <g id="wingOpen">
+    <path d="M 206.2 103.3 C 183.9 94.3 159.3 88.4 147.2 90.8 C 145.8 92.9 155.0 101.5 173.1 108.1 C 187.4 112.7 199.0 115.7 201.8 116.7 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 205.6 100.6 C 182.3 86.3 156.2 74.7 142.6 74.2 C 140.8 76.0 149.8 86.8 168.6 97.6 C 183.7 105.6 196.0 111.3 199.0 112.9 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 204.9 98.0 C 182.6 78.5 156.9 60.9 142.7 57.4 C 140.6 58.8 148.4 71.7 166.7 86.8 C 181.2 98.2 193.3 106.8 196.2 109.0 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 204.0 95.6 C 184.9 71.9 162.1 49.5 148.5 43.3 C 146.2 44.4 151.9 58.7 167.7 77.2 C 180.4 91.3 191.1 102.1 193.6 105.0 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 203.1 93.3 C 188.8 67.3 170.7 42.0 158.5 33.9 C 156.1 34.6 159.0 49.3 171.0 69.8 C 180.8 85.4 189.2 97.6 191.2 100.8 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 201.9 91.2 C 193.3 65.3 180.7 39.6 170.6 30.5 C 168.1 30.8 168.0 44.7 175.5 65.2 C 181.9 80.9 187.6 93.3 188.9 96.4 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 200.5 89.1 C 197.2 65.3 190.0 41.1 181.9 31.7 C 179.4 31.6 176.6 43.9 179.9 62.8 C 183.0 77.5 186.2 89.1 186.8 92.0 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 208.0 106.8 C 188.5 102.0 167.3 101.5 157.4 107.4 C 156.5 110.2 165.0 118.0 180.8 121.0 C 193.1 122.8 203.2 123.3 205.6 123.7 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 213.7 115.8 C 196.1 109.0 176.4 106.1 166.3 111.0 C 165.1 113.7 172.1 122.2 186.4 126.9 C 197.7 130.0 207.0 131.6 209.3 132.2 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 219.4 124.9 C 203.8 116.4 185.8 111.7 175.7 115.5 C 174.2 118.0 179.6 127.1 192.3 133.2 C 202.5 137.3 211.0 139.8 213.0 140.6 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 225.0 134.1 C 211.6 124.3 195.4 118.1 185.4 120.9 C 183.7 123.2 187.3 132.6 198.4 139.7 C 207.4 144.7 215.0 147.9 216.8 148.9 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 230.6 143.4 C 219.5 132.8 205.1 125.3 195.3 127.2 C 193.3 129.3 195.4 138.8 204.7 146.6 C 212.4 152.2 219.0 156.0 220.6 157.1 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 236.0 152.8 C 227.2 141.7 214.8 133.5 205.2 134.5 C 203.0 136.4 203.5 145.6 211.1 153.9 C 217.5 159.9 223.2 164.0 224.5 165.2 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1"/>
+    <path d="M 236.0 170.0 C 225.2 170.7 193.4 115.7 192.7 88.8 C 208.1 96.4 226.9 97.7 237.2 121.1 C 258.7 152.8 244.6 166.3 236.0 170.0 Z" fill="url(#wingOpen)" stroke="pal:l_bfc4cc" stroke-width="1.1"/>
+    <path d="M 217.1 117.4 q 5 4 10 0 M 223.1 128.6 q 5 4 10 0 M 229.1 139.8 q 5 4 10 0 M 235.1 151.0 q 5 4 10 0" fill="none" stroke="pal:l_cdd1d7" stroke-width="1" opacity="0.8"/>
+  </g>
+
+  <g id="nearLeg">
+    <path d="M 180 250 C 180 256 179 262 178 268" fill="none" stroke="url(#leg)" stroke-width="7" stroke-linecap="round"/>
+    <path d="M 176 266 C 186 266 198 270 206 276 C 198 281 188 280 180 279 C 172 280 162 278 156 274 C 160 269 168 266 176 266 Z" fill="#f08f2c"/>
+    <path d="M 178 268 L 204 276 M 178 268 L 182 279 M 178 268 L 158 274" fill="none" stroke="#c96a1e" stroke-width="1" stroke-linecap="round" opacity="0.8"/>
+  </g>
+</svg>

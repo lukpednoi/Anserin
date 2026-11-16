@@ -1,0 +1,29 @@
+{
+  "name": "Halloy",
+  "category": "apps",
+  "icon": "󰭹",
+  "detect": {
+    "bin": [
+      "halloy"
+    ],
+    "flatpak": [
+      "org.squidowl.halloy"
+    ]
+  },
+  "templates": [
+    {
+      "input": "anserin.toml",
+      "output": "$XDG_CONFIG_HOME/halloy/themes/anserin.toml"
+    }
+  ],
+  "integrate": [
+    {
+      "type": "line",
+      "file": "$XDG_CONFIG_HOME/halloy/config.toml",
+      "section": "",
+      "line": "theme = \"anserin\"",
+      "disable": "^\\s*theme\\s*=",
+      "create": true
+    }
+  ]
+}

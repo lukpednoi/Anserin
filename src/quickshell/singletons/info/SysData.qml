@@ -1,0 +1,144 @@
+pragma Singleton
+import QtQuick
+import Quickshell
+import Quickshell.Io
+import Quickshell.Services.UPower
+import "../../"
+
+Item {
+    id: root
+
+    property int cpu: 0
+    property int ramPercent: 0
+    property real ramGb: 0.0
+    property int temp: 0
+    property real netRx: 0
+    property real netTx: 0
+    property int diskPercent: 0
+    property real diskGb: 0.0
+    property real diskTotalGb: 0.0
+
+    property int subscribers: 0
+    property bool isScanningNet: false
+    readonly property bool onBattery: UPower.displayDevice.ready && UPower.displayDevice.state === UPowerDeviceState.Discharging
+
+    function subscribe() {
+        subscribers++;
+        if (subscribers === 1) streamProc.running = true;
+    }
+
+    function unsubscribe() {
+        subscribers = Math.max(0, subscribers - 1);
+        if (subscribers === 0) streamProc.running = false;
+    }
+
+    // Subscribers that want a sample every second (the left edge panel's System page while it is shown).
+    property int fastSubscribers: 0
+    function subscribeFast() { fastSubscribers++; subscribe(); }
+    function unsubscribeFast() { fastSubscribers = Math.max(0, fastSubscribers - 1); unsubscribe(); }
+    signal sampled()
+
+    // Parses one cpu|ram%|ramGB|temp|rx|tx|disk%|diskUsedGB|diskTotalGB line, or one JSON sample from
+    // serpantinum-core (CoreTools.core).
+    function applyUsage(text, withNet) {
+        text = text ? text.trim() : "";
+        if (!text) return;
+        if (text.charAt(0) === "{") {
+            let j;
+            try { j = JSON.parse(text); } catch (e) { return; }
+            root.cpu = Math.round(Number(j.cpu) || 0);
+            root.ramPercent = Math.round(Number(j.ramPercent) || 0);
+            root.ramGb = Number(j.ramGb) || 0;
+            root.temp = Math.round(Number(j.temp) || 0);
+            if (withNet) { root.netRx = Number(j.netRx) || 0; root.netTx = Number(j.netTx) || 0; }
+            root.diskPercent = Math.round(Number(j.diskPercent) || 0);
+            root.diskGb = Number(j.diskUsedGb) || 0;
+            root.diskTotalGb = Number(j.diskTotalGb) || 0;
+            root.sampled();
+            return;
+        }
+
+        let p = text.split("|");
+        if (p.length >= 4) {
+            root.cpu = parseInt(p[0]);
+            root.ramPercent = parseInt(p[1]);
+            root.ramGb = parseFloat(p[2]);
+            root.temp = parseInt(p[3]);
+        }
+        if (withNet && p.length >= 6) {
+            root.netRx = parseFloat(p[4]);
+            root.netTx = parseFloat(p[5]);
+        }
+        if (p.length >= 9) {
+            root.diskPercent = parseInt(p[6]);
+            root.diskGb = parseFloat(p[7]);
+            root.diskTotalGb = parseFloat(p[8]);
+        }
+        root.sampled();
+    }
+
+    function prewarm() {
+        if (!fetchProc.running) {
+            fetchProc.running = true;
+        }
+    }
+
+    function scanNetwork() {
+        if (isScanningNet) return;
+        isScanningNet = true;
+        netScanProc.running = false;
+        netScanProc.running = true;
+    }
+
+    // Samples are rewritten every tick, so they live on tmpfs rather than in ~/.cache.
+    readonly property string stateDir: Caching.getRunDir("sysdata")
+
+    // One long-running fetcher while anything is subscribed, printing a line per tick.
+    property int streamInterval: root.fastSubscribers > 0 ? 1 : (root.onBattery ? 4 : 2)
+    onStreamIntervalChanged: {
+        if (streamProc.running) {
+            streamProc.running = false;
+            streamProc.running = true;
+        }
+    }
+
+    // the helper is found after start-up: a stream already running switches over to it
+    Connections {
+        target: CoreTools
+        function onCoreChanged() { if (streamProc.running) { streamProc.running = false; streamProc.running = true; } }
+    }
+
+    Process {
+        id: streamProc
+        running: false
+        command: CoreTools.core ? [CoreTools.coreBin, "watch", "sysinfo", "--interval", String(root.streamInterval)]
+                                : ["bash", Caching.qsDir + "/watchers/sys_fetcher.sh", "--stream", String(root.streamInterval)]
+        environment: ({ QS_RUN_SYSDATA: root.stateDir })
+        stdout: SplitParser {
+            onRead: data => root.applyUsage(data, false)
+        }
+    }
+
+    Process {
+        id: fetchProc
+        running: false
+        command: ["bash", Caching.qsDir + "/watchers/sys_fetcher.sh"]
+        environment: ({ QS_RUN_SYSDATA: root.stateDir })
+        stdout: StdioCollector {
+            onStreamFinished: root.applyUsage(this.text, false)
+        }
+    }
+
+    Process {
+        id: netScanProc
+        running: false
+        command: ["bash", Caching.qsDir + "/watchers/sys_fetcher.sh"]
+        environment: ({ QS_RUN_SYSDATA: root.stateDir })
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.applyUsage(this.text, true);
+                root.isScanningNet = false;
+            }
+        }
+    }
+}

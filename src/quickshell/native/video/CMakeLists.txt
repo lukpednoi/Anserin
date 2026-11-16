@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.21)
+project(AnserinVideo LANGUAGES CXX)
+set(CMAKE_AUTOMOC ON)
+find_package(Qt6 REQUIRED COMPONENTS Qml Multimedia)
+add_library(anserinvideo MODULE plugin.cpp)
+target_link_libraries(anserinvideo PRIVATE Qt6::Qml Qt6::Multimedia)
+target_compile_features(anserinvideo PRIVATE cxx_std_17)
+set_target_properties(anserinvideo PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
