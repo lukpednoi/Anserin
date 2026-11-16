@@ -84,6 +84,7 @@ Added since the fork:
 Changed from Serpantinum:
 
 - Renamed to Anserin, with its own command, daemon and folders.
+- Serpantinum's bar-based interface is removed (version 0.0.2). Anserin is the only interface.
 - Serpantinum's updater and telemetry are off.
 - Starts and stops inside your running Hyprland session.
 - Many screens were restyled or reworked.

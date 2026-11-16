@@ -1,6 +1,41 @@
 {
   "versions": [
     {
+      "version": "0.0.2",
+      "date": "2026-11-16",
+      "posts": [
+        {
+          "id": "update-page",
+          "tag": "feature",
+          "title": "See what's new in Update",
+          "image": "docs/updates/0.0.2-update-page.jpg",
+          "details": "Control Center → Update now lists every release: Latest, All, and Not installed.\n\nWhen a new version is out, Anserin tells you once and can update itself with one click. It checks GitHub a minute after you log in and then every 6 hours.\n\nSome new features will arrive turned off. Open one and press Turn on to try it, and Turn off to go back.",
+          "resources": {
+            "ram": "~10 MB",
+            "cpu": "under 1%",
+            "disk": "40 KB"
+          }
+        },
+        {
+          "id": "default-interface-gone",
+          "tag": "removed",
+          "title": "The Default interface is gone",
+          "details": "Anserin is now the only interface. The bar, the floating Quick Actions and the separate Settings window are removed, along with the switch between interfaces.\n\nIf you were still on the Default interface, Anserin moves you over once and keeps your settings."
+        },
+        {
+          "id": "fresh-install-interface",
+          "tag": "fixbug",
+          "title": "New installs start in Anserin",
+          "details": "A fresh install now opens the Anserin interface you see in the screenshots.",
+          "report": {
+            "where": "Right after installing, on the first start",
+            "wrong": "Anserin opened the old Default interface with a bar, not the Anserin interface",
+            "changed": "New installs start in Anserin, and the old interface is removed"
+          }
+        }
+      ]
+    },
+    {
       "version": "0.0.1",
       "date": "2026-11-16",
       "posts": [

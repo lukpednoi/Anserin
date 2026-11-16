@@ -99,7 +99,7 @@ Where everything comes from, and what was changed: **[CREDITS.md](CREDITS.md)**
 <p>
   <img src="docs/made-by/codex.png" width="72" align="left" hspace="10" alt="Codex" />
   <b>Codex</b><br/>
-  Wrote the Default interface.
+  Wrote the old Default interface (now removed).
 </p>
 <br clear="left"/>
 
