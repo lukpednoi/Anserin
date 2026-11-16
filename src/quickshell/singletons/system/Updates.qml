@@ -30,14 +30,17 @@ Item {
     // every version both copies know of, newest first; a version only GitHub has is not installed yet
     readonly property var versions: {
         const byVer = {};
-        for (const v of localFeed) byVer[v.version] = Object.assign({}, v, { installed: true, remote: false });
+        // installed means not newer than version.txt (the local feed can list a version before it is installed)
+        const here = v => localVersion === "" || !newer(v.version, localVersion);
+        for (const v of localFeed) byVer[v.version] = Object.assign({}, v, { installed: here(v), remote: false });
         for (const v of remoteFeed) {
-            if (!byVer[v.version]) byVer[v.version] = Object.assign({}, v, { installed: !newer(v.version, localVersion), remote: true });
+            if (!byVer[v.version]) byVer[v.version] = Object.assign({}, v, { installed: here(v), remote: true });
         }
         return Object.values(byVer).sort((a, b) => newer(a.version, b.version) ? -1 : newer(b.version, a.version) ? 1 : 0);
     }
     readonly property var latest: versions.length > 0 ? versions[0] : null
-    readonly property var pending: versions.filter(v => !v.installed)
+    // nothing is "not installed" until this copy's version is known (the GitHub copy can be read first)
+    readonly property var pending: localVersion === "" ? [] : versions.filter(v => !v.installed)
     readonly property var on: Config.getSetting("updates.on", {}) || {}
 
     // bright, fixed tag colours (dark text on them): the theme's own yellow, green and blue can share one hue, and
@@ -111,7 +114,7 @@ Item {
         path: root.rootDir !== "" ? root.rootDir + "/version.txt" : ""
         watchChanges: true
         onFileChanged: reload()
-        onLoaded: root.localVersion = text().trim()
+        onLoaded: { root.localVersion = text().trim(); root.maybeNotify(); }
     }
     FileView {
         path: root.rootDir !== "" ? root.rootDir + "/updates/updates.json" : ""
