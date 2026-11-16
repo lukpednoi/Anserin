@@ -61,6 +61,11 @@ The layout, ASCII art and images in `config/fastfetch/` come from
 [mkhmtdots](https://github.com/mkhmtolzhas/mkhmtdots/tree/main/.config/fastfetch) by mkhmtolzhas, with paths changed
 for Anserin.
 
+### Logos in the README
+
+The Codex and Claude icons come from [LobeHub Icons](https://github.com/lobehub/lobe-icons) (MIT). They are
+trademarks of OpenAI and Anthropic, used here only to show which tools helped build Anserin.
+
 ## What's new in Anserin
 
 Added since the fork:

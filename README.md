@@ -89,17 +89,23 @@ Where everything comes from, and what was changed: **[CREDITS.md](CREDITS.md)**
 
 ## Made by
 
-<table>
-  <tr>
-    <td align="center" width="96"><a href="https://github.com/lukpednoi"><img src="https://avatars.githubusercontent.com/u/283710713?v=4&s=160" width="72" alt="lukpednoi" /></a></td>
-    <td><b>lukpednoi</b><br/>UI design, interactions and how everything works. Testing and bug hunting.</td>
-  </tr>
-  <tr>
-    <td align="center" width="96"><b>Codex</b></td>
-    <td>Code for the Default interface.</td>
-  </tr>
-  <tr>
-    <td align="center" width="96"><b>Claude</b></td>
-    <td>Code for the Anserin interface.</td>
-  </tr>
-</table>
+<p>
+  <a href="https://github.com/lukpednoi"><img src="docs/made-by/lukpednoi.png" width="72" align="left" hspace="10" alt="lukpednoi" /></a>
+  <b>lukpednoi</b><br/>
+  Designed the UI and how everything works. Tested it all and hunted down bugs.
+</p>
+<br clear="left"/>
+
+<p>
+  <img src="docs/made-by/codex.png" width="72" align="left" hspace="10" alt="Codex" />
+  <b>Codex</b><br/>
+  Wrote the Default interface.
+</p>
+<br clear="left"/>
+
+<p>
+  <img src="docs/made-by/claude.png" width="72" align="left" hspace="10" alt="Claude" />
+  <b>Claude</b><br/>
+  Wrote the Anserin interface and fixed bugs.
+</p>
+<br clear="left"/>
