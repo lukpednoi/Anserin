@@ -3,16 +3,15 @@ import Quickshell
 import Quickshell.Widgets
 import "../"
 import "../reusables"
-import "../pet"
 
-// Settings / Control → Update: Anserin's update posts (Updates.qml). Three tabs, centred (Latest shows its version
+// Settings / Control → Update: Anserin's update posts (Updates.qml). Two tabs, centred (Latest shows its version
 // on the left of them and its date on the right):
-//   Latest — the newest version's posts. All — every version (a row of versions, then that version's posts).
-//   Not installed — versions newer than this copy, the same way, with Update (anserin -up); empty, the duck dives.
-// A card is the post's title with its tag below on the left, and on the right ✓ / ✕ when it has a switch.
+//   Latest — the newest version's posts. All — every version (a row of versions, then that version's posts), with
+//   Update (anserin -up) beside the row when a version newer than this copy exists.
+// A card is the post's title with its tag below on the left.
 // Opening one shows the post (Reddit-like): tag, big title, version and date, its picture, the resources it uses
-// (Feature and Improved), the details, a Fix bug's report, and Turn on / Turn off. Pages change with the
-// Control tab's own fade and slide (BoardSettings.qml). Lists scroll only when they do not fit.
+// (Feature and Improved), the details and a Fix bug's report. Pages change with the Control tab's own fade and
+// slide (BoardSettings.qml). Lists scroll only when they do not fit.
 Item {
     id: page
     objectName: "update-page"
@@ -25,13 +24,12 @@ Item {
     readonly property real cardRadius: Math.min(ThemeBackend.borderRadius, s(16))
     readonly property color cardColor: Qt.darker(ThemeBackend.surface0, 1.04)
 
-    property int tab: 0                 // 0 Latest, 1 All, 2 Not installed
+    property int tab: 0                 // 0 Latest, 1 All
     property real pillX: 0
     property real pillW: 0
     property int pickAll: 0
-    property int pickPending: 0
-    readonly property var tabVersions: tab === 1 ? Updates.versions : tab === 2 ? Updates.pending : []
-    readonly property int pick: Math.max(0, Math.min(tab === 2 ? pickPending : pickAll, tabVersions.length - 1))
+    readonly property var tabVersions: tab === 1 ? Updates.versions : []
+    readonly property int pick: Math.max(0, Math.min(pickAll, tabVersions.length - 1))
     readonly property var current: tab === 0 ? Updates.latest : (tabVersions.length > 0 ? tabVersions[pick] : null)
     readonly property var posts: current ? (current.posts || []) : []
 
@@ -75,7 +73,7 @@ Item {
             width: Math.min(parent.width - page.s(24), page.s(640))
             spacing: page.s(10)
 
-            // the three tabs, a pill sliding under the chosen one (as the Control tab's sub-pages)
+            // the two tabs, a pill sliding under the chosen one (as the Control tab's sub-pages)
             Item {
                 width: parent.width; height: page.s(32)
                 Rectangle {
@@ -110,7 +108,7 @@ Item {
                     height: page.s(26)
                     Repeater {
                         id: tabRep
-                        model: ["Latest", "All", "Not installed" + (Updates.pending.length > 0 ? "  ·  " + Updates.pending.length : "")]
+                        model: ["Latest", "All"]
                         Item {
                             id: tabItem
                             required property var modelData
@@ -141,9 +139,9 @@ Item {
                 }
             }
 
-            // All / Not installed: the row of versions (Update beside it when not installed)
+            // All: the row of versions (Update beside it when a newer version exists)
             Item {
-                visible: page.tab !== 0 && page.tabVersions.length > 0
+                visible: page.tab === 1 && page.tabVersions.length > 0
                 width: parent.width; height: page.s(28)
                 ListView {
                     id: verRow
@@ -177,14 +175,14 @@ Item {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: if (!parent.chosen) {
                                 Sounds.playSfx("reusables/switch/sfx.wav");
-                                if (page.tab === 2) page.pickPending = parent.index; else page.pickAll = parent.index;
+                                page.pickAll = parent.index;
                             }
                         }
                     }
                 }
                 ClickButton {
                     id: updateBtn
-                    visible: page.tab === 2
+                    visible: Updates.pending.length > 0
                     anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                     height: page.s(28)
                     cornerRadius: height / 2
@@ -193,14 +191,6 @@ Item {
                     accentColor: ThemeBackend.mauve; textColor: ThemeBackend.crust
                     onClicked: Updates.update()
                 }
-            }
-            Text {
-                visible: page.posts.some(p => Updates.hasSwitch(p)) && page.current && page.current.installed
-                width: parent.width
-                text: "New features start off. Open one to turn it on."
-                font.family: ThemeBackend.fontFamily; font.pixelSize: page.s(11)
-                color: ThemeBackend.subtext0
-                wrapMode: Text.WordWrap
             }
         }
 
@@ -220,7 +210,6 @@ Item {
                 id: card
                 required property var modelData
                 readonly property var info: Updates.tag(modelData.tag)
-                readonly property bool switchable: Updates.hasSwitch(modelData) && page.current && page.current.installed
                 width: cards.width; height: page.s(54)
                 Rectangle {
                     anchors.fill: parent
@@ -231,7 +220,7 @@ Item {
                     Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutQuart } }
                     Text {
                         x: page.s(14); y: page.s(9)
-                        width: parent.width - x - (card.switchable ? page.s(48) : page.s(14))
+                        width: parent.width - x - page.s(14)
                         text: card.modelData.title || ""
                         elide: Text.ElideRight
                         font.family: ThemeBackend.fontFamily; font.pixelSize: page.s(13); font.bold: true
@@ -250,20 +239,6 @@ Item {
                             color: ThemeBackend.crust
                         }
                     }
-                    // on (✓, green) or off (✕, grey)
-                    Rectangle {
-                        visible: card.switchable
-                        readonly property bool isOn: Updates.isOn(card.modelData.id)
-                        anchors.right: parent.right; anchors.rightMargin: page.s(14); anchors.verticalCenter: parent.verticalCenter
-                        width: page.s(24); height: width; radius: width / 2
-                        color: isOn ? Updates.tag("fixbug").color : Qt.alpha(ThemeBackend.overlay0, 0.2)
-                        Text {
-                            anchors.centerIn: parent
-                            text: parent.isOn ? "󰄬" : "󰅖"
-                            font.family: ThemeBackend.iconFont; font.pixelSize: page.s(13)
-                            color: parent.isOn ? ThemeBackend.crust : ThemeBackend.overlay0
-                        }
-                    }
                 }
                 MouseArea {
                     id: cardMa
@@ -272,25 +247,6 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: page.openIt(page.current, card.modelData)
                 }
-            }
-        }
-
-        // nothing waiting: the duck dives
-        Column {
-            visible: page.tab === 2 && Updates.pending.length === 0
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: head.y + head.height + (parent.height - head.y - head.height - height) / 2
-            spacing: page.s(8)
-            DuckDive {
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: page.s(180); height: page.s(140)
-                playing: parent.visible && page.visible
-            }
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "You're up to date"
-                font.family: ThemeBackend.fontFamily; font.pixelSize: page.s(14); font.bold: true
-                color: ThemeBackend.subtext0
             }
         }
     }
@@ -304,9 +260,6 @@ Item {
         readonly property var v: page.openVersion
         readonly property var info: Updates.tag(p ? p.tag : "")
         readonly property bool installed: !!v && v.installed
-        readonly property bool switchable: Updates.hasSwitch(p)
-        readonly property bool isOn: !!p && Updates.isOn(p.id)
-        readonly property string blocker: Updates.blockedBy(p)
 
         Flickable {
             anchors.fill: parent
@@ -357,7 +310,7 @@ Item {
                     color: ThemeBackend.text
                 }
                 Text {
-                    text: page.meta(postLayer.v) + (postLayer.installed ? "" : "  ·  not installed")
+                    text: page.meta(postLayer.v)
                     font.family: ThemeBackend.fontFamily; font.pixelSize: page.s(11); font.bold: true
                     color: ThemeBackend.subtext0
                 }
@@ -434,32 +387,16 @@ Item {
                     }
                 }
 
-                // Turn on / Turn off, or Update when this version is not here yet
-                Column {
-                    visible: postLayer.switchable || !postLayer.installed
-                    spacing: page.s(6)
-                    ClickButton {
-                        height: page.s(34)
-                        cornerRadius: height / 2
-                        horizontalPadding: page.s(18)
-                        enabled: !postLayer.installed || postLayer.isOn || postLayer.blocker === ""
-                        opacity: enabled ? 1 : 0.5
-                        buttonIcon: !postLayer.installed ? "󰚰" : postLayer.isOn ? "󰅖" : "󰄬"
-                        buttonText: !postLayer.installed ? "Update to get this" : postLayer.isOn ? "Turn off" : "Turn on"
-                        textFontSize: page.s(12); iconFontSize: page.s(13)
-                        accentColor: postLayer.installed && postLayer.isOn ? page.cardColor : ThemeBackend.mauve
-                        textColor: postLayer.installed && postLayer.isOn ? ThemeBackend.text : ThemeBackend.crust
-                        onClicked: {
-                            if (!postLayer.installed) Updates.update();
-                            else Updates.setOn(postLayer.p.id, !postLayer.isOn);
-                        }
-                    }
-                    Text {
-                        visible: postLayer.installed && !postLayer.isOn && postLayer.blocker !== ""
-                        text: "Turn on “" + postLayer.blocker + "” first."
-                        font.family: ThemeBackend.fontFamily; font.pixelSize: page.s(11)
-                        color: ThemeBackend.subtext0
-                    }
+                // Update, when this version is not here yet
+                ClickButton {
+                    visible: !postLayer.installed
+                    height: page.s(34)
+                    cornerRadius: height / 2
+                    horizontalPadding: page.s(18)
+                    buttonIcon: "󰚰"; buttonText: "Update to get this"
+                    textFontSize: page.s(12); iconFontSize: page.s(13)
+                    accentColor: ThemeBackend.mauve; textColor: ThemeBackend.crust
+                    onClicked: Updates.update()
                 }
             }
         }

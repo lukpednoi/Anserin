@@ -9,8 +9,6 @@ import "../../"
 // checkout; the newest copy is fetched from GitHub a minute after start and then every 6 hours (one small request),
 // kept in the cache so the page works offline. A version newer than version.txt is "not installed": once per
 // version a notification offers to update (anserin -up in Kitty) or to open the page.
-// Features and improvements that have a switch arrive off; Turn on / Turn off only shows or hides them
-// (updates.on in settings), so nothing is lost either way. A post can need another one on first (requires).
 Item {
     id: root
 
@@ -41,7 +39,6 @@ Item {
     readonly property var latest: versions.length > 0 ? versions[0] : null
     // nothing is "not installed" until this copy's version is known (the GitHub copy can be read first)
     readonly property var pending: localVersion === "" ? [] : versions.filter(v => !v.installed)
-    readonly property var on: Config.getSetting("updates.on", {}) || {}
 
     // bright, fixed tag colours (dark text on them): the theme's own yellow, green and blue can share one hue, and
     // the four tags must always look different
@@ -61,30 +58,6 @@ Item {
             if (p !== q) return p > q;
         }
         return false;
-    }
-
-    // ---------- switches ----------
-    function hasSwitch(post) { return !!post && post.switch === true && (post.tag === "feature" || post.tag === "improved"); }
-    function isOn(id) { return on[id] === true; }
-    function findPost(id) {
-        for (const v of versions) for (const p of (v.posts || [])) if (p.id === id) return p;
-        return null;
-    }
-    // what must be on first ("" when nothing): the title of the post it needs
-    function blockedBy(post) {
-        if (!post || !post.requires || isOn(post.requires)) return "";
-        const need = findPost(post.requires);
-        return need ? need.title : post.requires;
-    }
-    function setOn(id, value) {
-        const next = Object.assign({}, on);
-        if (value) next[id] = true;
-        else {
-            delete next[id];
-            // whatever needed it goes off with it
-            for (const v of versions) for (const p of (v.posts || [])) if (p.requires === id) delete next[p.id];
-        }
-        Config.setSetting("updates.on", next);
     }
 
     // a post's picture: from this checkout once installed, from GitHub before
