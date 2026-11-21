@@ -1,0 +1,5 @@
+singleton SmartMirrorTheme 1.0 SmartMirrorTheme.qml
+singleton SmartWeatherData 1.0 SmartWeatherData.qml
+SmartLineIcon 1.0 SmartLineIcon.qml
+SmartSkyBackdrop 1.0 SmartSkyBackdrop.qml
+SmartWeatherPage 1.0 SmartWeatherPage.qml
