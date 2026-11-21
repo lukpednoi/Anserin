@@ -92,10 +92,14 @@ PanelWindow {
 
     WlrLayershell.namespace: "qs-widget-" + wType + "-" + wId
     WlrLayershell.layer: WlrLayer.Bottom
-    WlrLayershell.keyboardFocus: effectiveKeyboardFocus ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // A face with a text field (GitHub's user name, the timer) keeps on-demand focus all the time: the click that
+    // opens its field must already be able to give it the keyboard (asking for focus only after that click left
+    // typing dead until a second click, and Hyprland does not grant exclusive focus on the bottom layer).
+    readonly property bool faceCanType: !!(faceLoader.item && (("wantsKeyboardFocus" in faceLoader.item) || ("isEditingUser" in faceLoader.item)))
+    WlrLayershell.keyboardFocus: (effectiveKeyboardFocus || faceCanType) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
     exclusionMode: ExclusionMode.Ignore
-    focusable: effectiveKeyboardFocus
+    focusable: effectiveKeyboardFocus || faceCanType
 
     onEffectiveKeyboardFocusChanged: {
         if (effectiveKeyboardFocus && typeof root.requestActivate === "function") {

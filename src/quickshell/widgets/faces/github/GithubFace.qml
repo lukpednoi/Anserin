@@ -294,6 +294,7 @@ Item {
         xhr.open("GET", url);
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
+            if (!root) return; // the widget was closed before the answer came
             if (xhr.status === 200) {
                 try {
                     let resp = JSON.parse(xhr.responseText);
@@ -324,7 +325,7 @@ Item {
                     }
                 } catch(e) {}
             }
-            fetchGithubHtml(cleanUser, year);
+            if (root) root.fetchGithubHtml(cleanUser, year);
         };
         xhr.send();
     }
@@ -337,6 +338,7 @@ Item {
         xhr.open("GET", url);
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== XMLHttpRequest.DONE) return;
+            if (!root) return;
             if (xhr.status === 200) {
                 try {
                     let html = xhr.responseText;
@@ -401,11 +403,8 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: {
                 let u = this.text.trim();
-                if (u !== "") {
-                    root.loadUser(u, false);
-                } else if (typeof SystemInfo !== "undefined" && SystemInfo.username !== "") {
-                    root.loadUser(SystemInfo.username, false);
-                }
+                // no saved account: wait for "Set user" (the Linux user name is not the GitHub account)
+                if (u !== "") root.loadUser(u, false);
             }
         }
     }
