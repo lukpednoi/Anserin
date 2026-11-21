@@ -1,6 +1,23 @@
 {
   "versions": [
     {
+      "version": "0.1.1",
+      "date": "2026-11-22",
+      "posts": [
+        {
+          "id": "anserin-core",
+          "tag": "improved",
+          "title": "Anserin's own engine under the hood",
+          "details": "Before: system info, brightness, lock keys and Night light leaned on helpers from Serpantinum, and every click sound started its own player.\n\nNow: Anserin has its own core. Sounds start in about 4 ms instead of 80 ms, wallpaper lists load small copies of your pictures (about 12x faster), video wallpapers get a real poster instead of a blank first frame, and wallpapers can sit in Images and Videos subfolders.\n\nNothing to set up: it builds itself the first time Anserin starts (cmake and a C++ compiler are needed; without them Anserin keeps its old ways).",
+          "resources": {
+            "ram": "~9 MB (two small helpers)",
+            "cpu": "under 0.1% at rest",
+            "disk": "4.3 MB"
+          }
+        }
+      ]
+    },
+    {
       "version": "0.1.0",
       "date": "2026-11-22",
       "posts": [
