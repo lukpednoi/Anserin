@@ -8,14 +8,22 @@ var MIN_ACCEPT_SCORE = 55;
 function cleanString(str) {
     if (!str) return "";
     var s = String(str);
+    s = s.replace(/^\(\d+\)\s*/, "");
     s = s.replace(/\.(?:mp3|flac|wav|m4a|ogg|aac|wma|opus)$/i, "");
     s = s.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");
-    s = s.replace(/\s*[\(\[\{](?:feat\.?|ft\.?|with|official|video|audio|lyrics?|remaster(?:ed)?|deluxe|version|live|radio\s*edit|explicit|clean|bonus|mono|stereo)[^)\]\}]*[)\]\}]/gi, "");
-    s = s.replace(/\s*[-–—|/]\s*(?:official(?:\s+music)?\s+video|lyrics?\s+video|audio|visualizer|mv)\s*$/gi, "");
+    s = s.replace(/\s*[-–—|]\s*YouTube(?:\s+Music)?\s*$/i, "");
+    s = s.replace(/\s*[-–—]\s*Topic\s*$/i, "");
+    s = s.replace(/\s*[\(\[\{](?:feat\.?|ft\.?|with|official(?:\s+(?:music\s+)?(?:video|audio|mv|lyric(?:s)?\s+video))?|mv|music\s+video|lyric(?:s)?\s+video|video|audio|lyrics?|remaster(?:ed)?|deluxe|version|live|radio\s*edit|explicit|clean|bonus|mono|stereo|hd|4k|hq)[^)\]\}]*[)\]\}]/gi, "");
+    s = s.replace(/\s*[-–—|/]\s*(?:official(?:\s+(?:music\s+)?(?:video|audio|mv))?|lyrics?\s+video|audio|visualizer|mv)\s*$/gi, "");
     s = s.replace(/\s*[-–—|/]\s*$/g, "");
     s = s.replace(/^(?:группа|виа|the\s+band)\s+/gi, "");
     s = s.replace(/\s{2,}/g, " ").trim();
     return s;
+}
+
+function stripSubtitleParens(str) {
+    if (!str) return "";
+    return cleanString(str).replace(/\s*[\(\[\{][^)\]\}]*[\)\]\}]\s*/g, " ").replace(/\s{2,}/g, " ").trim();
 }
 
 function splitCompoundTrack(str) {
@@ -50,14 +58,25 @@ function scoreDirect(candidateTitle, candidateArtist, wantTitle, wantArtist) {
     var a = normalizeForMatch(candidateArtist || "");
     var wantT = normalizeForMatch(wantTitle || "");
     var wantA = normalizeForMatch(wantArtist || "");
+    var tBase = normalizeForMatch(stripSubtitleParens(candidateTitle || ""));
+    var wantTBase = normalizeForMatch(stripSubtitleParens(wantTitle || ""));
 
     var titleScore = 0;
     if (t && wantT && t === wantT) titleScore = 40;
+    else if (tBase && wantTBase && tBase === wantTBase) titleScore = 35;
     else if (t && wantT && (t.indexOf(wantT) !== -1 || wantT.indexOf(t) !== -1)) titleScore = 18;
+    else if (tBase && wantTBase && (tBase.indexOf(wantTBase) !== -1 || wantTBase.indexOf(tBase) !== -1)) titleScore = 18;
 
     var artistScore = 0;
     if (a && wantA && a === wantA) artistScore = 35;
     else if (a && wantA && (a.indexOf(wantA) !== -1 || wantA.indexOf(a) !== -1)) artistScore = 18;
+    else if (a && wantA && /vevo$/i.test(wantA)) {
+        var aCompact = a.replace(/\s+/g, "");
+        var wantACompact = wantA.replace(/vevo$/i, "").replace(/\s+/g, "");
+        if (aCompact && wantACompact && (aCompact === wantACompact || aCompact.indexOf(wantACompact) !== -1 || wantACompact.indexOf(aCompact) !== -1)) {
+            artistScore = 28;
+        }
+    }
 
     // Reject clear mismatches (same title, wrong artist / vice versa)
     if (wantA && artistScore < 18) return -100;
@@ -154,17 +173,25 @@ function pickBestNetEaseSong(songs, wantTitle, wantArtist, targetDurSec) {
 }
 
 function buildLrclibSearchQueries(session) {
+    var baseTitle = stripSubtitleParens(session.title || "");
     var queries = [
         ((session.artist || "") + " " + (session.title || "")).trim(),
         ((session.title || "") + " " + (session.artist || "")).trim(),
-        session.title || ""
+        session.title || "",
+        ((session.artist || "") + " " + baseTitle).trim(),
+        baseTitle
     ];
     var compound = splitCompoundTrack(session.title || "");
     if (compound) {
+        var basePart1 = stripSubtitleParens(compound.part1);
+        var basePart2 = stripSubtitleParens(compound.part2);
         queries.push((compound.part1 + " " + compound.part2).trim());
         queries.push((compound.part2 + " " + compound.part1).trim());
+        queries.push((basePart1 + " " + basePart2).trim());
         queries.push(compound.part2);
         queries.push(compound.part1);
+        queries.push(basePart1);
+        queries.push(basePart2);
     }
     queries.push(((session.rawArtist || "") + " " + (session.rawTitle || "")).trim());
     queries.push(session.rawTitle || "");

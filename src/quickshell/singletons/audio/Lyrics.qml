@@ -68,6 +68,64 @@ Item {
         }
         return out;
     }
+    // True when the active lyrics contain real word-level timestamps (YRC / KRC / enhanced LRC).
+    readonly property bool hasWordTiming: {
+        if (!hasLyrics || !lyrics || lyrics.length === 0) return false;
+        for (let i = 0; i < lyrics.length; i++) {
+            if (lyrics[i].words && lyrics[i].words.length > 0) return true;
+        }
+        return false;
+    }
+    // Word-timed lines for karaoke-style views: [{ start, end, text, estimated, words: [{ w, t, end }] }].
+    // Uses real word timestamps when available; smoothly interpolates word spans across line duration for line-only LRC.
+    readonly property var karaokeLines: {
+        if (!hasLyrics || !lyrics || lyrics.length === 0) return [];
+        const src = lyrics;
+        const out = [];
+        for (let i = 0; i < src.length; i++) {
+            const l = src[i];
+            const lineStart = Number(l.time) || 0;
+            const nextStart = (i + 1 < src.length && Number(src[i + 1].time) > lineStart)
+                ? Number(src[i + 1].time)
+                : (lineStart + 4.0);
+            const realWords = l.words && l.words.length > 0 ? l.words : null;
+            if (realWords) {
+                const words = [];
+                let maxEnd = lineStart + 0.5;
+                for (let j = 0; j < realWords.length; j++) {
+                    const rw = realWords[j];
+                    const txt = String(rw.text || "").trim();
+                    if (!txt) continue;
+                    const wt = Number(rw.time) >= 0 ? Number(rw.time) : lineStart;
+                    let we = (rw.endTime !== undefined && Number(rw.endTime) > wt)
+                        ? Number(rw.endTime)
+                        : (j + 1 < realWords.length && Number(realWords[j + 1].time) > wt ? Number(realWords[j + 1].time) : wt + 0.45);
+                    if (we > maxEnd) maxEnd = we;
+                    words.push({ w: txt, t: wt, end: we });
+                }
+                if (words.length === 0) words.push({ w: "♪", t: lineStart, end: Math.max(lineStart + 1.0, nextStart) });
+                out.push({ start: lineStart, end: Math.max(maxEnd, nextStart), text: String(l.text || ""), estimated: false, words: words });
+            } else {
+                const parts = String(l.text || "").trim().split(/\s+/).filter(p => p !== "");
+                const span = Math.max(1.0, Math.min(5.5, (nextStart - lineStart) * 0.90));
+                if (parts.length === 0) {
+                    out.push({ start: lineStart, end: nextStart, text: "♪", estimated: true, words: [{ w: "♪", t: lineStart, end: nextStart }] });
+                } else {
+                    let totalWeight = 0;
+                    for (let j = 0; j < parts.length; j++) totalWeight += Math.max(2, parts[j].length);
+                    let cursor = lineStart;
+                    const words = [];
+                    for (let j = 0; j < parts.length; j++) {
+                        const dur = span * (Math.max(2, parts[j].length) / Math.max(1, totalWeight));
+                        words.push({ w: parts[j], t: cursor, end: cursor + dur });
+                        cursor += dur;
+                    }
+                    out.push({ start: lineStart, end: nextStart, text: String(l.text || ""), estimated: true, words: words });
+                }
+            }
+        }
+        return out;
+    }
     property bool loading: false
     property string activeFetchKey: ""
     property string lastFetchedKey: ""
@@ -289,8 +347,14 @@ Item {
         interval: 10000
         repeat: false
         onTriggered: {
-            if (root.loading && root.activeSession && !root.activeSession.done) {
-                root.loading = false;
+            if (root.activeSession && !root.activeSession.done) {
+                if (root.activeSession.lrclibAppliedLine && root.activeSession.lineCandidate && root.activeSession.lineCandidate.length > 0) {
+                    root.activeSession.done = true;
+                    root.saveLyricsToDisk(root.activeSession.key, root.activeSession.lineCandidate);
+                }
+                if (root.loading) {
+                    root.loading = false;
+                }
             }
         }
     }
@@ -299,7 +363,9 @@ Item {
         target: MprisController
         function onLivePositionChanged() {
             if (!root.player || !root.player.isPlaying) {
-                root.currentPosition = MprisController.livePosition + root.lead;
+                const pos = MprisController.livePosition + root.lead;
+                root.polledPosition = pos;
+                root.currentPosition = pos;
             }
         }
         function onActivePlayerChanged() {
@@ -317,7 +383,9 @@ Item {
                 if (!positionTimer.running) root.applyPosition(root.player.position);
             } else {
                 root.pendingJumpPosition = -1;
-                root.currentPosition = root.player.position + root.lead;
+                const pos = root.player.position + root.lead;
+                root.polledPosition = pos;
+                root.currentPosition = pos;
             }
         }
         function onTrackTitleChanged() {
@@ -683,7 +751,9 @@ Item {
     function applyLyrics(parsedList, key, shouldSaveToDisk) {
         if (key !== root.activeFetchKey) return;
         parsedList = withoutCredits(parsedList);
-        searchTimeoutTimer.stop();
+        if (!root.activeSession || root.activeSession.done) {
+            searchTimeoutTimer.stop();
+        }
         root.lyrics = parsedList;
         root.hasLyrics = parsedList && parsedList.length > 0;
         root.loading = false;
@@ -701,9 +771,14 @@ Item {
         if (session.netEaseDone && session.lrclibDone) {
             session.done = true;
             searchTimeoutTimer.stop();
+            if (session.hasWordLyrics) return;
             if (session.lineCandidate && session.lineCandidate.length > 0) {
-                applyLyrics(session.lineCandidate, session.key, true);
-            } else {
+                if (session.lrclibAppliedLine && root.lyrics && root.lyrics.length >= session.lineCandidate.length) {
+                    saveLyricsToDisk(session.key, root.lyrics);
+                } else {
+                    applyLyrics(session.lineCandidate, session.key, true);
+                }
+            } else if (!session.lrclibAppliedLine) {
                 root.loading = false;
                 root.hasLyrics = false;
                 root.lyrics = [];
@@ -730,11 +805,16 @@ Item {
         if (resp.syncedLyrics && String(resp.syncedLyrics).trim() !== "") {
             let lines = parseLrc(resp.syncedLyrics);
             if (lines && lines.length > 0) {
-                // Apply immediately — do not wait for NetEase / do not keep a weak first hit
                 session.lineCandidate = lines;
                 session.lrclibDone = true;
-                session.done = true;
-                applyLyrics(lines, session.key, true);
+                session.lrclibAppliedLine = true;
+                if (session.netEaseDone) {
+                    session.done = true;
+                    applyLyrics(lines, session.key, true);
+                } else {
+                    // Display immediately while still allowing NetEase to upgrade to word-level YRC if available
+                    applyLyrics(lines, session.key, false);
+                }
                 return true;
             }
         }
@@ -772,6 +852,7 @@ Item {
             hasWordLyrics: false,
             netEaseDone: false,
             lrclibDone: false,
+            lrclibAppliedLine: false,
             lineCandidate: null
         };
 
@@ -818,7 +899,9 @@ Item {
 
     function fetchNetEaseLegacy(session) {
         if (session.key !== root.activeFetchKey || session.done) return;
-        let query = (session.artist + " " + session.title).trim();
+        // If the title itself contains "Song - Artist" (common on YouTube MV uploads), search the clean title without the upload channel name.
+        let compound = LyricsMatch.splitCompoundTrack(session.title || "");
+        let query = compound ? session.title : (session.artist + " " + session.title).trim();
         if (query === "") query = session.title;
         let url = "https://music.163.com/api/search/get/web?csrf_token=&hlpretag=&hlposttag=&s=" + encodeURIComponent(query) + "&type=1&offset=0&total=true&limit=8";
         let xhr = new XMLHttpRequest();
