@@ -6,9 +6,13 @@ PIPE="$QS_RUN_DIR/qs_kb_wait_$$.fifo"
 mkfifo "$PIPE" 2>/dev/null
 cleanup() {
     trap - EXIT INT TERM
+    local job file
     for job in $(jobs -p); do
-        mo_pid_write "$QS_RUN_DIR/kb-job-$job.pid" "$job" && mo_stop_tree "$QS_RUN_DIR/kb-job-$job.pid"
+        file="$QS_RUN_DIR/kb-job-$job.pid"
+        mo_pid_write "$file" "$job" && mo_stop_tree "$file"
+        rm -f -- "$file" "$file.start" "$file".child-*
     done
+    rm -f -- "$PIPE"
     exit 0
 }
 trap cleanup EXIT INT TERM

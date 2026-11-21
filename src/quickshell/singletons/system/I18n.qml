@@ -59,6 +59,8 @@ Item {
         id: langFileView
         path: root.currentLang !== "en" ? (root.i18nDir + "/" + root.currentLang + ".json") : ""
         watchChanges: true
+        // A system language Anserin has no file for (e.g. th) falls back to en.json quietly.
+        printErrors: false
         onFileChanged: reload()
         onLoaded: {
             let txt = typeof text === "function" ? text() : text;
