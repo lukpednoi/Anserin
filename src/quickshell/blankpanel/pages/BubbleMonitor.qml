@@ -18,9 +18,7 @@ import "bubble/BubbleLogic.js" as B
 //   A tapped bubble's page slides in on the left (60 % of the page, 30 % of the screen full screen) and the camera
 //   keeps that bubble in the middle of what is left; another bubble's page, from a tap or the four buttons under the
 //   full-screen one (CPU, memory, temperature, disk; the wheel steps through them), takes its place by moving up.
-//   Full screen (the button top right): the page is sucked like a cloth into that button and ink spreads from it over
-//   the screen (bubble/shaders/); the bubbles get the whole screen at 50 %. Esc or the button brings it back into the
-//   panel, which stays open meanwhile (PanelLayout.bubbleFull).
+//   (Full screen was removed.)
 // The logic (physics, lightning, the charts' lines) is bubble/BubbleLogic.js.
 Item {
     id: shell
@@ -54,123 +52,11 @@ Item {
     readonly property string fMono: ThemeBackend.fontFamily
     readonly property string fDisplay: ThemeBackend.fontFamily
 
-    // ---------- full screen. Going: the page moves into the full-screen window at the same spot and is sucked like a
-    // cloth into its full-screen button, the parts nearest the button first (shaders/bubble_cloth.vert, drawing the
-    // page live); then the page takes the whole screen, and ink spreads from the button until it covers the screen,
-    // the full-screen monitor showing wherever it has reached (shaders/bubble_ink.frag). Coming back runs it backwards.
-    property bool full: false
-    property bool leaving: false
-    property real fsT: 0
-    property rect slotRect: Qt.rect(0, 0, 1, 1)                  // where the page is on the screen (set going full)
-    property var camBeforeFull: null
-    readonly property point btnCenter: Qt.point(pageSlot.width - 12 - 20, 12 + 20)      // the full-screen button, in the page
+    // full screen was removed (a copy of the old file is in _to_delete/); `full` stays false for the page's layout
+    readonly property bool full: false
     readonly property var homeScreen: typeof masterWindow !== "undefined" && masterWindow.screen ? masterWindow.screen : Quickshell.screens[0]
     readonly property real screenW: homeScreen.width
     readonly property real screenH: homeScreen.height
-    // the left panel stays open while the page is away full screen (its auto-hide waits)
-    onFullChanged: PanelLayout.bubbleFull = full
-    Component.onDestruction: if (full) PanelLayout.bubbleFull = false
-    NumberAnimation {
-        id: fsAnim
-        target: shell; property: "fsT"
-        onFinished: if (shell.fsT <= 0) {
-            page.parent = pageSlot;
-            shell.full = false;
-            shell.leaving = false;
-            page.forceActiveFocus();
-        }
-    }
-    // halfway the page changes size: whole screen on the way out (the cloth has gone into the middle), its own on the
-    // way back (the ink has drawn in)
-    onFsTChanged: {
-        if (!full) return;
-        if (!leaving && fsT >= 0.5 && page.parent === clothHolder) {
-            page.parent = fsHost;
-            page.resizeWorld(screenW / 0.5, screenH / 0.5);
-            page.camZ = 0.5; page.camX = (screenW - page.worldW * 0.5) / 2; page.camY = (screenH - page.worldH * 0.5) / 2;
-        } else if (leaving && fsT <= 0.5 && page.parent === fsHost) {
-            page.parent = clothHolder;
-            page.resizeWorld(page.worldSize.w, page.worldSize.h);
-            const c = camBeforeFull || page.fitCam();
-            page.camX = c.x; page.camY = c.y; page.camZ = c.z;
-        }
-    }
-    function goFull() {
-        if (full || preview) return;
-        // the page's place on the screen: in the main window, which starts frameInset in from the screen's edge
-        const p = pageSlot.mapToItem(null, 0, 0), inset = typeof masterWindow !== "undefined" ? masterWindow.frameInset : 0;
-        slotRect = Qt.rect(p.x + inset, p.y + inset, pageSlot.width, pageSlot.height);
-        begin();
-    }
-    function begin() {
-        camBeforeFull = { x: page.camX, y: page.camY, z: page.camZ };
-        full = true;
-        page.parent = clothHolder;
-        page.forceActiveFocus();
-        fsAnim.stop(); fsAnim.from = 0; fsAnim.to = 1; fsAnim.duration = 1800; fsAnim.start();
-    }
-    function leaveFull() {
-        if (!full || leaving || fsT < 1) return;
-        page.closeNow();
-        leaving = true;
-        fsAnim.stop(); fsAnim.from = 1; fsAnim.to = 0; fsAnim.duration = 1500; fsAnim.start();
-    }
-    PanelWindow {
-        id: fsWin
-        visible: shell.full
-        screen: shell.homeScreen
-        anchors { top: true; bottom: true; left: true; right: true }
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.namespace: "anserin-bubble-monitor"
-        WlrLayershell.keyboardFocus: shell.full ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-        readonly property bool moving: shell.fsT < 1 || shell.leaving
-
-        Item { id: fsHost; anchors.fill: parent }
-        ShaderEffectSource { id: fsSource; anchors.fill: parent; sourceItem: fsHost; hideSource: fsWin.moving; live: fsWin.moving; visible: false }
-        // the page at its own size and place while it is the cloth (drawn only through the cloth); once it has gone
-        // to full size the cloth keeps its last picture for the little that is left of it
-        Item { id: clothHolder; x: shell.slotRect.x; y: shell.slotRect.y; width: shell.slotRect.width; height: shell.slotRect.height }
-        ShaderEffectSource { id: clothSource; sourceItem: clothHolder; hideSource: true; visible: false; live: page.parent === clothHolder }
-
-        // the ink, spreading from the button once the cloth has gone in (0.5–1); far enough to reach every corner
-        // even where its ragged edge lags most
-        ShaderEffect {
-            id: ink
-            anchors.fill: parent
-            visible: fsWin.moving && shell.fsT > 0.5
-            readonly property real t: B.clamp((shell.fsT - 0.5) / 0.5, 0, 1)
-            readonly property point from: Qt.point(shell.slotRect.x + shell.btnCenter.x, shell.slotRect.y + shell.btnCenter.y)
-            readonly property real reach: Math.max(Math.hypot(from.x, from.y), Math.hypot(width - from.x, from.y),
-                                                   Math.hypot(from.x, height - from.y), Math.hypot(width - from.x, height - from.y))
-            property var source: fsSource
-            property vector2d res: Qt.vector2d(width, height)
-            property vector2d center: Qt.vector2d(from.x, from.y)
-            property real inkR: (1 - Math.pow(1 - t, 3)) * (reach / 0.76 + 60)
-            property real time: page.clock % 1000
-            property color inkColor: Qt.darker(ThemeBackend.base, 1.2)
-            property color rimColor: shell.cAccent
-            fragmentShader: Qt.resolvedUrl("bubble/shaders/bubble_ink.frag.qsb")
-        }
-        // the cloth (0–0.6): the UI on a fine mesh, sucked into its full-screen button
-        ShaderEffect {
-            id: cloth
-            x: shell.slotRect.x; y: shell.slotRect.y
-            width: shell.slotRect.width; height: shell.slotRect.height
-            visible: fsWin.moving && shell.fsT < 0.6
-            mesh: GridMesh { resolution: Qt.size(44, 40) }
-            property var source: clothSource
-            property real prog: B.clamp(shell.fsT / 0.6, 0, 1)
-            property real swirl: 1.2
-            property vector2d size: Qt.vector2d(width, height)
-            property vector2d target: Qt.vector2d(shell.btnCenter.x, shell.btnCenter.y)
-            vertexShader: Qt.resolvedUrl("bubble/shaders/bubble_cloth.vert.qsb")
-            fragmentShader: Qt.resolvedUrl("bubble/shaders/bubble_cloth.frag.qsb")
-        }
-        // nothing is taken while it moves
-        MouseArea { anchors.fill: parent; enabled: fsWin.moving; acceptedButtons: Qt.AllButtons }
-    }
 
     // the bump sound: four players taken in turn, so knocks close together can overlap
     Item {
@@ -482,7 +368,7 @@ Item {
                 openNode(n);
             }
             property real clock: 0
-            Keys.onEscapePressed: { if (ms.open) closeOverlay(); else if (shell.full && shell.fsT >= 1) shell.leaveFull(); }
+            Keys.onEscapePressed: { if (ms.open) closeOverlay(); }
             // ---------- frame loop ----------
             FrameAnimation {
                 running: page.visible && shell.running
@@ -784,24 +670,18 @@ Item {
                     ModeSeg { id: appsSeg; label: "Apps"; value: "apps" }
                 }
             }
-            // full screen and back
-            Rectangle {
+            // the top-right corner the battery and what is under it hang from
+            Item {
                 id: fullBtn
-                z: 40          // above an open page's dimming, so they still work
                 anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 12
-                width: 40; height: 40; radius: 20
-                color: Qt.alpha(fullMa.containsMouse ? shell.cLine : shell.cBg, 0.82)
-                Behavior on color { ColorAnimation { duration: 140 } }
-                Text { anchors.centerIn: parent; text: shell.full ? "󰊔" : "󰊓"; font.family: ThemeBackend.iconFont; font.pixelSize: 17; color: shell.cText }
-                MouseArea { id: fullMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                            onClicked: shell.full ? shell.leaveFull() : shell.goFull() }
+                width: 0; height: 40
             }
             // the battery beside it, the size of the button: a drawn battery lying down (as on the System page's
             // Graphs), filled to the charge, the percentage under it
             Rectangle {
                 z: 40          // above an open page's dimming, so they still work
                 visible: !!page.battery
-                anchors.right: fullBtn.left; anchors.rightMargin: 8; anchors.verticalCenter: fullBtn.verticalCenter
+                anchors.right: fullBtn.left; anchors.rightMargin: 0; anchors.verticalCenter: fullBtn.verticalCenter
                 width: 40; height: 40; radius: 20
                 color: Qt.alpha(shell.cBg, 0.82)
                 readonly property real pct: page.battery ? page.battery.pct : 0
