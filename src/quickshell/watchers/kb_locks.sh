@@ -248,9 +248,10 @@ case "$ACTION" in
         get_locks
         ;;
     watch)
-        # Anserin core built: it reads the keyboard LEDs and prints "capslock 0|1" / "numlock 0|1" for what
-        # changed. exec, so the shell stops the watcher itself (a pipeline here was left running on reloads).
-        if [[ -x "${ANSERIN_CORE:-}" ]]; then
+        # Anserin core built and the keyboard has lock LEDs: it reads them and prints "capslock 0|1" /
+        # "numlock 0|1" for what changed. exec, so the shell stops the watcher itself (a pipeline here was left
+        # running on reloads). Keyboards without LED entries keep the compositor polling below.
+        if [[ -x "${ANSERIN_CORE:-}" ]] && compgen -G "/sys/class/leds/*::capslock" >/dev/null; then
             exec "$ANSERIN_CORE" watch locks --changes
         else
             watch_locks
