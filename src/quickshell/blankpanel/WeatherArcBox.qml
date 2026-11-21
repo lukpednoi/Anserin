@@ -222,7 +222,9 @@ Rectangle {
                     Text {
                         id: skyText
                         width: Math.min(implicitWidth, parent.parent.width - (placeText.visible ? placeText.width + box.s(16) : 0))
-                        text: box.dayData ? (box.dayData.desc || "") : ""
+                        // today follows the weather now, as the icon and scene do
+                        text: box.day === 0 && box.wData && box.wData.current_desc ? box.wData.current_desc
+                            : (box.dayData ? (box.dayData.desc || "") : "")
                         font.family: ThemeBackend.fontFamily
                         font.weight: Font.Medium
                         font.pixelSize: box.s(13)
@@ -249,7 +251,8 @@ Rectangle {
             oneDay: true
             count: 8
             accent: box.textAccent
-            fallbackIcon: box.dayData ? (box.dayData.icon || "") : ""
+            fallbackIcon: box.day === 0 && box.wData && box.wData.current_icon ? box.wData.current_icon
+                : (box.dayData ? (box.dayData.icon || "") : "")
             cardScale: 0.78
             swaying: true
             swayPhase: box.oscPhase

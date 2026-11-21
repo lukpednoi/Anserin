@@ -363,6 +363,7 @@ get_data() {
         current_icon: $c_map.icon,
         current_hex: $c_map.hex,
         current_code: $c_code,
+        current_desc: $c_map.desc,
         forecast: $forecast
       }
     '

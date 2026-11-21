@@ -29,6 +29,9 @@ Singleton {
                 icon: h.icon || "",
                 cond: conditionFromCode(h.code, h.icon)
             }));
+            // Today shows the weather now everywhere (the forecast's day summary is one hour's snapshot, so it
+            // could say Sunny under a sky that is raining)
+            const now = i === 0 && hasLiveData;
             out.push({
                 day: i === 0 ? "Today" : (f.day || ("Day " + (i + 1))),
                 day_full: f.day_full || f.day || "",
@@ -41,9 +44,10 @@ Singleton {
                 pop: Number(f.pop || 0),
                 sunrise: formatTimeShort(f.sunrise),
                 sunset: formatTimeShort(f.sunset),
-                desc: f.desc || conditionLabel(conditionFromCode(f.code, f.icon)),
-                code: f.code !== undefined ? Number(f.code) : 0,
-                icon: f.icon || "",
+                desc: now ? (wData.current_desc || conditionLabel(conditionFromCode(currentCode, wData.current_icon)))
+                          : (f.desc || conditionLabel(conditionFromCode(f.code, f.icon))),
+                code: now ? currentCode : (f.code !== undefined ? Number(f.code) : 0),
+                icon: now ? (wData.current_icon || f.icon || "") : (f.icon || ""),
                 hourly: hrs
             });
         }
