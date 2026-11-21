@@ -154,6 +154,9 @@ def process_entry(entry_tuple, poster_dir, cached_items):
     furl = f"file://{fpath}"
 
     existing = cached_items.get(fname)
+    if existing:
+        # a file moved into Images or Videos keeps its colour and poster but takes its new place
+        existing = dict(existing, filePath=fpath, fileUrl=furl)
     if existing and existing.get("mtime") == mtime and existing.get("size") == size:
         if is_video:
             p_path = existing.get("posterPath", "")
@@ -217,10 +220,19 @@ def run_indexing(src_dir, per_dir_cache, index_file, poster_dir):
     entries_to_process = []
     seen_entry_names = set()
     seen_entry_paths = set()
+    # Wallpapers sit in the folder itself and, sorted by kind, in its Images and Videos subfolders.
+    dir_entries = []
     try:
-        dir_entries = list(os.scandir(src_dir))
+        top = list(os.scandir(src_dir))
     except Exception:
-        dir_entries = []
+        top = []
+    dir_entries.extend(top)
+    for sub in top:
+        try:
+            if sub.is_dir() and sub.name.lower() in ("images", "videos"):
+                dir_entries.extend(os.scandir(sub.path))
+        except OSError:
+            continue
 
     for entry in dir_entries:
         try:

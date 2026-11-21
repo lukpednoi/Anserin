@@ -418,6 +418,24 @@ Item {
         return false;
     }
 
+    // Wallpapers can be sorted into the folder's Images and Videos subfolders. Once any is, new downloads go there too.
+    readonly property bool sortedFolders: {
+        const lk = window.thumbLookup || {};
+        for (const k in lk) {
+            const fp = lk[k] && lk[k].filePath ? String(lk[k].filePath) : "";
+            if (fp.indexOf(window.srcDir + "/Images/") === 0 || fp.indexOf(window.srcDir + "/Videos/") === 0) return true;
+        }
+        return false;
+    }
+    function existingPath(safeFileName) {
+        const l = window.thumbLookup[safeFileName] || window.thumbLookup[window.getCleanBaseName(safeFileName)];
+        return l && l.filePath ? String(l.filePath) : "";
+    }
+    function newDownloadPath(safeFileName) {
+        if (!window.sortedFolders) return window.srcDir + "/" + safeFileName;
+        return window.srcDir + (/\.(mp4|mkv|mov|webm)$/i.test(safeFileName) ? "/Videos/" : "/Images/") + safeFileName;
+    }
+
     function isDownloaded(safeFileName) {
         if (!safeFileName) return false;
         let clean = window.getCleanName(safeFileName);
@@ -538,7 +556,7 @@ Item {
         let path = "";
         if (window.currentFilter === "Search" && window.hasSearched) {
             if (!window.isDownloaded(safeFileName)) return;          // only results already downloaded have a file
-            path = window.srcDir + "/" + safeFileName;
+            path = window.existingPath(safeFileName) || (window.srcDir + "/" + safeFileName);
         } else {
             let lookup = window.thumbLookup[safeFileName] || window.thumbLookup[window.getCleanBaseName(safeFileName)] || {};
             path = lookup.filePath || (window.srcDir + "/" + window.getOriginalFileName(safeFileName));
@@ -583,7 +601,7 @@ Item {
 
         if (window.currentFilter === "Search" && window.hasSearched) {
             let alreadyExists = window.isDownloaded(safeFileName);
-            let destFile = window.srcDir + "/" + safeFileName;
+            let destFile = (alreadyExists && window.existingPath(safeFileName)) || window.newDownloadPath(safeFileName);
             let mapFile = Caching.getCacheDir("wallpaper") + "/search_map.txt";
 
             if (alreadyExists) {
@@ -598,6 +616,7 @@ Item {
                 let downloadScript =
                     "URL=$(awk -F'|' -v fname=\"$1\" '$1 == fname {print $2; exit}' \"$2\")\n" +
                     "if [ -n \"$URL\" ]; then\n" +
+                    "  mkdir -p \"$(dirname \"$3\")\"\n" +
                     "  curl -s -L -A 'Mozilla/5.0' \"$URL\" -o \"$3.tmp\"\n" +
                     "  if file \"$3.tmp\" | grep -iq 'webp'; then\n" +
                     "    magick \"$3.tmp\" \"$3\" 2>/dev/null || convert \"$3.tmp\" \"$3\" 2>/dev/null || mv \"$3.tmp\" \"$3\"\n" +
