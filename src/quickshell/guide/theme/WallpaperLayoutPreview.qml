@@ -30,7 +30,7 @@ Item {
                     fileUrl: String(entry.fileUrl || ""),
                     posterUrl: String(entry.posterUrl || ""),
                     isVideo: !!entry.isVideo,
-                    thumbnail: String(entry.isVideo ? entry.posterUrl : entry.fileUrl)
+                    thumbnail: String(entry.isVideo ? entry.posterUrl : (entry.thumbUrl || entry.fileUrl))
                 }));
             }
         } catch (error) { console.warn("Wallpaper preview index: " + error); }

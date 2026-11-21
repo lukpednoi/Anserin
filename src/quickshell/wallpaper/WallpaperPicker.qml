@@ -1177,13 +1177,12 @@ Item {
         id: indexProcess
         objectName: "wallpaper-indexer"
         running: false
-        command: [
-            "python3",
-            window.scriptDir + "/indexer.py",
+        // Anserin core's indexer (also makes the thumbnails) once it is built, else the Python one; same index
+        command: (CoreTools.core ? [CoreTools.wallpaperBin, "index"] : ["python3", window.scriptDir + "/indexer.py"]).concat([
             window.srcDir,
             Caching.getCacheDir("wallpaper"),
             Caching.getRunDir("wallpaper")
-        ]
+        ])
         stdout: StdioCollector {
             onStreamFinished: {
                 let trimmed = this.text ? this.text.trim() : "";
@@ -1895,6 +1894,8 @@ Item {
             readonly property string safeFileName: fileName !== undefined ? String(fileName) : ""
             readonly property string itemFileUrl: fileUrl !== undefined ? String(fileUrl) : ""
             readonly property string itemPosterUrl: posterUrl !== undefined ? String(posterUrl) : ""
+            // the small copy Anserin core's indexer made (decodes far faster than the full picture), else the picture
+            readonly property string itemThumbUrl: { const e = window.thumbLookup[safeFileName]; return e && e.thumbUrl ? String(e.thumbUrl) : ""; }
             readonly property bool isVideo: (model.isVideo !== undefined && model.isVideo !== null) ? !!model.isVideo : (safeFileName.toLowerCase().match(/\.(mp4|mkv|mov|webm)$/) !== null || safeFileName.startsWith("000_"))
 
             readonly property bool isCurrent: ListView.isCurrentItem && !window.isScrollingBlocked
@@ -2010,7 +2011,7 @@ Item {
                             width: (window.itemWidth * 1.5) + ((window.itemHeight + window.s(30)) * Math.abs(window.skewFactor)) + window.s(50)
                             height: window.itemHeight + window.s(30)
                             fillMode: Image.PreserveAspectCrop
-                            source: delegateRoot.isVideo ? (delegateRoot.itemPosterUrl !== "" ? delegateRoot.itemPosterUrl : "") : delegateRoot.itemFileUrl
+                            source: delegateRoot.isVideo ? (delegateRoot.itemPosterUrl !== "" ? delegateRoot.itemPosterUrl : "") : (delegateRoot.itemThumbUrl || delegateRoot.itemFileUrl)
                             asynchronous: true
                             cache: true
                             opacity: (status === Image.Ready && source.toString() !== "") ? 1.0 : 0.0

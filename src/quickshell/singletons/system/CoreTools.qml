@@ -7,7 +7,7 @@ import "../../"
 // Anserin core (src/quickshell/native/core): built by scripts/build-core.py when the shell starts, only when its
 // source or Qt changed, into .lab-data/core-build (outside the config folder, where Quickshell finds a C++
 // plugin). It gives the sound engine (module/, used by Sounds) and anserin-core (bin/: system usage,
-// monitors, lock keys, backlight, Night light). Until it is ready, or when it cannot be built, every user keeps
+// monitors, lock keys, backlight, Night light) and anserin-wallpaper (the wallpaper index with thumbnails). Until it is ready, or when it cannot be built, every user keeps
 // its own older way (pw-play, the shell scripts).
 Item {
     id: root
@@ -16,6 +16,7 @@ Item {
     readonly property bool gamma: core
     readonly property string buildDir: Caching.anserinDir + "/../.lab-data/core-build"
     readonly property string coreBin: buildDir + "/bin/anserin-core"
+    readonly property string wallpaperBin: buildDir + "/bin/anserin-wallpaper"
     readonly property string moduleDir: buildDir + "/module"
 
     Process {

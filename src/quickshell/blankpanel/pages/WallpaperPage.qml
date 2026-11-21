@@ -58,7 +58,7 @@ Item {
             if (!it || !it.filePath) continue;
             const video = !!it.isVideo || /\.(mp4|mkv|mov|webm)$/i.test(it.filePath);
             const bucket = it.bucket === "Monochrome" ? "Gray" : (it.bucket || "Gray");
-            const row = { filePath: String(it.filePath), url: String(video ? (it.posterUrl || "") : (it.fileUrl || ("file://" + it.filePath))),
+            const row = { filePath: String(it.filePath), url: String(video ? (it.posterUrl || "") : (it.thumbUrl || it.fileUrl || ("file://" + it.filePath))),
                           poster: String(it.posterPath || ""), isVideo: video, hex: String(it.hex || "#808080"), bucket: video ? "" : bucket };
             (video ? vids : pics).push(row);
         }
@@ -70,8 +70,9 @@ Item {
     }
     Process {
         id: indexer
-        command: ["python3", Caching.anserinDir + "/scripts/wallpaper/indexer.py", page.srcDir,
-                  Caching.getCacheDir("wallpaper"), Caching.getRunDir("wallpaper")]
+        // Anserin core's indexer (also makes the thumbnails) once it is built, else the Python one; same index
+        command: (CoreTools.core ? [CoreTools.wallpaperBin, "index"] : ["python3", Caching.anserinDir + "/scripts/wallpaper/indexer.py"])
+                     .concat([page.srcDir, Caching.getCacheDir("wallpaper"), Caching.getRunDir("wallpaper")])
         stdout: StdioCollector {
             onStreamFinished: { try { page.load(JSON.parse(this.text.trim())); } catch (e) {} }
         }

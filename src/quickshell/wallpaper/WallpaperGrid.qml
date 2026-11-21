@@ -40,7 +40,7 @@ FocusScope {
                 readonly property string fileName: String(model.fileName || "")
                 readonly property bool video: !!model.isVideo
                 readonly property var entry: root.browser.thumbLookup[fileName] || ({})
-                readonly property string thumbnail: String(model.posterUrl || entry.posterUrl || (video ? "" : model.fileUrl || entry.fileUrl || ""))
+                readonly property string thumbnail: String(model.posterUrl || entry.posterUrl || (video ? "" : entry.thumbUrl || model.fileUrl || entry.fileUrl || ""))
                 objectName: "orbit-wallpaper-tile-" + index
                 width: grid.cellWidth; height: grid.cellHeight
                 Rectangle {

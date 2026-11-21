@@ -12,6 +12,7 @@ SOURCE = ROOT / "src/quickshell/native/core"
 BUILD = ROOT / ".lab-data/core-build"
 LIBRARY = BUILD / "module/libanserincore.so"   # with its qmldir; imported by path from the shell
 TOOL = BUILD / "bin/anserin-core"              # the helper program the scripts call
+WALLPAPER = BUILD / "bin/anserin-wallpaper"    # the wallpaper indexer
 
 
 def main():
@@ -19,7 +20,7 @@ def main():
     build = BUILD
     version_file = build / "qt-version"
     inputs = [p for p in SOURCE.rglob("*") if p.suffix in (".cpp", ".h", ".xml") or p.name in ("CMakeLists.txt", "qmldir")]
-    built = [LIBRARY, TOOL]
+    built = [LIBRARY, TOOL, WALLPAPER]
     if (all(p.is_file() for p in built) and version_file.is_file() and version_file.read_text() == qt_version
             and all(path.stat().st_mtime <= min(p.stat().st_mtime for p in built) for path in inputs)):
         return
