@@ -21,10 +21,8 @@ FocusScope {
     readonly property bool sceneActive: rootLock.locked
     readonly property string animationStyle: Config.getSetting("lockscreen.animation", "padlock")
     // Simple (lockscreen.style): no Dashboard; the clock, and the profile picture, the name and the password under it;
-    // unlocked it slides up. After the corner revolver's Lock (AnserinMode.lockShotAt), in either style, the intro's
-    // waves sweep in from the top-right corner to the bottom-left instead of down from the top.
+    // unlocked it slides up.
     readonly property bool simple: Config.getSetting("lockscreen.style", "dashboard") === "simple"
-    readonly property bool diagonalIntro: Date.now() - AnserinMode.lockShotAt < 4000
     property real simpleSlide: 0
     readonly property bool portalEnabled: !simple && (animationStyle === "portal" || animationStyle === "portal-large")
     readonly property bool transitionEnabled: !simple && animationStyle !== "default"

@@ -14,7 +14,6 @@ layout(std140, binding = 0) uniform buf {
     vec4 color2;
     vec4 color3;
     vec4 color4;
-    float diagonal;   // 1: from the top-right corner to the bottom-left (the Simple lock screen's Bullet)
 };
 
 layout(binding = 1) uniform sampler2D source;
@@ -24,15 +23,14 @@ const float TAU = 6.283185307179586;
 const float STAGGER = 0.079;
 const float SPEED = 1.65;
 
-// p.y: how far along the sweep this point is, `total` the sweep's length
-float layerDist(float i, vec2 p, float u, float phase, float total, out bool started, out bool finished) {
+float layerDist(float i, vec2 p, float u, float phase, out bool started, out bool finished) {
     float prog = (reveal - i * STAGGER) * SPEED;
     started = prog > 0.0;
     finished = prog >= 1.0;
     if (!started || finished) return 0.0;
 
     float smoothProg = mix(prog, prog * prog * (3.0 - 2.0 * prog), 0.5);
-    float currentY = total * smoothProg;
+    float currentY = itemSize.y * smoothProg;
     float envelope = pow(sin(smoothProg * PI), 0.7);
     float amp = s28 * 2.0 * envelope * (1.0 - i * 0.05);
 
@@ -51,10 +49,10 @@ vec4 shade(vec4 accum, float d) {
     return accum;
 }
 
-vec4 layer(vec4 accum, vec4 color, float i, vec2 p, float u, float phase, float total) {
+vec4 layer(vec4 accum, vec4 color, float i, vec2 p, float u, float phase) {
     bool started;
     bool finished;
-    float d = layerDist(i, p, u, phase, total, started, finished);
+    float d = layerDist(i, p, u, phase, started, finished);
     if (!started) return accum;
     if (finished) return color;
 
@@ -67,10 +65,10 @@ vec4 layer(vec4 accum, vec4 color, float i, vec2 p, float u, float phase, float 
     return mix(accum, lit, edge);
 }
 
-vec4 opening(vec4 accum, float i, vec2 p, float u, float phase, float total) {
+vec4 opening(vec4 accum, float i, vec2 p, float u, float phase) {
     bool started;
     bool finished;
-    float d = layerDist(i, p, u, phase, total, started, finished);
+    float d = layerDist(i, p, u, phase, started, finished);
     if (!started) return accum;
     if (finished) return vec4(0.0);
 
@@ -89,22 +87,14 @@ void main() {
 
     vec2 p = qt_TexCoord0 * itemSize;
     float u = p.x / max(itemSize.x, 1.0);
-    float total = itemSize.y;
-    if (diagonal > 0.5) {
-        // measured from the top-right corner along the diagonal; the waves run across it
-        float k = 0.70710678;
-        u = (p.x + p.y) / max(itemSize.x + itemSize.y, 1.0);
-        p = vec2(p.x, ((itemSize.x - p.x) + p.y) * k);
-        total = (itemSize.x + itemSize.y) * k;
-    }
     float phase = reveal * 9.0;
 
-    accum = layer(accum, color0, 0.0, p, u, phase, total);
-    accum = layer(accum, color1, 1.0, p, u, phase, total);
-    accum = layer(accum, color2, 2.0, p, u, phase, total);
-    accum = layer(accum, color3, 3.0, p, u, phase, total);
-    accum = layer(accum, color4, 4.0, p, u, phase, total);
-    accum = opening(accum, 5.0, p, u, phase, total);
+    accum = layer(accum, color0, 0.0, p, u, phase);
+    accum = layer(accum, color1, 1.0, p, u, phase);
+    accum = layer(accum, color2, 2.0, p, u, phase);
+    accum = layer(accum, color3, 3.0, p, u, phase);
+    accum = layer(accum, color4, 4.0, p, u, phase);
+    accum = opening(accum, 5.0, p, u, phase);
 
     fragColor = accum * qt_Opacity;
 }

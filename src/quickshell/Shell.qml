@@ -26,8 +26,6 @@ ShellRoot {
             else mainWindow.openFromEdge("blankpanel", screenName);
         }
     }
-    // the bottom-left corner: the desktop's quick actions in a revolver's cylinder (Anserin interface)
-    CornerRevolver { onLockRequested: sessionLock.lock() }
     Loader {
         active: PanelLayout.capsuleScreen !== ""
         sourceComponent: WorkspaceCapsule { checkEdge: done => mainWindow.checkPointerOnEdge("left", done) }

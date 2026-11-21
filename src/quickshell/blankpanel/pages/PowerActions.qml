@@ -2,10 +2,10 @@ import QtQuick
 import Quickshell
 import "../../"
 
-// The User pages' power actions, using the shell's own scripts. The panel closes first. (Lock is the corner
-// revolver's, in the Anserin interface.)
+// The User pages' power actions, using the shell's own scripts and its lock. The panel closes first.
 QtObject {
     readonly property var list: [
+        { id: "lock", icon: "󰌾", name: "Lock", danger: false },
         { id: "logout", icon: "󰍃", name: "Log out", danger: true },
         { id: "suspend", icon: "󰤄", name: "Suspend", danger: false },
         { id: "reboot", icon: "󰜉", name: "Reboot", danger: true },
@@ -15,6 +15,7 @@ QtObject {
     function run(id) {
         const dir = Caching.anserinDir + "/scripts/system/";
         const commands = {
+            lock: ["quickshell", "-p", Caching.mainQml, "ipc", "call", "lock", "activate"],
             logout: ["bash", dir + "exit.sh"],
             suspend: ["bash", dir + "suspend.sh"],
             reboot: ["bash", dir + "reboot.sh"],

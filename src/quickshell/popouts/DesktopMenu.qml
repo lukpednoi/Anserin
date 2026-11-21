@@ -146,6 +146,19 @@ PanelWindow {
         Quickshell.execDetached(["bash", scriptPath, mon, targetId]);
     }
 
+    // the desktop's own menu (right-click on empty desktop): Open Redactor, Restart desktop and Lock screen
+    function reloadShell() {
+        DesktopMenuController.hide();
+        let dir = (typeof Caching !== "undefined" && Caching.anserinDir) ? Caching.anserinDir : "";
+        Quickshell.execDetached(["bash", dir + "/scripts/reload.sh"]);
+    }
+
+    function lockScreen() {
+        DesktopMenuController.hide();
+        let dir = (typeof Caching !== "undefined" && Caching.anserinDir) ? Caching.anserinDir : "";
+        Quickshell.execDetached(["bash", dir + "/scripts/lock.sh"]);
+    }
+
     function openGuide(tab, openOnly) {
         DesktopMenuController.hide();
         let targetTab = tab !== undefined ? String(tab).trim() : "";
@@ -229,6 +242,7 @@ PanelWindow {
                 spacing: desktopMenuWindow.s(2)
 
                 RowLayout {
+                    visible: desktopMenuWindow.isWidgetMode          // the widget's Edit and Delete buttons
                     anchors.left: parent.left
                     anchors.right: parent.right
                     spacing: 0
@@ -326,7 +340,6 @@ PanelWindow {
                         spacing: desktopMenuWindow.s(2)
 
                         ClickButton {
-                            visible: desktopMenuWindow.isWidgetMode
                             width: parent.width
                             height: desktopMenuWindow.s(29)
                             cornerRadius: desktopMenuWindow.s(8)
@@ -348,6 +361,38 @@ PanelWindow {
                             onClicked: {
                                 desktopMenuWindow.openRedactor("");
                             }
+                        }
+
+                        ClickButton {
+                            visible: !desktopMenuWindow.isWidgetMode
+                            width: parent.width
+                            height: desktopMenuWindow.s(29)
+                            cornerRadius: desktopMenuWindow.s(8)
+                            contentAlignment: Qt.AlignLeft
+                            horizontalPadding: desktopMenuWindow.s(10)
+                            buttonIcon: "󰑐"
+                            iconFontSize: desktopMenuWindow.s(15)
+                            textFontSize: desktopMenuWindow.s(12)
+                            buttonText: "Restart desktop"
+                            accentColor: desktopMenuWindow.buttonColor
+                            textColor: ThemeBackend.text
+                            onClicked: desktopMenuWindow.reloadShell()
+                        }
+
+                        ClickButton {
+                            visible: !desktopMenuWindow.isWidgetMode
+                            width: parent.width
+                            height: desktopMenuWindow.s(29)
+                            cornerRadius: desktopMenuWindow.s(8)
+                            contentAlignment: Qt.AlignLeft
+                            horizontalPadding: desktopMenuWindow.s(10)
+                            buttonIcon: "󰌾"
+                            iconFontSize: desktopMenuWindow.s(15)
+                            textFontSize: desktopMenuWindow.s(12)
+                            buttonText: "Lock screen"
+                            accentColor: desktopMenuWindow.buttonColor
+                            textColor: ThemeBackend.text
+                            onClicked: desktopMenuWindow.lockScreen()
                         }
 
                     }

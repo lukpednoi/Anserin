@@ -162,8 +162,6 @@ ShaderEffect {
     property color color2: ThemeBackend.sapphire
     property color color3: ThemeBackend.blue
     property color color4: ThemeBackend.mauve
-    // after the corner revolver's Lock: from the top-right corner to the bottom-left instead of down from the top
-    property real diagonal: screenRoot.diagonalIntro ? 1 : 0
     property var source: ShaderEffectSource {
         sourceItem: freezeBackdropLayer
         hideSource: false

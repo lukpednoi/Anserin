@@ -15,9 +15,6 @@ Singleton {
     readonly property var display: (Config.rawSettings && Config.rawSettings.display) || ({})
     readonly property string style: "anserin"
     readonly property bool active: true
-    // when the corner revolver's Lock was fired (Date.now()): the Simple lock screen's Bullet animation sweeps in
-    // diagonally after it, any other lock comes down from the top
-    property real lockShotAt: 0
 
     readonly property var separatedKeys: ["bar", "dock", "launcher", "notifications", "osd", "theme", "widgets"]
     // machine-wide, so never swapped: the SDDM style and the apps that follow Anserin colours
