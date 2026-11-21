@@ -2600,8 +2600,8 @@ Item {
 
             // Power-on charge: the black hole feeds itself. Two thick streams of light, from the top left and the
             // bottom right, spiral in, drawn in from outside at first, and melt into the glow round its rim; thicker
-            // and brighter the longer the charge lasts. Drawn on the GPU (bh_charge_streams.frag), only while
-            // charging and shown.
+            // and brighter the longer the charge lasts, in the black hole's own colour and tilt. Drawn on the GPU
+            // (bh_charge_streams.frag), only while charging and shown.
             ShaderEffect {
                 id: chargeFx
                 width: 1400; height: 1400
@@ -2614,6 +2614,9 @@ Item {
                 property real level: view.chargeLevel
                 property real time: view.chargeTime
                 property real head: Math.min(1.0, view.chargeTime / 1.6)
+                // the editor's colour (Copper / Champagne) and tilt, as the black hole itself uses them
+                property real colorMode: view.bhColorMode
+                property real tiltRad: view.bhTiltRad
                 fragmentShader: Qt.resolvedUrl("shaders/bh_charge_streams.frag.qsb")
             }
 
