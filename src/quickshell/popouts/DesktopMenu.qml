@@ -45,7 +45,6 @@ PanelWindow {
     function s(val) { return (typeof Scaler !== "undefined") ? Scaler.s(val) : val; }
 
     property bool isVisible: DesktopMenuController.isVisible
-    property bool isWidgetMode: DesktopMenuController.mode === "widget"
     property real targetX: DesktopMenuController.targetX - frameInset
     property real targetY: DesktopMenuController.targetY - frameInset
 
@@ -137,9 +136,9 @@ PanelWindow {
 
     visible: isVisible || menuContainer.animProgress > 0.001
 
-    function openRedactor(selectedWidgetId) {
+    function openRedactor() {
         DesktopMenuController.hide();
-        let targetId = selectedWidgetId !== undefined ? String(selectedWidgetId) : "";
+        let targetId = "";
         let mon = (desktopMenuWindow.screen && desktopMenuWindow.screen.name) ? desktopMenuWindow.screen.name : ((DesktopMenuController.screen && DesktopMenuController.screen.name) ? DesktopMenuController.screen.name : "");
         let dir = (typeof Caching !== "undefined" && Caching.anserinDir) ? Caching.anserinDir : "";
         let scriptPath = dir ? (dir + "/scripts/redactor.sh") : "redactor.sh";
@@ -157,17 +156,6 @@ PanelWindow {
         DesktopMenuController.hide();
         let dir = (typeof Caching !== "undefined" && Caching.anserinDir) ? Caching.anserinDir : "";
         Quickshell.execDetached(["bash", dir + "/scripts/lock.sh"]);
-    }
-
-    function openGuide(tab, openOnly) {
-        DesktopMenuController.hide();
-        let targetTab = tab !== undefined ? String(tab).trim() : "";
-        let dir = (typeof Caching !== "undefined" && Caching.anserinDir) ? Caching.anserinDir : "";
-        let args = (openOnly ? "open guide" : "toggle guide") + (targetTab ? (" " + targetTab) : "");
-        let cmd = (dir ? ("if [ -f '" + dir + "/scripts/qs_manager.sh' ]; then bash '" + dir + "/scripts/qs_manager.sh' " + args + "; else ") : "")
-            + "if command -v anserin >/dev/null 2>&1; then anserin " + args + "; elif command -v qs_manager.sh >/dev/null 2>&1; then qs_manager. " + args + "; fi"
-            + (dir ? "; fi" : "");
-        Quickshell.execDetached(["bash", "-c", cmd]);
     }
 
     Item {
@@ -241,83 +229,6 @@ PanelWindow {
                 anchors.top: parent.top
                 spacing: desktopMenuWindow.s(2)
 
-                RowLayout {
-                    visible: desktopMenuWindow.isWidgetMode          // the widget's Edit and Delete buttons
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    spacing: 0
-
-                    Item {
-                        visible: desktopMenuWindow.alignRight
-                        Layout.fillWidth: true
-                    }
-
-                    Rectangle {
-                        id: iconButtonsBox
-                        Layout.preferredWidth: iconRow.implicitWidth + desktopMenuWindow.s(8)
-                        Layout.preferredHeight: iconRow.implicitHeight + desktopMenuWindow.s(8)
-                        color: iconButtonsBoxGlass.active ? "transparent" : desktopMenuWindow.menuBackgroundColor
-                        radius: desktopMenuWindow.cornerRadius
-                        WallpaperBlur {
-                        id: iconButtonsBoxGlass
-                        anchors.fill: parent
-                        radius: parent.radius
-                    }
-                    clip: true
-
-                        Row {
-                            id: iconRow
-                            anchors.centerIn: parent
-                            spacing: desktopMenuWindow.s(3)
-
-                            IconButton {
-                                visible: desktopMenuWindow.isWidgetMode
-                                width: desktopMenuWindow.s(36)
-                                height: desktopMenuWindow.s(36)
-                                size: height
-                                cornerRadius: desktopMenuWindow.s(8)
-                                accentColor: desktopMenuWindow.primaryButtonColor
-                                textColor: desktopMenuWindow.primaryTextColor
-                                buttonIcon: "󰏫"
-                                iconFontSize: desktopMenuWindow.s(16)
-                                onClicked: {
-                                    desktopMenuWindow.openRedactor(DesktopMenuController.targetWidgetId);
-                                }
-                            }
-
-                            DeleteButton {
-                                visible: desktopMenuWindow.isWidgetMode
-                                width: desktopMenuWindow.s(36)
-                                height: desktopMenuWindow.s(36)
-                                size: height
-                                cornerRadius: desktopMenuWindow.s(8)
-                                accentColor: (typeof ThemeBackend !== "undefined" && ThemeBackend.red) ? Qt.rgba(ThemeBackend.red.r, ThemeBackend.red.g, ThemeBackend.red.b, 0.22) : "#452026"
-                                textColor: (typeof ThemeBackend !== "undefined" && ThemeBackend.red) ? ThemeBackend.red : "#f38ba8"
-                                onClicked: {
-                                    let wId = DesktopMenuController.targetWidgetId;
-                                    if (wId) {
-                                        let mon = (desktopMenuWindow.screen && desktopMenuWindow.screen.name) ? desktopMenuWindow.screen.name : ((DesktopMenuController.screen && DesktopMenuController.screen.name) ? DesktopMenuController.screen.name : "");
-                                        let safeMon = mon.replace(/[^a-zA-Z0-9_-]/g, "_");
-                                        if (typeof WidgetSync !== "undefined") {
-                                            WidgetSync.removeWidget(mon, wId);
-                                        }
-                                        let mainQml = (typeof Caching !== "undefined" && Caching.mainQml) ? Caching.mainQml : "";
-                                        if (mainQml) {
-                                            Quickshell.execDetached(["quickshell", "-p", mainQml, "ipc", "call", "widgets-" + safeMon, "remove", wId]);
-                                        }
-                                    }
-                                    DesktopMenuController.hide();
-                                }
-                            }
-                        }
-                    }
-
-                    Item {
-                        visible: !desktopMenuWindow.alignRight
-                        Layout.fillWidth: true
-                    }
-                }
-
                 Rectangle {
                     id: clickButtonsBox
                     width: parent.width
@@ -359,12 +270,11 @@ PanelWindow {
                             accentColor: desktopMenuWindow.primaryButtonColor
                             textColor: desktopMenuWindow.primaryTextColor
                             onClicked: {
-                                desktopMenuWindow.openRedactor("");
+                                desktopMenuWindow.openRedactor();
                             }
                         }
 
                         ClickButton {
-                            visible: !desktopMenuWindow.isWidgetMode
                             width: parent.width
                             height: desktopMenuWindow.s(29)
                             cornerRadius: desktopMenuWindow.s(8)
@@ -380,7 +290,6 @@ PanelWindow {
                         }
 
                         ClickButton {
-                            visible: !desktopMenuWindow.isWidgetMode
                             width: parent.width
                             height: desktopMenuWindow.s(29)
                             cornerRadius: desktopMenuWindow.s(8)
@@ -395,58 +304,6 @@ PanelWindow {
                             onClicked: desktopMenuWindow.lockScreen()
                         }
 
-                    }
-                }
-
-                // Settings: only in a widget's menu (no Settings window, and files open from the left panel's File page)
-                Rectangle {
-                    id: settingsBox
-                    visible: desktopMenuWindow.isWidgetMode
-                    width: parent.width
-                    height: settingsCol.implicitHeight + desktopMenuWindow.s(8)
-                    color: settingsBoxGlass.active ? "transparent" : desktopMenuWindow.menuBackgroundColor
-                    radius: desktopMenuWindow.cornerRadius
-                    WallpaperBlur {
-                        id: settingsBoxGlass
-                        anchors.fill: parent
-                        radius: parent.radius
-                    }
-                    clip: true
-
-                    Column {
-                        id: settingsCol
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.margins: desktopMenuWindow.s(4)
-
-                        ClickButton {
-                            width: parent.width
-                            height: desktopMenuWindow.s(29)
-                            cornerRadius: desktopMenuWindow.s(8)
-                            contentAlignment: Qt.AlignLeft
-                            horizontalPadding: desktopMenuWindow.s(10)
-                            buttonIcon: "󰒓"
-                            iconFontSize: desktopMenuWindow.s(15)
-                            textFontSize: desktopMenuWindow.s(12)
-                            buttonText: {
-                                if (typeof I18n !== "undefined" && typeof I18n.t === "function") {
-                                    let val = I18n.t("widgets.guide.name", "Settings");
-                                    if (val && val !== "widgets.guide.name") return val;
-                                    return "Settings";
-                                }
-                                return "Settings";
-                            }
-                            accentColor: desktopMenuWindow.buttonColor
-                            textColor: ThemeBackend.text
-                            onClicked: {
-                                if (desktopMenuWindow.isWidgetMode) {
-                                    desktopMenuWindow.openGuide("display_general");
-                                } else {
-                                    desktopMenuWindow.openGuide("");
-                                }
-                            }
-                        }
                     }
                 }
             }

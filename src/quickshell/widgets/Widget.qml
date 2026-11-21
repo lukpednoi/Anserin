@@ -22,12 +22,6 @@ PanelWindow {
 
     readonly property real auraMargin: 8
 
-    readonly property bool isSelected: typeof DesktopMenuController !== "undefined"
-        && DesktopMenuController.isVisible
-        && DesktopMenuController.mode === "widget"
-        && DesktopMenuController.targetWidgetId === String(root.wId)
-        && (!DesktopMenuController.screen || !root.screen || !DesktopMenuController.screen.name || !root.screen.name || DesktopMenuController.screen.name === root.screen.name)
-
     function applyCustomProps() {
         let it = faceLoader.item;
         if (!it || !customProps) return;
@@ -209,39 +203,4 @@ PanelWindow {
         }
     }
 
-    Item {
-        id: auraContainer
-        width: faceLoader.width + (root.auraMargin * 2)
-        height: faceLoader.height + (root.auraMargin * 2)
-        anchors.centerIn: faceLoader
-        rotation: faceLoader.rotation
-        visible: opacity > 0.001
-        opacity: root.isSelected ? 1.0 : 0.0
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 150
-                easing.type: Easing.OutQuad
-            }
-        }
-
-        SelectionOutline {
-            anchors.fill: parent
-            running: root.isSelected && auraContainer.opacity > 0.001
-        }
-    }
-
-    MouseArea {
-        id: widgetMenuArea
-        anchors.fill: parent
-        acceptedButtons: Qt.RightButton | (DesktopMenuController.isVisible ? Qt.LeftButton : 0)
-        enabled: !root.isRedacting
-        onClicked: mouse => {
-            if (mouse.button === Qt.RightButton) {
-                DesktopMenuController.toggle(root.screen, (root.shownX - root.auraMargin) + mouse.x, (root.shownY - root.auraMargin) + mouse.y, "widget", root.wId);
-            } else {
-                DesktopMenuController.hide();
-            }
-        }
-    }
 }

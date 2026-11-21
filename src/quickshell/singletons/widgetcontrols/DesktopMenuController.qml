@@ -39,28 +39,11 @@ Item {
     function toggle(scr, posX, posY, menuMode, widgetId) {
         let m = menuMode !== undefined ? menuMode : "desktop";
         let wId = widgetId !== undefined ? String(widgetId) : "";
-        let sName = (scr && scr.name) ? scr.name : "";
-        let curSName = (controller.screen && controller.screen.name) ? controller.screen.name : "";
 
-        if (controller.isVisible) {
-            let sameScreen = (!sName || !curSName || sName === curSName);
-            let dx = Math.abs(controller.targetX - posX);
-            let dy = Math.abs(controller.targetY - posY);
-            let isSamePos = sameScreen && (dx < 10 && dy < 10);
-
-            if (m === "widget") {
-                // Widget logic: hide if clicked exact same spot, otherwise fall through to move/reopen
-                if (controller.mode === "widget" && controller.targetWidgetId === wId && isSamePos) {
-                    controller.hide();
-                    return;
-                }
-            } else if (m === "desktop") {
-                // Desktop logic: hide whenever clicked on wallpaper again while in desktop mode
-                if (controller.mode === "desktop") {
-                    controller.hide();
-                    return;
-                }
-            }
+        // a second right-click on the desktop while its menu is open closes it (widgets have no menu of their own)
+        if (controller.isVisible && m === "desktop" && controller.mode === "desktop") {
+            controller.hide();
+            return;
         }
 
         openAt(scr, posX, posY, m, wId);
