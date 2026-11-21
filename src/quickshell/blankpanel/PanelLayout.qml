@@ -10,7 +10,10 @@ import "../"
 //                  of about 44 px as fit, all the same height, the last reaching the foot of the sidebar, in the
 //                  panel and in Edit panel alike (cellLayout).
 //   panel.star     the module that opens first every time the panel opens ("" = the page used last)
-//   panel.styles   { system: "graphs" | "rings" | "bubble", user: "hero" | "slide", weather: "classic" | "dashboard" }
+//   panel.styles   { system: "graphs" | "rings" | "bubble", user: "hero" | "slide", weather: "classic" | "dashboard" | "smart",
+//                  network: "classic" | "radar" | "gargantua" }
+//   panel.smartWeather  { arc: bool, tone: "mirror" | "theme" } for the Smart Weather style (Edit panel's Smart bar)
+//   panel.gargantua     { colour: "copper" | "champagne", tilt: bool, unified: bool } for the Gargantua Network style
 //   panel.music    the Anserin interface's own copy of Theme → Music (style "original" | "m3" | "m5", the covers,
 //                  m3Background, cavaEnabled, and <style>FirstPage "lyrics" | "eq"), set in Edit panel → Style →
 //                  Music. It starts as a copy of theme.music the first time the Anserin interface runs without one;
@@ -28,8 +31,9 @@ Singleton {
         music: { name: "Music", icon: "󰎈", face: "../bar/faces/media/SideMediaFace.qml",
                  styles: [{ id: "original", name: "Classic" }, { id: "m3", name: "Split" }, { id: "m5", name: "Ambient" }] },
         weather: { name: "Weather", icon: "\u{F0C2}", face: "../bar/faces/weather/SideWeatherFace.qml",
-                   styles: [{ id: "classic", name: "Classic" }, { id: "dashboard", name: "Dashboard" }] },
-        network: { name: "Network", icon: "󰤨", face: "../bar/faces/wifi/SideWifiFace.qml" },
+                   styles: [{ id: "classic", name: "Classic" }, { id: "dashboard", name: "Dashboard" }, { id: "smart", name: "Smart" }] },
+        network: { name: "Network", icon: "󰤨", face: "../bar/faces/wifi/SideWifiFace.qml",
+                   styles: [{ id: "classic", name: "Classic" }, { id: "radar", name: "Radar" }, { id: "gargantua", name: "Gargantua" }] },
         launcher: { name: "Launcher", icon: "󰵆", face: "../bar/faces/LauncherFace.qml", live: true },
         timer: { name: "Timer", icon: "󰔛", face: "SideTimerFace.qml" },
         system: { name: "System", icon: "󰍛", styles: [{ id: "graphs", name: "Graphs" }, { id: "rings", name: "Activity rings" }, { id: "bubble", name: "Bubble" }] },
@@ -213,6 +217,8 @@ Singleton {
     property bool editing: false
     // the System page's Bubble style is full screen: the panel it came from stays open until it is back
     property bool bubbleFull: false
+    // Gargantua is switching the radio on or off: its page stays alive (unseen, silent) until that is done
+    property bool networkPowerBusy: false
     property string editScreen: ""
     signal editFinished(string screenName)
     function startEdit(screenName) {

@@ -7,3 +7,5 @@ SceneEditor 1.0 SceneEditor.qml
 EditorChoices 1.0 EditorChoices.qml
 MusicStyleEditor 1.0 MusicStyleEditor.qml
 FilePage 1.0 FilePage.qml
+SmartWeatherEditor 1.0 SmartWeatherEditor.qml
+GargantuaEditor 1.0 GargantuaEditor.qml

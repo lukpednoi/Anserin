@@ -5,9 +5,13 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "../"
 import "pages" as Pages
+import "smartweather" as SmartWeather
+import "../network" as Network
+import "../network/orbit" as Orbit
 import "../widgets"
 import "../reusables"
 import "../media" as Media
+import "../reusables/warning"
 
 // Edit panel: a full-screen editor for the left edge panel's sidebar, built like the widget editor (same dim and
 // the same bottom toolbar, WidgetPicker, with its own sections). The sidebar stands in the middle at its real
@@ -18,12 +22,13 @@ import "../media" as Media
 // button puts a star on the pointer: click a sidebar module to star it (again to unstar). Style shows a large live
 // preview of the chosen module's style in the middle of the right edge, the styles before and after it half showing
 // above and below, smaller and faint; the wheel or a swipe over it brings the next one forward (one a click or swipe,
-// stopping at either end, as the sidebar steps). With Dashboard chosen for Weather, the pencil
-// beside its preview opens the scene editor: the sidebar slides away to the left, the preview rises to the middle
-// of the screen and SceneEditor's card opens beside it (Adjust saves panel.weatherScene.*, Test only changes the
-// big preview); its Done or Esc puts everything back. Each of Music's three styles (Classic, Split, Ambient, panel.music)
-// has a pencil opening its own card (MusicStyleEditor) in the same way. Every change is saved at once; Done or Esc
-// closes the editor and reopens the panel.
+// stopping at either end, as the sidebar steps). With Dashboard or Smart chosen for Weather, or Gargantua for
+// Network, the pencil beside its preview opens the style editor: the sidebar slides away to the left, the preview
+// rises to the middle of the screen and its Smart bar comes down above it (SceneEditor: Adjust saves
+// panel.weatherScene.*, Test only changes the big preview; SmartWeatherEditor; GargantuaEditor); its Done or Esc puts
+// everything back. Each of Music's three styles (Classic, Split, Ambient, panel.music) has a pencil opening its own
+// bar (MusicStyleEditor) in the same way. Every change is saved at once; Done or Esc closes the editor and reopens
+// the panel.
 PanelWindow {
     id: win
     color: "transparent"
@@ -37,6 +42,39 @@ PanelWindow {
 
     function s(v) { return Scaler.s(v); }
 
+    // ---------- picking a style, with a warning for the heavy ones (reusables/warning/WarningDialog) ----------
+    // Bubble (System): a plain warning. Gargantua (Network): Before → After (the two style cards), Cancel goes back.
+    property var styleWarn: null        // { module, prev } while a change warning is open
+    property var styleShots: []         // the two card pictures, kept while the warning shows them
+    Timer { id: shotWait; interval: 50; property var go: null; onTriggered: { const f = go; go = null; if (f) f(); } }
+    function pickStyle(moduleId, styleId) {
+        const prev = PanelLayout.style(moduleId);
+        if (prev === styleId) return;
+        if (moduleId === "system" && styleId === "bubble") {
+            PanelLayout.setStyle(moduleId, styleId);
+            styleWarning.show({ text: "Bubble draws a live view of everything running, so it uses more of your computer than Graphs: extra RAM and some CPU while the System page is open. Nothing runs once the page is closed." });
+        } else if (moduleId === "network" && styleId === "gargantua") {
+            const text = "Gargantua draws a live black hole, so it uses more of your computer than Classic: extra RAM and some GPU while the Network page is open. Nothing runs once the page is closed.";
+            const item = id => { for (let i = 0; i < previewRep.count; i++) { const it = previewRep.itemAt(i); if (it && it.modelData.id === id) return it; } return null; };
+            const pa = item(prev), pb = item(styleId);
+            const done = (before, after) => {
+                if (pa) pa.holdDrawn = false;
+                PanelLayout.setStyle(moduleId, styleId);
+                win.styleWarn = { module: moduleId, prev: prev };
+                styleWarning.show({ text: text, before: before, after: after });
+            };
+            // the two cards as pictures; if either cannot be taken, the warning shows without them
+            const shoot = () => {
+                if (!pa || !pb || !pa.card.grabToImage(ra => { if (!pb.card.grabToImage(rb => { win.styleShots = [ra, rb]; done(ra.url, rb.url); })) done("", ""); })) done("", "");
+            };
+            // a card far from the front is hidden and comes out blank: draw it (unseen) for a few frames first
+            if (pa && !pa.visible) { pa.holdDrawn = true; shotWait.go = shoot; shotWait.restart(); }
+            else shoot();
+        } else {
+            PanelLayout.setStyle(moduleId, styleId);
+        }
+    }
+
     property string styleModule: ""       // the module whose styles are shown at the right ("" = none)
     property bool starMode: false         // the pointer carries a star
 
@@ -44,8 +82,8 @@ PanelWindow {
     property bool sceneEdit: false        // the big preview and its card are out
     property real sceneT: 0               // 0: the preview in its place at the right, 1: in the middle
     property rect sceneFrom: Qt.rect(0, 0, 1, 1)
-    property string sceneKind: "weather"  // weather, or a Music style: original, m3, m5
-    readonly property bool sceneMusic: sceneKind !== "weather"
+    property string sceneKind: "weather"  // weather (Dashboard), smart (Smart Weather), gargantua (Network), or a Music style: original, m3, m5
+    readonly property bool sceneMusic: ["original", "m3", "m5"].indexOf(sceneKind) >= 0
     // the design size of what is previewed: the panel's pages, or the Music window
     function designOf(moduleId) { return moduleId === "music" ? Qt.size(625, 565) : Qt.size(565, 525); }
     readonly property size sceneDesign: designOf(sceneMusic ? "music" : "weather")
@@ -54,7 +92,8 @@ PanelWindow {
         const p = frame.mapToItem(root, 0, 0);
         sceneFrom = Qt.rect(p.x, p.y, frame.width, frame.height);
         sceneKind = kind || "weather";
-        if (!sceneMusic) sceneCard.mode = "adjust";
+        if (sceneKind === "weather") sceneCard.mode = "adjust";
+        if (sceneKind === "smart") smartCard.reset();
         sceneEdit = true;
         sceneClose.stop();
         sceneOpen.restart();
@@ -278,7 +317,7 @@ PanelWindow {
                 enabled: !win.sceneEdit
                 // Weather's and Music's previews leave room for their pencils at the right
                 anchors.right: parent.right
-                anchors.rightMargin: win.styleModule === "weather" || win.styleModule === "music" ? win.s(76) : win.s(40)
+                anchors.rightMargin: ["weather", "music", "network"].indexOf(win.styleModule) >= 0 ? win.s(76) : win.s(40)
                 anchors.top: parent.top; anchors.topMargin: win.s(28)
                 width: win.s(win.designOf(win.styleModule).width) * k
                 height: toolbar.y - win.s(28) - win.s(20)   // the toolbar is outside this item: no anchor
@@ -335,11 +374,14 @@ PanelWindow {
                 readonly property real cardH: win.s(design.height) * k + label
 
             Repeater {
+                id: previewRep
                 model: previews.styles
                 Item {
                     id: preview
                     required property var modelData
                     required property int index
+                    property alias card: frame
+                    property bool holdDrawn: false     // kept drawn (still unseen) while the warning takes its picture
                     readonly property bool chosen: PanelLayout.style(win.styleModule) === modelData.id
                     readonly property real k: previews.k
                     // where it is: 0 in front, -1 just before it (half showing above), 1 just after (half showing below);
@@ -357,7 +399,7 @@ PanelWindow {
                     // slides in from the right edge, one after the other, each time a module is picked
                     property real enter: 0
                     opacity: enter * (1 - 0.65 * near) * Math.max(0, Math.min(1, 2 - Math.abs(rel)))
-                    visible: opacity > 0.01
+                    visible: opacity > 0.01 || holdDrawn
                     enabled: front
                     property real hoverK: pvMa.containsMouse ? 1.015 : 1
                     Behavior on hoverK { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
@@ -393,10 +435,14 @@ PanelWindow {
                             transformOrigin: Item.TopLeft
                             enabled: false
                             active: win.styleModule !== ""
-                            sourceComponent: ({ graphs: graphsPreview, rings: ringsPreview, hero: heroPreview, slide: slidePreview,
-                                               classic: weatherClassicPreview, dashboard: weatherDashboardPreview,
+                            readonly property Component style: ({ graphs: graphsPreview, rings: ringsPreview, hero: heroPreview, slide: slidePreview,
+                                               classic: win.styleModule === "network" ? networkClassicPreview : weatherClassicPreview,
+                                               dashboard: weatherDashboardPreview, smart: weatherSmartPreview,
+                                               radar: networkRadarPreview, gargantua: networkGargantuaPreview,
                                                original: musicOriginalPreview, m3: musicM3Preview, m5: musicM5Preview,
                                                bubble: bubblePreview })[preview.modelData.id]
+                            // every card is the style itself, moving; all of it goes when Edit panel closes
+                            sourceComponent: style
                         }
                     }
                     // its name, under it while it is in front
@@ -413,12 +459,13 @@ PanelWindow {
                     MouseArea { id: pvMa; anchors.fill: frame; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             Sounds.playSfx("reusables/clickbutton/click.wav");
-                            PanelLayout.setStyle(win.styleModule, preview.modelData.id);
+                            win.pickStyle(win.styleModule, preview.modelData.id);
                         } }
                     // the pencil, right of the preview: the chosen Dashboard's opens the scene editor, each Music style's
                     // its own card
                     IconButton {
-                        visible: preview.front && ((preview.modelData.id === "dashboard" && preview.chosen) || win.styleModule === "music")
+                        visible: preview.front && ((["dashboard", "smart", "gargantua"].indexOf(preview.modelData.id) >= 0 && preview.chosen)
+                                                   || win.styleModule === "music")
                         x: frame.width + win.s(8)
                         y: 0
                         size: win.s(28)
@@ -427,26 +474,30 @@ PanelWindow {
                         iconFontSize: win.s(14)
                         accentColor: ThemeBackend.surface0
                         textColor: ThemeBackend.text
-                        onClicked: win.openScene(frame, win.styleModule === "music" ? preview.modelData.id : "weather")
+                        onClicked: win.openScene(frame, win.styleModule === "music" || preview.modelData.id !== "dashboard"
+                                                       ? preview.modelData.id : "weather")
                     }
                 }
             }
             }
         }
 
-        // ---------- the scene editor: the Dashboard preview in the middle, its card beside it ----------
+        // ---------- the style editor: its Smart bar at the top, the big preview in the middle below it ----------
         Item {
             id: sceneStage
             anchors.fill: parent
             visible: win.sceneEdit
             opacity: win.shown
-            readonly property real cardW: win.s(320)
-            readonly property real gap: win.s(28)
-            readonly property real k: Math.min(1.25, (width - cardW - gap - win.s(96)) / win.s(win.sceneDesign.width), (height - win.s(120)) / win.s(win.sceneDesign.height))
+            readonly property real barTop: win.s(28)
+            readonly property real gap: win.s(22)
+            readonly property real barH: sceneCard.visible ? sceneCard.implicitHeight : smartCard.visible ? smartCard.implicitHeight
+                                       : gargantuaCard.visible ? gargantuaCard.implicitHeight : musicCard.implicitHeight
+            readonly property real areaTop: barTop + barH + gap
+            readonly property real k: Math.min(1.25, (width - win.s(96)) / win.s(win.sceneDesign.width), (height - areaTop - win.s(40)) / win.s(win.sceneDesign.height))
             readonly property real toW: win.s(win.sceneDesign.width) * k
             readonly property real toH: win.s(win.sceneDesign.height) * k
-            readonly property real toX: (width - (toW + gap + cardW)) / 2
-            readonly property real toY: (height - toH) / 2
+            readonly property real toX: (width - toW) / 2
+            readonly property real toY: areaTop + Math.max(0, (height - areaTop - win.s(40) - toH) / 2)
             readonly property real cardIn: Math.max(0, Math.min(1, (win.sceneT - 0.45) / 0.55))
 
             // a click beside the preview and the card closes the editor
@@ -468,9 +519,37 @@ PanelWindow {
                     scale: bigFrame.width / win.s(win.sceneDesign.width)
                     transformOrigin: Item.TopLeft
                     active: win.sceneEdit
-                    sourceComponent: win.sceneMusic ? bigMusic : bigWeather
+                    sourceComponent: win.sceneMusic ? bigMusic : win.sceneKind === "smart" ? bigSmart
+                                   : win.sceneKind === "gargantua" ? bigGargantua : bigWeather
+                }
+                Component {
+                    id: bigGargantua
+                    Item {
+                        Orbit.NetworkStyleShell {
+                            style: "gargantua"
+                            preview: true
+                            width: 565; height: 525
+                            scale: parent.width / 565
+                            transformOrigin: Item.TopLeft
+                        }
+                    }
                 }
                 Component { id: bigWeather; WeatherPage { active: false; animate: true; dashboard: true; sceneTest: sceneCard.test } }
+                Component {
+                    id: bigSmart
+                    SmartWeather.SmartWeatherPage {
+                        running: true
+                        cornerRadius: 0
+                        hour: smartCard.testHour
+                        liveTime: smartCard.liveTime
+                        conditionOverride: smartCard.condition
+                        windOverride: smartCard.wind
+                        showArc: smartCard.arcOn
+                        onActiveHourChanged: smartCard.liveHour = activeHour
+                        onHourScrubbed: (h) => smartCard.setHour(h)
+                        Connections { target: smartCard; function onConditionPicked() { bigPage.item.animateWeatherTransition(); } }
+                    }
+                }
                 Component {
                     id: bigMusic
                     Media.MusicStylePreview { appearance: win.sceneKind; cover: PanelLayout.music[win.sceneKind + "Cover"] || "" }
@@ -492,36 +571,58 @@ PanelWindow {
                 color: Qt.alpha(ThemeBackend.mauve, 0.14)
             }
 
+            // the bars come down from above once the preview is nearly in place
             SceneEditor {
                 id: sceneCard
-                visible: !win.sceneMusic
-                x: sceneStage.toX + sceneStage.toW + sceneStage.gap
-                y: Math.max(win.s(24), sceneStage.toY + (sceneStage.toH - height) / 2)
-                width: sceneStage.cardW
+                visible: win.sceneKind === "weather"
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: sceneStage.barTop - (1 - sceneStage.cardIn) * win.s(24)
+                width: implicitWidth
                 height: implicitHeight
+                maxWidth: parent.width - win.s(48)
                 opacity: sceneStage.cardIn
-                scale: 0.94 + 0.06 * sceneStage.cardIn
-                transform: Translate { x: (1 - sceneStage.cardIn) * win.s(40) }
                 enabled: win.sceneEdit && !sceneClose.running
-                readonly property Item liveBox: bigPage.item && !win.sceneMusic ? bigPage.item.box : null
+                readonly property Item liveBox: bigPage.item && win.sceneKind === "weather" ? bigPage.item.box : null
                 live: liveBox ? { hour: DateTime.now.getHours() + DateTime.now.getMinutes() / 60, dayOffset: liveBox.day,
                                   condition: liveBox.liveCondition, wind: Math.round(liveBox.liveWind) } : null
-                MouseArea { anchors.fill: parent; z: -1 }  // clicks on the card stay in it
+                onFinished: win.closeScene()
+            }
+            SmartWeatherEditor {
+                id: smartCard
+                visible: win.sceneKind === "smart"
+                open: win.sceneEdit && visible
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: sceneStage.barTop - (1 - sceneStage.cardIn) * win.s(24)
+                width: implicitWidth
+                height: implicitHeight
+                maxWidth: parent.width - win.s(48)
+                opacity: sceneStage.cardIn
+                enabled: win.sceneEdit && !sceneClose.running
+                onFinished: win.closeScene()
+            }
+            GargantuaEditor {
+                id: gargantuaCard
+                visible: win.sceneKind === "gargantua"
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: sceneStage.barTop - (1 - sceneStage.cardIn) * win.s(24)
+                width: implicitWidth
+                height: implicitHeight
+                maxWidth: parent.width - win.s(48)
+                opacity: sceneStage.cardIn
+                enabled: win.sceneEdit && !sceneClose.running
                 onFinished: win.closeScene()
             }
             MusicStyleEditor {
                 id: musicCard
                 visible: win.sceneMusic
                 styleId: win.sceneMusic ? win.sceneKind : "original"
-                x: sceneStage.toX + sceneStage.toW + sceneStage.gap
-                y: Math.max(win.s(24), sceneStage.toY + (sceneStage.toH - height) / 2)
-                width: sceneStage.cardW
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: sceneStage.barTop - (1 - sceneStage.cardIn) * win.s(24)
+                width: implicitWidth
                 height: implicitHeight
+                maxWidth: parent.width - win.s(48)
                 opacity: sceneStage.cardIn
-                scale: 0.94 + 0.06 * sceneStage.cardIn
-                transform: Translate { x: (1 - sceneStage.cardIn) * win.s(40) }
                 enabled: win.sceneEdit && !sceneClose.running
-                MouseArea { anchors.fill: parent; z: -1 }  // clicks on the card stay in it
                 onFinished: win.closeScene()
             }
         }
@@ -659,6 +760,24 @@ PanelWindow {
     Component { id: heroPreview; Pages.UserHero { power: previewPower; screenName: PanelLayout.editScreen; uptimeText: win.uptimeText } }
     Component { id: weatherClassicPreview; WeatherPage { active: false } }
     Component { id: weatherDashboardPreview; WeatherPage { active: false; dashboard: true } }
+    // the Network styles: Classic drawn still with made-up data, filling the card (it runs nothing, so the Gargantua
+    // warning can take its picture at once); Radar and Gargantua as previews (they move, but do not scan and take no
+    // input)
+    Component {
+        id: networkClassicPreview
+        Item { Network.NetworkClassicPreview { scale: parent.width / 565; transformOrigin: Item.TopLeft } }
+    }
+    Component {
+        id: networkRadarPreview
+        Item { Orbit.NetworkStyleShell { style: "radar"; preview: true; width: 565; height: 525; scale: parent.width / 565; transformOrigin: Item.TopLeft } }
+    }
+    Component {
+        id: networkGargantuaPreview
+        Item { Orbit.NetworkStyleShell { style: "gargantua"; preview: true; width: 565; height: 525; scale: parent.width / 565; transformOrigin: Item.TopLeft } }
+    }
+    // Smart drawn still (its sky stopped), as the Dashboard preview is
+    Component { id: weatherSmartPreview; SmartWeather.SmartWeatherPage { running: false; liveTime: true; cornerRadius: 0
+                                                                          showArc: Config.getSetting("panel.smartWeather.arc", true) !== false } }
     // the Music styles drawn as Control's Theme → Music cards draw them, with the Anserin interface's covers
     Component { id: musicOriginalPreview; Media.MusicStylePreview { appearance: "original"; cover: PanelLayout.music.originalCover || "" } }
     Component { id: musicM3Preview; Media.MusicStylePreview { appearance: "m3"; cover: PanelLayout.music.m3Cover || "" } }
@@ -672,5 +791,14 @@ PanelWindow {
             const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
             win.uptimeText = d > 0 ? d + "d " + h + "h" : (h > 0 ? h + "h " + m + "m" : m + "m");
         }
+    }
+
+    WarningDialog {
+        id: styleWarning
+        anchors.fill: parent
+        z: 1000
+        behind: root
+        onCancelled: if (win.styleWarn) PanelLayout.setStyle(win.styleWarn.module, win.styleWarn.prev)
+        onClosed: { win.styleWarn = null; win.styleShots = []; root.forceActiveFocus(); }
     }
 }

@@ -9,8 +9,10 @@ import "../"
 import "../bar"
 import "../media" as Media
 import "../network" as Network
+import "../network/orbit" as Orbit
 import "."
 import "pages" as Pages
+import "smartweather" as SmartWeather
 import "../reusables"
 
 // Panel on the left screen edge, joined to the screen frame like the Control Center. Opened by hovering the
@@ -1103,31 +1105,73 @@ Item {
         }
 
         // Weather in the style chosen in Edit panel: Classic (the orbit) or Dashboard (the animated weather scene and the
-        // day's hourly cards), both on WeatherPage with the month and the day's readings below
+        // day's hourly cards), both on WeatherPage with the month and the day's readings below, or Smart (the whole page
+        // a Smart Mirror sky, SmartWeatherPage)
         Component {
             id: weatherPage
             Item {
                 id: weatherHost
                 readonly property bool shown: root.pagesShown && Math.abs(root.pagePos - root.pageOf("weather")) < 1
+                readonly property string style: PanelLayout.style("weather")
                 WeatherPage {
                     anchors.fill: parent
-                    active: weatherHost.shown
-                    dashboard: Config.getSetting("panel.styles.weather", "classic") === "dashboard"
+                    visible: weatherHost.style !== "smart"
+                    active: weatherHost.shown && visible
+                    dashboard: weatherHost.style === "dashboard"
+                }
+                // Smart: drawn at its design size (the page's 565 × 525) and scaled to the page
+                Loader {
+                    active: weatherHost.style === "smart"
+                    width: 565; height: 525
+                    scale: weatherHost.width / 565
+                    transformOrigin: Item.TopLeft
+                    sourceComponent: SmartWeather.SmartWeatherPage {
+                        running: weatherHost.shown
+                        liveTime: true
+                        cornerRadius: Math.min(ThemeBackend.borderRadius, 20) / Math.max(0.01, weatherHost.width / 565)
+                        showArc: Config.getSetting("panel.smartWeather.arc", true) !== false
+                    }
                 }
             }
         }
 
-        // The Network popup at 78%, so its 720 × 600 fits the page; it only scans while it is shown.
+        // Network in the style chosen in Edit panel. Classic: the Network popup at 78%, so its 720 × 600 fits the page;
+        // it only scans while it is shown. Radar and Gargantua (network/orbit/NetworkStyleShell): drawn at the page's
+        // design size and scaled to it, created as the page comes into view (each opening plays their entrance) and
+        // destroyed a moment after it has gone, so they leave nothing running.
         Component {
             id: networkPage
             Item {
-                Network.NetworkPopup {
-                    readonly property real factor: 0.78
-                    anchors.centerIn: parent
-                    width: root.s(720) * factor
-                    height: root.s(600) * factor
-                    sizeFactor: factor
-                    visible: true
+                id: networkHost
+                readonly property string style: PanelLayout.style("network")
+                readonly property bool inView: root.pagesShown && Math.abs(root.pagePos - root.pageOf("network")) < 1
+                Loader {
+                    anchors.fill: parent
+                    active: networkHost.style === "classic"
+                    sourceComponent: Item {
+                        Network.NetworkPopup {
+                            readonly property real factor: 0.78
+                            anchors.centerIn: parent
+                            width: root.s(720) * factor
+                            height: root.s(600) * factor
+                            sizeFactor: factor
+                            visible: true
+                        }
+                    }
+                }
+                Timer { id: networkRelease; interval: 400 }
+                onInViewChanged: if (!inView) networkRelease.restart()
+                // kept while Gargantua is switching the radio (PanelLayout.networkPowerBusy), so closing the panel
+                // mid-charge still finishes it; destroyed once that is done
+                Loader {
+                    active: networkHost.style !== "classic" && (networkHost.inView || networkRelease.running || PanelLayout.networkPowerBusy)
+                    width: 565; height: 525
+                    scale: networkHost.width / 565
+                    transformOrigin: Item.TopLeft
+                    sourceComponent: Orbit.NetworkStyleShell {
+                        style: networkHost.style
+                        shown: networkHost.inView
+                    }
                 }
             }
         }
