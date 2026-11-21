@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.21)
+project(AnserinCore LANGUAGES CXX)
+set(CMAKE_AUTOMOC ON)
+find_package(Qt6 REQUIRED COMPONENTS Qml)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3)
+pkg_check_modules(SNDFILE REQUIRED IMPORTED_TARGET sndfile)
+add_library(anserincore MODULE plugin.cpp sfx.cpp sfx.h)
+target_link_libraries(anserincore PRIVATE Qt6::Qml PkgConfig::PIPEWIRE PkgConfig::SNDFILE)
+target_compile_features(anserincore PRIVATE cxx_std_17)
+target_compile_options(anserincore PRIVATE -Wall -Wextra)
+# The module goes into the build folder, outside the shell's config folder: Quickshell serves that folder through
+# its own copy, where a C++ plugin is not found.
+set_target_properties(anserincore PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/module")
+configure_file(qmldir "${CMAKE_BINARY_DIR}/module/qmldir" COPYONLY)

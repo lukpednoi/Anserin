@@ -21,6 +21,41 @@ Item {
         return Math.max(0.0, Math.min(1.0, v / 100.0));
     }
 
+    // The native sound engine (native/core): sounds decoded once and mixed into one PipeWire stream, so a click
+    // starts in a few milliseconds without starting a process. Built on first start; until it is ready, or when
+    // it cannot be built, sounds play through pw-play as before.
+    property var core: null
+    Process {
+        id: coreBuild
+        running: Caching.anserinDir !== ""
+        command: ["python3", Caching.anserinDir + "/scripts/build-core.py"]
+        stderr: StdioCollector { id: coreBuildErrors }
+        onExited: code => {
+            if (code !== 0) {
+                console.warn("Anserin core: " + coreBuildErrors.text.trim() + " (sounds use pw-play)");
+                return;
+            }
+            // the module is built outside the config folder (Quickshell would not find its plugin there)
+            const module = Caching.anserinDir + "/../.lab-data/core-build/module";
+            try {
+                root.core = Qt.createQmlObject('import "file://' + module + '" as Core; Core.SfxEngine {}', root, "AnserinCore");
+            } catch (e) {
+                console.warn("Anserin core: " + e + " (sounds use pw-play)");
+            }
+        }
+    }
+    Component.onDestruction: if (root.core) root.core.destroy()
+
+    Connections {
+        target: root.core
+        // a sound started with playUntilStopped that ended by itself
+        function onFinished(handle) {
+            for (let id in root.activeHandles) {
+                if (root.activeHandles[id] && root.activeHandles[id].coreHandle === handle) delete root.activeHandles[id];
+            }
+        }
+    }
+
     Connections {
         target: Config
         function onSettingsLoaded() {
@@ -52,6 +87,7 @@ Item {
 
     function _reallyPlay(filePath, vol, dur) {
         let cleanPath = filePath.startsWith("file://") ? filePath.substring(7) : filePath;
+        if (root.core && root.core.play(cleanPath, vol, dur, false) >= 0) return;
         let propsJson = "{\"application.id\":\"anserin-sfx\",\"application.name\":\"anserin-sfx\",\"media.role\":\"event\"}";
         try {
             if (dur > 0) {
@@ -83,6 +119,12 @@ Item {
         let volFlag = "--volume=" + finalVol;
 
         let id = root.nextHandleId++;
+        if (root.core) {
+            const h = root.core.play(cleanPath, finalVol, 0, doLoop);
+            if (h < 0) return -1;
+            root.activeHandles[id] = { coreHandle: h };
+            return id;
+        }
         let sfxProps = "-P '{\"application.id\":\"anserin-sfx\",\"application.name\":\"anserin-sfx\",\"media.role\":\"event\"}' ";
 
         let script;
@@ -112,13 +154,16 @@ Item {
     function stopSfx(handleId) {
         let entry = root.activeHandles[handleId];
         if (!entry) return;
-        entry.running = false;
+        if (entry.coreHandle !== undefined) { if (root.core) root.core.stop(entry.coreHandle); }
+        else entry.running = false;
         delete root.activeHandles[handleId];
     }
 
     function stopAllSfx() {
         for (let id in root.activeHandles) {
-            root.activeHandles[id].running = false;
+            const entry = root.activeHandles[id];
+            if (entry.coreHandle !== undefined) { if (root.core) root.core.stop(entry.coreHandle); }
+            else entry.running = false;
         }
         root.activeHandles = ({});
     }
