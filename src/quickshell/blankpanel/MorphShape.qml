@@ -26,6 +26,7 @@ Item {
     ].map(shape => Object.assign({ scale: 1 / maxRadius(shape) }, shape))
 
     property var history: []
+    property var initialShape: null
     property var current: null
     property var next: null
     property real blend: 1
@@ -34,6 +35,8 @@ Item {
     function rawRadius(shape, angle) {
         const c = Math.cos(angle), s = Math.sin(angle);
         switch (shape.kind) {
+        case "circle": return 1;
+        case "diamond": return 1 / (Math.abs(c) + Math.abs(s));
         case "cookie": return 1 + shape.d * Math.cos(shape.n * angle);
         case "clover": return 0.55 + 0.45 * Math.pow(Math.abs(Math.cos(shape.n * angle / 2)), 0.7);
         case "star": return 0.62 + 0.38 * Math.pow((1 + Math.cos(shape.n * angle)) / 2, 2);
@@ -64,8 +67,15 @@ Item {
     }
 
     function change() {
+        morphTo(pickShape());
+    }
+
+    function morphTo(shapeSpec) {
+        const target = shapeSpec && shapeSpec.scale !== undefined
+            ? shapeSpec
+            : Object.assign({ scale: 1 / maxRadius(shapeSpec) }, shapeSpec);
         current = blend >= 1 ? next : current;
-        next = pickShape();
+        next = target;
         morph.stop();
         spinMore.stop();
         spinMore.to = spin + 180;
@@ -75,7 +85,7 @@ Item {
     }
 
     Component.onCompleted: {
-        current = pickShape();
+        current = initialShape ? Object.assign({ scale: 1 / maxRadius(initialShape) }, initialShape) : pickShape();
         next = current;
         canvas.requestPaint();
     }
