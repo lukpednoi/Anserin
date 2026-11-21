@@ -27,39 +27,64 @@ namespace {
 
 constexpr int kRate = 48000;                              // the mix runs at 48 kHz stereo
 constexpr qint64 kCacheLimitBytes = 64LL * 1024 * 1024;   // decoded audio kept in memory
-constexpr qint64 kInlineDecodeBytes = 2LL * 1024 * 1024;  // smaller files decode at once, larger ones in the background
+constexpr double kInlineSeconds = 1.0;                    // shorter sounds decode at once, longer ones in the background
 constexpr int kPauseMs = 1500;                            // pause the stream after this long without sound
 constexpr int kCloseMs = 5 * 60 * 1000;                   // and close PipeWire after this long
 
-// Windowed-sinc resampler for the one-off conversion to 48 kHz (good enough for interface sounds, and only
-// run once per file).
+// Windowed-sinc resampler for the one-off conversion to 48 kHz. The kernel is tabulated for 512 sub-sample
+// phases, so each output sample is 32 multiply-adds per channel with no trigonometry (a 20 s sound converts in
+// tens of milliseconds, on a background thread).
 std::vector<float> resample(const std::vector<float> &in, int channels, int fromRate, long long &frames)
 {
     if (fromRate == kRate) return in;
+    constexpr int half = 16;                               // taps each side
+    constexpr int phases = 512;
     const double ratio = double(kRate) / double(fromRate);
+    const double cutoff = std::min(1.0, ratio);            // low-pass below the lower Nyquist
+    std::vector<float> table(size_t(phases) * 2 * half);
+    for (int p = 0; p < phases; ++p) {
+        const double frac = double(p) / phases;            // position of the output between input samples
+        double sum = 0;
+        for (int t = 0; t < 2 * half; ++t) {
+            const double d = double(t - half + 1) - frac;  // tap distance from the output position
+            const double x = d * cutoff;
+            const double sinc = std::abs(x) < 1e-9 ? 1.0 : std::sin(M_PI * x) / (M_PI * x);
+            const double w = 0.5 * (1.0 + std::cos(M_PI * d / double(half)));   // Hann
+            table[size_t(p) * 2 * half + size_t(t)] = float(sinc * w);
+            sum += sinc * w;
+        }
+        for (int t = 0; t < 2 * half; ++t) table[size_t(p) * 2 * half + size_t(t)] /= float(sum);
+    }
     const long long outFrames = (long long)std::floor(double(frames) * ratio);
-    const double cutoff = std::min(1.0, ratio);           // low-pass below the lower Nyquist
-    const int half = 16;                                  // taps each side
     std::vector<float> out(size_t(outFrames) * size_t(channels));
     for (long long o = 0; o < outFrames; ++o) {
         const double center = double(o) / ratio;
-        const long long first = (long long)std::floor(center) - half + 1;
+        const long long base = (long long)std::floor(center);
+        const int phase = std::min(phases - 1, int((center - double(base)) * phases));
+        const float *k = table.data() + size_t(phase) * 2 * half;
+        const long long first = base - half + 1;
         for (int c = 0; c < channels; ++c) {
-            double acc = 0, norm = 0;
-            for (long long i = first; i < first + 2 * half; ++i) {
+            float acc = 0;
+            for (int t = 0; t < 2 * half; ++t) {
+                const long long i = first + t;
                 if (i < 0 || i >= frames) continue;
-                const double x = (double(i) - center) * cutoff;
-                const double sinc = std::abs(x) < 1e-9 ? 1.0 : std::sin(M_PI * x) / (M_PI * x);
-                const double w = 0.5 * (1.0 + std::cos(M_PI * (double(i) - center) / double(half)));  // Hann
-                const double k = sinc * w;
-                acc += k * in[size_t(i) * size_t(channels) + size_t(c)];
-                norm += k;
+                acc += k[t] * in[size_t(i) * size_t(channels) + size_t(c)];
             }
-            out[size_t(o) * size_t(channels) + size_t(c)] = float(norm != 0 ? acc / norm : 0);
+            out[size_t(o) * size_t(channels) + size_t(c)] = acc;
         }
     }
     frames = outFrames;
     return out;
+}
+
+// the length of a sound file in seconds, from its header only (-1 when it cannot be read)
+double soundSeconds(const QString &path)
+{
+    SF_INFO info{};
+    SNDFILE *file = sf_open(QFile::encodeName(path).constData(), SFM_READ, &info);
+    if (!file) return -1;
+    sf_close(file);
+    return info.samplerate > 0 ? double(info.frames) / info.samplerate : -1;
 }
 
 std::shared_ptr<SfxClip> decodeFile(const QString &path)
@@ -328,7 +353,7 @@ int SfxEngine::play(const QString &rawPath, double volume, double maxSeconds, bo
     if (!clip && !m_decoding.contains(path)) {
         const QFileInfo fi(path);
         if (!fi.isFile()) return -1;
-        if (fi.size() <= kInlineDecodeBytes) {
+        if (soundSeconds(path) <= kInlineSeconds) {
             clip = decodeFile(path);
             if (!clip) return -1;
             storeClip(path, clip);
