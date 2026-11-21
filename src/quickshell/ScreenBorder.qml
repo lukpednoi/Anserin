@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Shapes
 import Quickshell
 import Quickshell.Wayland
 import "reusables"
@@ -46,42 +45,12 @@ Variants {
                 Region { item: dockTrigger.visible ? dockTrigger : null }
             }
 
-            readonly property real rounding: Math.max(0, Math.min(ScreenEdges.rounding, (width - scope.inset * 2) / 2, (height - scope.inset * 2) / 2))
-
             ScreenEdgeTrigger { id: barTrigger; target: LauncherController.bars[window.screen.name] || null }
             ScreenEdgeTrigger { id: dockTrigger; target: ScreenEdges.docks[window.screen.name] || null }
 
-            WallpaperBlur {
-                id: glass
+            ScreenFrame {
                 anchors.fill: parent
-                radius: window.rounding
-                inverted: true
-                boxRect: Qt.rect(scope.inset, scope.inset, width - scope.inset * 2, height - scope.inset * 2)
-                bezelSize: scope.inset
-            }
-
-            Shape {
-                anchors.fill: parent
-                visible: !glass.active
-                ShapePath {
-                    fillColor: ThemeBackend.base
-                    strokeWidth: -1
-                    fillRule: ShapePath.OddEvenFill
-                    startX: 0; startY: 0
-                    PathLine { x: window.width; y: 0 }
-                    PathLine { x: window.width; y: window.height }
-                    PathLine { x: 0; y: window.height }
-                    PathLine { x: 0; y: 0 }
-                    PathMove { x: scope.inset + window.rounding; y: scope.inset }
-                    PathLine { x: window.width - scope.inset - window.rounding; y: scope.inset }
-                    PathArc { x: window.width - scope.inset; y: scope.inset + window.rounding; radiusX: window.rounding; radiusY: window.rounding }
-                    PathLine { x: window.width - scope.inset; y: window.height - scope.inset - window.rounding }
-                    PathArc { x: window.width - scope.inset - window.rounding; y: window.height - scope.inset; radiusX: window.rounding; radiusY: window.rounding }
-                    PathLine { x: scope.inset + window.rounding; y: window.height - scope.inset }
-                    PathArc { x: scope.inset; y: window.height - scope.inset - window.rounding; radiusX: window.rounding; radiusY: window.rounding }
-                    PathLine { x: scope.inset; y: scope.inset + window.rounding }
-                    PathArc { x: scope.inset + window.rounding; y: scope.inset; radiusX: window.rounding; radiusY: window.rounding }
-                }
+                inset: scope.inset
             }
         }
     }
