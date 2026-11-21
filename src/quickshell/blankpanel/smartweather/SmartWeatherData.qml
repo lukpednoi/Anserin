@@ -44,7 +44,8 @@ Singleton {
                 pop: Number(f.pop || 0),
                 sunrise: formatTimeShort(f.sunrise),
                 sunset: formatTimeShort(f.sunset),
-                desc: now ? (wData.current_desc || conditionLabel(conditionFromCode(currentCode, wData.current_icon)))
+                // today's row uses the same words as the page's header for the weather now
+                desc: now ? conditionLabel(conditionFromCode(currentCode, wData.current_icon))
                           : (f.desc || conditionLabel(conditionFromCode(f.code, f.icon))),
                 code: now ? currentCode : (f.code !== undefined ? Number(f.code) : 0),
                 icon: now ? (wData.current_icon || f.icon || "") : (f.icon || ""),
