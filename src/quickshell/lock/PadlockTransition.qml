@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import "../"
 
 Item {
     id: root
@@ -55,16 +56,16 @@ Item {
     }
 
     Repeater {
-        model: ["lock", "lock_open"]
+        // closed and open padlock from the Nerd Font symbols Anserin ships (the Material Symbols font this used is
+        // not installed with Anserin, so the words "lock" / "lock_open" showed instead)
+        model: ["\u{F033E}", "\u{F033F}"]
         Text {
             required property int index
             required property string modelData
             anchors.centerIn: parent
             text: modelData
-            font.family: "Material Symbols Rounded"
+            font.family: ThemeBackend.iconFont
             font.pixelSize: root.glyphSize
-            font.weight: Font.Bold
-            font.variableAxes: ({FILL: 0, GRAD: -25, opsz: 48})
             color: root.glyphColor
             opacity: index === 0 ? 1 - root.shackleOpen : root.shackleOpen
         }
