@@ -243,7 +243,9 @@ Item {
                     }
 
                     Text {
-                        text: root.weatherData && root.weatherData.forecast && root.weatherData.forecast[0] && root.weatherData.forecast[0].desc ? root.weatherData.forecast[0].desc : (Weather.data && Weather.data.desc ? Weather.data.desc : "")
+                        // the weather now, as the big icon shows it (the forecast's day line is one hour's snapshot)
+                        text: root.weatherData && root.weatherData.current_desc ? root.weatherData.current_desc
+                            : (root.weatherData && root.weatherData.forecast && root.weatherData.forecast[0] && root.weatherData.forecast[0].desc ? root.weatherData.forecast[0].desc : (Weather.data && Weather.data.desc ? Weather.data.desc : ""))
                         font.family: ThemeBackend.fontFamily
                         font.pixelSize: root.textDesc
                         font.weight: Font.Medium

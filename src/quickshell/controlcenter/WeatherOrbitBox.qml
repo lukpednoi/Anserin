@@ -103,7 +103,9 @@ Rectangle {
     readonly property string tempText: (offline || !Weather.isReady || Weather.currentTemp === "" ? "--" : displayedTemp.toFixed(1)) + (Weather.unitSym || "°C")
     readonly property string placeText: {
         const location = Weather.activeLocation;
-        const parts = [location && location.city ? location.city : "", today && today.desc ? today.desc : ""];
+        // today follows the weather now, as the icon does (the forecast's day line is one hour's snapshot)
+        const desc = day === 0 && wData && wData.current_desc ? wData.current_desc : (today && today.desc ? today.desc : "");
+        const parts = [location && location.city ? location.city : "", desc];
         return parts.filter(part => part !== "").join(" · ");
     }
     readonly property real cardScale: Math.max(0.35, Math.min(0.85, width / s(560))) * fit
