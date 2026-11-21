@@ -51,3 +51,10 @@ ScreenEdgeTrigger 1.0 behavior/ScreenEdgeTrigger.qml
 SystemUsageCircle 1.0 display/SystemUsageCircle.qml
 TimeRangeSlider 1.0 inputs/TimeRangeSlider.qml
 MaterialDigitGrid 1.0 display/MaterialDigitGrid.qml
+
+SmartBar 1.0 smartbar/SmartBar.qml
+SmartPill 1.0 smartbar/SmartPill.qml
+SmartSlider 1.0 smartbar/SmartSlider.qml
+SmartLabel 1.0 smartbar/SmartLabel.qml
+SmartDivider 1.0 smartbar/SmartDivider.qml
+SmartChoices 1.0 smartbar/SmartChoices.qml

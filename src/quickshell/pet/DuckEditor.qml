@@ -6,7 +6,7 @@ import "../blankpanel"
 import "DuckColours.js" as DuckColours
 
 // The duck editor. Over a dimmed screen: three small scenes to pick from (River, Grass, Waterfall), the duck large in
-// the picked scene doing its things on the spot, and a frosted card (Edit panel's rows and buttons): Adjust saves at
+// the picked scene doing its things on the spot, and the Smart bar above them (Edit panel's bars): Adjust saves at
 // once (breed, colour, size, quack sound, call-back notice; the scene too), Test plays any action on the big duck.
 // Done or Esc closes it.
 // Opened from the desktop pet, it carries that duck in from where it stood (`handoff`: { x, y, size, snap, busy }):
@@ -160,9 +160,172 @@ Item {
         MouseArea { anchors.fill: parent; enabled: editor.open }       // keeps clicks off what is underneath
     }
 
+    Column {
+        anchors.centerIn: parent
+        spacing: Scaler.s(18)
+
+    // ---------- the Smart bar ----------
+    SmartBar {
+        id: card
+        anchors.horizontalCenter: parent.horizontalCenter
+        readonly property real shown: editor.revealAt(0.3, 0.35)
+        opacity: shown
+        transform: Translate { y: -Scaler.s(20) * (1 - card.shown) }
+
+        // who it is, the two modes and Done
+        Row {
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: Scaler.s(6)
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "\u{F03E9}"
+                color: ThemeBackend.mauve
+                font { family: ThemeBackend.iconFont; pixelSize: Scaler.s(15) }
+            }
+            SmartLabel { strong: true; text: "Duck"; rightPadding: Scaler.s(4) }
+            SmartChoices {
+                current: editor.mode
+                options: [{ id: "adjust", name: "Adjust" }, { id: "test", name: "Test" }]
+                onChosen: (id) => {
+                    if (editor.mode === id) return;
+                    editor.mode = id;
+                    big.randomTest = false;
+                    big.play("idle");
+                }
+            }
+            SmartDivider {}
+            SmartPill { label: I18n.t("widgets.redactor.done"); onClicked: editor.finished() }
+        }
+
+        // ---------- Adjust: saved at once ----------
+        Row {
+            visible: editor.mode === "adjust"
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: Scaler.s(6)
+            SmartChoices { name: "Breed"; current: "call"; options: [{ id: "call", name: "Call duck" }] }
+            SmartDivider {}
+            SmartChoices {
+                name: "Size"
+                current: String(editor.duckSize)
+                options: [{ id: "128", name: "Real · 128" }, { id: "200", name: "Big · 200" }]
+                onChosen: (id) => editor.save("size", Number(id))
+            }
+            SmartDivider {}
+            SmartChoices {
+                name: "Quack sound"
+                current: editor.soundOn ? "on" : "off"
+                options: [{ id: "off", name: "Off" }, { id: "on", name: "On" }]
+                onChosen: (id) => editor.save("sound", id === "on")
+            }
+            SmartDivider {}
+            SmartChoices {
+                name: "Call-back notice"
+                current: editor.recallOn ? "on" : "off"
+                options: [{ id: "off", name: "Off" }, { id: "on", name: "On" }]
+                onChosen: (id) => editor.save("recall", id === "on")
+            }
+        }
+        Row {
+            id: colourRow
+            visible: editor.mode === "adjust"
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: Scaler.s(6)
+            property string hovered: ""
+            SmartLabel { text: "Colour · " + (colourRow.hovered || editor.variety.name); width: Scaler.s(150) }
+            Repeater {
+                model: DuckColours.list
+                Rectangle {
+                    id: sw
+                    required property var modelData
+                    required property int index
+                    readonly property bool picked: modelData.id === editor.colour
+                    readonly property real pop: editor.revealAt(0.55 + index * 0.025, 0.2)
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Scaler.s(22); height: width; radius: width / 2
+                    color: modelData.swatch
+                    border.width: picked ? Scaler.s(2) : 1
+                    border.color: picked ? ThemeBackend.mauve : Qt.alpha(ThemeBackend.text, 0.25)
+                    scale: (swMouse.pressed ? 0.9 : swMouse.containsMouse ? 1.12 : 1) * (0.6 + 0.4 * pop)
+                    Behavior on border.width { NumberAnimation { duration: 140 } }
+                    Text {
+                        anchors.centerIn: parent
+                        visible: sw.picked
+                        text: "\u{F012C}"
+                        color: ["magpie", "bibbed", "mallard", "blueMallard"].indexOf(sw.modelData.id) >= 0 ? "#ffffff" : "#2a2a2a"
+                        font { family: ThemeBackend.iconFont; pixelSize: Scaler.s(11) }
+                    }
+                    MouseArea {
+                        id: swMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onContainsMouseChanged: colourRow.hovered = containsMouse ? sw.modelData.name : (colourRow.hovered === sw.modelData.name ? "" : colourRow.hovered)
+                        onClicked: if (!sw.picked) { Sounds.playSfx("reusables/clickbutton/click.wav"); editor.save("colour", sw.modelData.id); }
+                    }
+                }
+            }
+        }
+
+        // ---------- Test: the big duck only ----------
+        readonly property var actions: [
+            { name: "Walk", act: "walk", o: { dur: 2.5 } }, { name: "Sit", act: "sit", o: { dur: 5 } },
+            { name: "Preen breast", act: "preenBreast" }, { name: "Preen wing", act: "preenWing" },
+            { name: "Peck", act: "peck" }, { name: "Peck around", act: "peckAround" },
+            { name: "Peck ahead", act: "peckAt", rise: 0.55 }, { name: "Jump-peck", act: "peckAt", rise: 1.5 },
+            { name: "Too high", act: "peckAt", rise: 2.6 }, { name: "Pet", act: "petted", o: { dur: 2.5 } },
+            { name: "Held", act: "held" }, { name: "Drop", act: "drop" },
+            { name: "Stretch", act: "stretch" }, { name: "Dive", act: "dive", water: true }, { name: "Quack", act: "quack" }
+        ]
+        function playAction(m) {
+            big.randomTest = false;
+            if (m.rise !== undefined) big.play(m.act, { x: big.px + big.facing * 0.62 * big.size, y: big.py - m.rise * big.size, rise: m.rise });
+            else if (m.act === "held") { big.py = editor.to.y - 0.3 * big.size; big.play("held"); heldDrop.restart(); }
+            else if (m.act === "drop") { big.py = editor.to.y - 0.9 * big.size; big.play("drop"); }
+            else big.play(m.act, m.o ? Object.assign({}, m.o) : {});
+        }
+        Row {
+            visible: editor.mode === "test"
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: Scaler.s(5)
+            SmartLabel { text: "Actions"; rightPadding: Scaler.s(2) }
+            Repeater {
+                model: card.actions.slice(0, 8)
+                SmartPill {
+                    required property var modelData
+                    label: modelData.name
+                    active: big.action === modelData.act && (modelData.rise === undefined || (big.act && big.act.o.rise === modelData.rise))
+                    onClicked: card.playAction(modelData)
+                }
+            }
+        }
+        Row {
+            visible: editor.mode === "test"
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: Scaler.s(5)
+            Repeater {
+                model: card.actions.slice(8)
+                SmartPill {
+                    required property var modelData
+                    visible: !modelData.water || big.swimming
+                    label: modelData.name
+                    active: big.action === modelData.act && (modelData.rise === undefined || (big.act && big.act.o.rise === modelData.rise))
+                    onClicked: card.playAction(modelData)
+                }
+            }
+            SmartDivider {}
+            SmartChoices {
+                name: "Random"
+                current: big.randomTest ? "on" : "off"
+                options: [{ id: "off", name: "Off" }, { id: "on", name: "On" }]
+                onChosen: (id) => { big.randomTest = id === "on"; if (big.randomTest) big.next(); }
+            }
+        }
+        Timer { id: heldDrop; interval: 1600; onTriggered: if (big.action === "held") big.play("drop") }
+    }
+
     Row {
         id: body
-        anchors.centerIn: parent
+        anchors.horizontalCenter: parent.horizontalCenter
         spacing: Scaler.s(18)
 
         // ---------- the scenes to choose from ----------
@@ -228,7 +391,7 @@ Item {
         Item {
             id: stageBox
             width: Scaler.s(560)
-            height: card.height
+            height: Scaler.s(520)
             readonly property real shown: editor.revealAt(0.18, 0.4)
             opacity: shown
             scale: 0.9 + 0.1 * shown
@@ -258,262 +421,7 @@ Item {
                 Text { id: nowText; anchors.centerIn: parent; text: big.action; color: ThemeBackend.text; font { family: ThemeBackend.fontFamily; pixelSize: Scaler.s(11) } }
             }
         }
-
-        // ---------- the card ----------
-        Item {
-            id: card
-            width: Scaler.s(360)
-            height: Math.max(Scaler.s(520), content.implicitHeight + Scaler.s(40))
-            readonly property real shown: editor.revealAt(0.3, 0.35)
-            opacity: shown
-            transform: Translate { x: Scaler.s(30) * (1 - card.shown) }
-
-            Rectangle {
-                anchors.fill: parent
-                radius: ThemeBackend.clampedBorderRadius
-                color: glass.active ? "transparent" : Qt.darker(ThemeBackend.surface0, 1.22)
-                border.width: 1
-                border.color: Qt.alpha(ThemeBackend.text, 0.08)
-                WallpaperBlur { id: glass; anchors.fill: parent; radius: parent.radius; tintColor: Qt.darker(ThemeBackend.surface0, 1.22) }
-            }
-
-            ColumnLayout {
-                id: content
-                x: Scaler.s(20); y: Scaler.s(20)
-                width: card.width - Scaler.s(40)
-                spacing: Scaler.s(16)
-
-                // the header: who it is
-                RowLayout {
-                    id: header
-                    spacing: Scaler.s(12)
-                    readonly property real shown: editor.revealAt(0.4)
-                    opacity: shown
-                    transform: Translate { y: Scaler.s(10) * (1 - header.shown) }
-                    Rectangle {
-                        Layout.preferredWidth: Scaler.s(40); Layout.preferredHeight: Scaler.s(40)
-                        radius: ThemeBackend.clampedBorderRadius
-                        color: Qt.alpha(ThemeBackend.mauve, 0.18)
-                        Text { anchors.centerIn: parent; text: "\u{F03E9}"; color: ThemeBackend.mauve; font { family: ThemeBackend.iconFont; pixelSize: Scaler.s(20) } }
-                    }
-                    Text { text: "Duck"; color: ThemeBackend.text; font { family: ThemeBackend.fontFamily; pixelSize: Scaler.s(17); bold: true } }
-                }
-
-                // Adjust / Test: a pill slides between them
-                Rectangle {
-                    id: modes
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: Scaler.s(36)
-                    radius: height / 2
-                    color: ThemeBackend.surface0
-                    readonly property real shown: editor.revealAt(0.45)
-                    opacity: shown
-                    transform: Translate { y: Scaler.s(10) * (1 - modes.shown) }
-                    Rectangle {
-                        width: (parent.width - Scaler.s(6)) / 2; height: parent.height - Scaler.s(6)
-                        y: Scaler.s(3)
-                        x: Scaler.s(3) + (editor.mode === "test" ? width : 0)
-                        radius: height / 2
-                        color: ThemeBackend.mauve
-                        Behavior on x { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-                    }
-                    Row {
-                        anchors.fill: parent
-                        Repeater {
-                            model: [{ id: "adjust", name: "Adjust" }, { id: "test", name: "Test" }]
-                            Item {
-                                required property var modelData
-                                width: modes.width / 2; height: modes.height
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: modelData.name
-                                    color: editor.mode === modelData.id ? ThemeBackend.crust : ThemeBackend.text
-                                    font { family: ThemeBackend.fontFamily; pixelSize: Scaler.s(12); bold: true }
-                                    Behavior on color { ColorAnimation { duration: 200 } }
-                                }
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: if (editor.mode !== modelData.id) {
-                                        Sounds.playSfx("reusables/switch/sfx.wav");
-                                        editor.mode = modelData.id;
-                                        big.randomTest = false;
-                                        big.play("idle");
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ---------- Adjust: saved at once ----------
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    visible: editor.mode === "adjust"
-                    spacing: Scaler.s(16)
-                    EditorChoices {
-                        id: breedRow
-                        Layout.fillWidth: true
-                        name: "Breed"
-                        current: "call"
-                        options: [{ id: "call", name: "Call duck" }]
-                        readonly property real shown: editor.revealAt(0.5)
-                        opacity: shown
-                        transform: Translate { y: Scaler.s(10) * (1 - breedRow.shown) }
-                    }
-                    Column {
-                        id: colourRow
-                        Layout.fillWidth: true
-                        spacing: Scaler.s(8)
-                        property string hovered: ""
-                        readonly property real shown: editor.revealAt(0.55)
-                        opacity: shown
-                        transform: Translate { y: Scaler.s(10) * (1 - colourRow.shown) }
-                        Text {
-                            text: "Colour · " + (colourRow.hovered || editor.variety.name)
-                            color: ThemeBackend.subtext0
-                            font { family: ThemeBackend.fontFamily; pixelSize: Scaler.s(12); bold: true }
-                        }
-                        Flow {
-                            width: parent.width; spacing: Scaler.s(7)
-                            Repeater {
-                                model: DuckColours.list
-                                Rectangle {
-                                    id: sw
-                                    required property var modelData
-                                    required property int index
-                                    readonly property bool picked: modelData.id === editor.colour
-                                    readonly property real pop: editor.revealAt(0.55 + index * 0.025, 0.2)
-                                    width: Scaler.s(32); height: width; radius: width / 2
-                                    color: modelData.swatch
-                                    border.width: picked ? Scaler.s(3) : 1
-                                    border.color: picked ? ThemeBackend.mauve : Qt.alpha(ThemeBackend.text, 0.25)
-                                    scale: (swMouse.pressed ? 0.9 : swMouse.containsMouse ? 1.1 : 1) * (0.6 + 0.4 * pop)
-                                    Behavior on border.width { NumberAnimation { duration: 140 } }
-                                    Text {
-                                        anchors.centerIn: parent
-                                        visible: sw.picked
-                                        text: "\u{F012C}"
-                                        color: ["magpie", "bibbed", "mallard", "blueMallard"].indexOf(sw.modelData.id) >= 0 ? "#ffffff" : "#2a2a2a"
-                                        font { family: ThemeBackend.iconFont; pixelSize: Scaler.s(14) }
-                                    }
-                                    MouseArea {
-                                        id: swMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onContainsMouseChanged: colourRow.hovered = containsMouse ? sw.modelData.name : (colourRow.hovered === sw.modelData.name ? "" : colourRow.hovered)
-                                        onClicked: if (!sw.picked) { Sounds.playSfx("reusables/clickbutton/click.wav"); editor.save("colour", sw.modelData.id); }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    EditorChoices {
-                        id: sizeRow
-                        Layout.fillWidth: true
-                        name: "Size"
-                        current: String(editor.duckSize)
-                        options: [{ id: "128", name: "Real · 128" }, { id: "200", name: "Big · 200" }]
-                        onChosen: (id) => editor.save("size", Number(id))
-                        readonly property real shown: editor.revealAt(0.62)
-                        opacity: shown
-                        transform: Translate { y: Scaler.s(10) * (1 - sizeRow.shown) }
-                    }
-                    EditorChoices {
-                        id: soundRow
-                        Layout.fillWidth: true
-                        name: "Quack sound"
-                        current: editor.soundOn ? "on" : "off"
-                        options: [{ id: "off", name: "Off" }, { id: "on", name: "On" }]
-                        onChosen: (id) => editor.save("sound", id === "on")
-                        readonly property real shown: editor.revealAt(0.67)
-                        opacity: shown
-                        transform: Translate { y: Scaler.s(10) * (1 - soundRow.shown) }
-                    }
-                    EditorChoices {
-                        id: recallRow
-                        Layout.fillWidth: true
-                        name: "Call-back notice"
-                        current: editor.recallOn ? "on" : "off"
-                        options: [{ id: "off", name: "Off" }, { id: "on", name: "On" }]
-                        onChosen: (id) => editor.save("recall", id === "on")
-                        readonly property real shown: editor.revealAt(0.72)
-                        opacity: shown
-                        transform: Translate { y: Scaler.s(10) * (1 - recallRow.shown) }
-                    }
-                }
-
-                // ---------- Test: the big duck only ----------
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    visible: editor.mode === "test"
-                    spacing: Scaler.s(16)
-                    Column {
-                        Layout.fillWidth: true
-                        spacing: Scaler.s(8)
-                        Text { text: "Actions"; color: ThemeBackend.subtext0; font { family: ThemeBackend.fontFamily; pixelSize: Scaler.s(12); bold: true } }
-                        Flow {
-                            width: parent.width; spacing: Scaler.s(6)
-                            Repeater {
-                                model: [
-                                    { name: "Walk", act: "walk", o: { dur: 2.5 } }, { name: "Sit", act: "sit", o: { dur: 5 } },
-                                    { name: "Preen breast", act: "preenBreast" }, { name: "Preen wing", act: "preenWing" },
-                                    { name: "Peck", act: "peck" }, { name: "Peck around", act: "peckAround" },
-                                    { name: "Peck ahead", act: "peckAt", rise: 0.55 }, { name: "Jump-peck", act: "peckAt", rise: 1.5 },
-                                    { name: "Too high", act: "peckAt", rise: 2.6 }, { name: "Pet", act: "petted", o: { dur: 2.5 } },
-                                    { name: "Held", act: "held" }, { name: "Drop", act: "drop" },
-                                    { name: "Stretch", act: "stretch" }, { name: "Dive", act: "dive", water: true }, { name: "Quack", act: "quack" }
-                                ]
-                                ClickButton {
-                                    required property var modelData
-                                    readonly property bool picked: big.action === modelData.act && (modelData.rise === undefined || (big.act && big.act.o.rise === modelData.rise))
-                                    visible: !modelData.water || big.swimming
-                                    implicitHeight: Scaler.s(30)
-                                    horizontalPadding: Scaler.s(12)
-                                    cornerRadius: Scaler.s(15)
-                                    buttonText: modelData.name
-                                    textFontSize: Scaler.s(11.5)
-                                    accentColor: picked ? ThemeBackend.mauve : ThemeBackend.surface0
-                                    textColor: picked ? ThemeBackend.crust : ThemeBackend.text
-                                    onClicked: {
-                                        big.randomTest = false;
-                                        const m = modelData;
-                                        if (m.rise !== undefined) big.play(m.act, { x: big.px + big.facing * 0.62 * big.size, y: big.py - m.rise * big.size, rise: m.rise });
-                                        else if (m.act === "held") { big.py = editor.to.y - 0.3 * big.size; big.play("held"); heldDrop.restart(); }
-                                        else if (m.act === "drop") { big.py = editor.to.y - 0.9 * big.size; big.play("drop"); }
-                                        else big.play(m.act, m.o ? Object.assign({}, m.o) : {});
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    EditorChoices {
-                        Layout.fillWidth: true
-                        name: "Random"
-                        current: big.randomTest ? "on" : "off"
-                        options: [{ id: "off", name: "Off" }, { id: "on", name: "On" }]
-                        onChosen: (id) => { big.randomTest = id === "on"; if (big.randomTest) big.next(); }
-                    }
-                    Timer { id: heldDrop; interval: 1600; onTriggered: if (big.action === "held") big.play("drop") }
-                }
-
-                Item { Layout.fillHeight: true; Layout.preferredHeight: 1 }
-
-                ClickButton {
-                    Layout.alignment: Qt.AlignRight
-                    implicitHeight: Scaler.s(34)
-                    horizontalPadding: Scaler.s(18)
-                    cornerRadius: ThemeBackend.borderRadius
-                    buttonText: I18n.t("widgets.redactor.done")
-                    textFontSize: Scaler.s(12)
-                    accentColor: ThemeBackend.mauve
-                    textColor: ThemeBackend.crust
-                    opacity: editor.revealAt(0.75)
-                    onClicked: editor.finished()
-                }
-            }
-        }
+    }
     }
 
     // ---------- the duck: flies in from the desktop, then stays in the big scene ----------
