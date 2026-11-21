@@ -2,12 +2,14 @@
 
 [[ ${_ANSERIN_CACHING_READY:-} == 1 ]] && return 0
 
-if [ -z "$ANSERIN_DIR" ]; then
+if [ -z "${ANSERIN_DIR:-}" ]; then
     SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
     export ANSERIN_DIR="$(dirname "$SCRIPT_DIR")"
 fi
 
 export QS_DIR="$ANSERIN_DIR/quickshell"
+# Anserin's own helper program (src/quickshell/native/core, built by scripts/build-core.py when the shell starts)
+export ANSERIN_CORE="$(dirname "$ANSERIN_DIR")/.lab-data/core-build/bin/anserin-core"
 export MAIN_QML="$QS_DIR/Shell.qml"
 : "${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR must be set}"
 export IPC_SOCKET="$XDG_RUNTIME_DIR/anserin/ipc.sock"
