@@ -1,6 +1,82 @@
 {
   "versions": [
     {
+      "version": "0.1.0",
+      "date": "2026-11-22",
+      "posts": [
+        {
+          "id": "network-gargantua",
+          "tag": "feature",
+          "title": "Gargantua: a black hole for your Network page",
+          "image": "docs/updates/0.1.0-gargantua.jpg",
+          "details": "A new Network style. Your router sits inside a live black hole, with the Wi-Fi networks around you floating in its glow. Click one to connect.\n\nPick it in Edit panel → Style → Network. It has its own editor for colour, tilt and how the networks group.",
+          "resources": {
+            "ram": "~65 MB",
+            "cpu": "~64% of one core",
+            "disk": "2.6 MB"
+          }
+        },
+        {
+          "id": "network-radar",
+          "tag": "feature",
+          "title": "Radar: a calm map of the networks near you",
+          "image": "docs/updates/0.1.0-radar.jpg",
+          "details": "A new Network style. The networks around you are drawn as a web of points around your router, with the one you use at the bottom and its power button beside it.\n\nPick it in Edit panel → Style → Network.",
+          "resources": {
+            "ram": "~45 MB",
+            "cpu": "~80% of one core",
+            "disk": "0.3 MB"
+          }
+        },
+        {
+          "id": "weather-smart",
+          "tag": "feature",
+          "title": "Smart Weather: a sky that matches outside",
+          "image": "docs/updates/0.1.0-smartweather.jpg",
+          "details": "A new Weather style, like a smart mirror. The whole page is a sky that follows the time of day and the weather now (rain, clouds, mist, snow, storms), with the hours and the next five days below.\n\nPick it in Edit panel → Style → Weather. Its editor lets you try any time and weather.",
+          "resources": {
+            "ram": "~35 MB",
+            "cpu": "~23% of one core",
+            "disk": "0.1 MB"
+          }
+        },
+        {
+          "id": "edit-panel-bar",
+          "tag": "improved",
+          "title": "Style editors use one simple bar",
+          "image": "docs/updates/0.1.0-edit-bar.jpg",
+          "details": "Before: a style's settings opened in a tall card beside the preview.\n\nNow: the settings sit in one short bar above the preview, with the same buttons and sliders in every editor, so the preview stays big and in the middle.",
+          "resources": {
+            "ram": "no extra",
+            "cpu": "no extra",
+            "disk": "7 KB"
+          }
+        },
+        {
+          "id": "heavy-style-warning",
+          "tag": "feature",
+          "title": "A heads-up before heavy styles",
+          "image": "docs/updates/0.1.0-warning.jpg",
+          "details": "Some styles use a lot more of your computer than others. Picking one of them (Gargantua, or Bubble in System) now shows a short warning with a before and after picture. Got it keeps the new style, Cancel puts the old one back.",
+          "resources": {
+            "disk": "90 KB"
+          }
+        },
+        {
+          "id": "widget-picker",
+          "tag": "improved",
+          "title": "A new way to add widgets",
+          "image": "docs/updates/0.1.0-widget-picker.jpg",
+          "details": "Before: Open Redactor showed only a small bar over your desktop, and you added a widget without seeing it first.\n\nNow: your desktop shrinks to the right with a soft bounce. Pick a group at the bottom, then a widget, and every style of it shows live on the left, two per row. Click one and it lands on your desktop. The selected widget's tools sit above it, and closing grows the desktop back.",
+          "resources": {
+            "ram": "~30 MB",
+            "cpu": "no extra",
+            "disk": "19 KB"
+          }
+        }
+      ]
+    },
+    {
       "version": "0.0.4",
       "date": "2026-11-16",
       "posts": [
