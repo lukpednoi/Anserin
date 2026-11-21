@@ -1432,7 +1432,9 @@
       "done": "Done",
       "widget_singular": "widget",
       "widgets_plural": "widgets",
-      "widgets_short": "w"
+      "widgets_short": "w",
+      "pick_hint": "Pick a group below, then a widget, to see its styles here.",
+      "pick_style_to_add": "Pick a group below, then click a style on the left to add it"
     },
     "types": {
       "clock": "Clock",

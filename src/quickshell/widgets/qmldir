@@ -4,3 +4,5 @@ SelectionOutline 1.0 SelectionOutline.qml
 
 WidgetPicker 1.0 WidgetPicker.qml
 singleton WidgetPickerState 1.0 WidgetPickerState.qml
+RedactorCategoryBar 1.0 RedactorCategoryBar.qml
+RedactorPreviewPanel 1.0 RedactorPreviewPanel.qml

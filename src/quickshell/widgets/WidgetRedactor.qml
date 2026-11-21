@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
+import Quickshell.Widgets
 import "../"
 import "../reusables"
 import "faces"
@@ -184,8 +185,16 @@ Scope {
                 }
 
                 function exitRedactor() {
+                    if (redactorMode.closing) return;
+                    redactorMode.closing = true;
                     redactorMode.selectedId = "";
                     root.targetSelectedWidgetId = "";
+                    openAnim.stop();
+                    closeAnim.start();
+                }
+
+                // after the closing animation: the desktop is full size again, so the real widgets take over
+                function finishExit() {
                     WidgetSync.setRedactMode(redactorWindow.safeMonitorName, false);
                     sendIpc("setRedactMode", ["false"]);
                     sendBarIpc("setRedactMode", ["false"]);
@@ -203,7 +212,8 @@ Scope {
                 Shortcut {
                     sequence: "Escape"
                     onActivated: {
-                        if (toolbar.dismiss()) return;
+                        if (redactorMode.closing) return;
+                        if (categoryBar.back()) return;
                         redactorMode.selectedId = "";
                         redactorWindow.exitRedactor();
                     }
@@ -274,7 +284,6 @@ Scope {
                     ListModel {
                         id: activeWidgetsModel
                         dynamicRoles: true
-                        onCountChanged: redactorMode.updateToolbarObscured()
                     }
 
                     property alias activeWidgetsModel: activeWidgetsModel
@@ -286,11 +295,62 @@ Scope {
                     readonly property real snapThreshold: s(12)
                     readonly property bool showDistances: !(typeof Config !== "undefined" && Config.rawSettings && Config.rawSettings.widgets && Config.rawSettings.widgets.showDistances === false)
                     property string nudgeTargetId: ""
-                    readonly property bool canNudge: selectedId !== "" && !toolbar.panelOpen && !(imagePickerLoader.item && imagePickerLoader.item.visible)
-                    property bool toolbarObscured: false
+                    readonly property bool canNudge: selectedId !== "" && !(imagePickerLoader.item && imagePickerLoader.item.visible)
                     property bool isReady: false
                     property bool isInitializing: true
                     property int topZ: 1
+
+                    // Layout: the preview panel takes the left 30%, the group bar the bottom 20% and the right 10% stays
+                    // empty; the desktop shrinks, keeping its shape, into what is left under the tools strip.
+                    // openProgress runs 0 (full-size desktop, as on screen) -> 1 (shrunk), with a soft bounce.
+                    property real openProgress: 0
+                    readonly property real layoutP: Math.max(0, Math.min(1, openProgress))
+                    // the Modern frame is the screen's edge: it stays drawn on top and everything sits inside it
+                    readonly property real frameInset: ScreenEdges.inset(redactorWindow.screen)
+                    readonly property real edgeGap: s(14)
+                    readonly property real innerMargin: frameInset + edgeGap
+                    readonly property real leftPanelWidth: Math.round(width * 0.30)
+                    readonly property real bottomBarHeight: Math.round(height * 0.20)
+                    readonly property real rightGapWidth: Math.round(width * 0.10)
+                    readonly property real topStripHeight: s(96)
+                    readonly property real deskAreaX: leftPanelWidth + edgeGap
+                    readonly property real deskAreaWidth: Math.max(1, width - leftPanelWidth - rightGapWidth - edgeGap * 2)
+                    readonly property real deskAreaY: frameInset + topStripHeight
+                    readonly property real deskAreaHeight: Math.max(1, height - bottomBarHeight - deskAreaY - edgeGap)
+                    readonly property real deskScaleTarget: Math.min(deskAreaWidth / Math.max(1, width), deskAreaHeight / Math.max(1, height))
+                    readonly property real deskXTarget: Math.round(deskAreaX + (deskAreaWidth - width * deskScaleTarget) / 2)
+                    readonly property real deskYTarget: Math.round(deskAreaY + (deskAreaHeight - height * deskScaleTarget) / 2)
+                    readonly property real deskScale: 1 + (deskScaleTarget - 1) * openProgress
+                    // multiply sizes inside the shrunk desktop by this to keep them their on-screen size
+                    readonly property real unshrink: 1 / Math.max(0.05, deskScale)
+                    property alias topToolsHost: topToolsHost
+                    property bool closing: false
+
+                    // Opens once the layout is in, so the shrinking desktop already shows the widgets.
+                    onIsReadyChanged: if (isReady && !closing) openAnim.start()
+
+                    NumberAnimation {
+                        id: openAnim
+                        target: redactorMode
+                        property: "openProgress"
+                        to: 1
+                        duration: 560
+                        easing.type: Easing.OutBack
+                        easing.overshoot: 1.15
+                    }
+
+                    SequentialAnimation {
+                        id: closeAnim
+                        NumberAnimation {
+                            target: redactorMode
+                            property: "openProgress"
+                            to: 0
+                            duration: 460
+                            easing.type: Easing.OutBack
+                            easing.overshoot: 0.9
+                        }
+                        ScriptAction { script: redactorWindow.finishExit() }
+                    }
 
                     readonly property var selectedWidget: {
                         if (!selectedId) return null;
@@ -306,9 +366,6 @@ Scope {
                     readonly property var currentWidget: selectedWidget
                     readonly property var activeWidget: selectedWidget
 
-                    onSelectedIdChanged: updateToolbarObscured()
-                    onWidthChanged: updateToolbarObscured()
-                    onHeightChanged: updateToolbarObscured()
 
                     Connections {
                         target: root
@@ -343,7 +400,6 @@ Scope {
                                 if (String(item.wId).trim() === target) {
                                     activeWidgetsModel.setProperty(i, "wX", x);
                                     activeWidgetsModel.setProperty(i, "wY", y);
-                                    redactorMode.queueUpdateToolbarObscured();
                                     break;
                                 }
                             }
@@ -370,17 +426,6 @@ Scope {
                         }
                     }
 
-                    Timer {
-                        id: toolbarCheckTimer
-                        interval: 100
-                        repeat: false
-                        onTriggered: redactorMode.updateToolbarObscured()
-                    }
-
-                    function queueUpdateToolbarObscured() {
-                        toolbarCheckTimer.restart();
-                    }
-
                     function removeWidget(widgetId) {
                         let rmId = String(widgetId);
                         if (!rmId) return;
@@ -400,7 +445,6 @@ Scope {
                                 root.targetSelectedWidgetId = "";
                             }
                         }
-                        redactorMode.updateToolbarObscured();
                     }
 
                     function removeAllWidgets() {
@@ -408,71 +452,6 @@ Scope {
                         root.targetSelectedWidgetId = "";
                         activeWidgetsModel.clear();
                         WidgetSync.clearWidgets(redactorWindow.safeMonitorName);
-                        redactorMode.updateToolbarObscured();
-                    }
-
-                    function updateToolbarObscured() {
-                        if (!activeWidgetsModel || activeWidgetsModel.count === 0) {
-                            toolbarObscured = false;
-                            return;
-                        }
-
-                        let margin = s(50);
-                        let tbW = toolbar.width;
-                        let tbH = toolbar.height;
-                        let tbX = (redactorMode.width - tbW) / 2;
-                        let tbY = toolbar.y;
-
-                        let zX1 = tbX - margin;
-                        let zX2 = tbX + tbW + margin;
-                        let zY1 = tbY - margin;
-                        let zY2 = redactorMode.height;
-
-                        let obscured = false;
-                        let repCount = widgetRepeater.count;
-
-                        if (repCount > 0) {
-                            for (let i = 0; i < repCount; i++) {
-                                let proxy = widgetRepeater.itemAt(i);
-                                if (!proxy) continue;
-
-                                let isSel = (redactorMode.selectedId === proxy.wId);
-                                let gap = isSel ? s(20) : 0;
-                                let chromeH = isSel ? s(90) : 0;
-
-                                let wX1 = proxy.x - gap;
-                                let wY1 = proxy.y - gap;
-                                let wX2 = proxy.x + proxy.width + gap;
-                                let wY2 = proxy.y + proxy.height + gap + chromeH;
-
-                                if (wX1 < zX2 && wX2 > zX1 && wY1 < zY2 && wY2 > zY1) {
-                                    obscured = true;
-                                    break;
-                                }
-                            }
-                        } else {
-                            for (let i = 0; i < activeWidgetsModel.count; i++) {
-                                let item = activeWidgetsModel.get(i);
-                                if (!item) continue;
-                                let rot = (item.wRotation !== undefined && !isNaN(item.wRotation)) ? Math.abs(Math.round(item.wRotation)) : 0;
-                                let bw = (rot % 180 === 0) ? item.wWidth : item.wHeight;
-                                let bh = (rot % 180 === 0) ? item.wHeight : item.wWidth;
-                                let isSel = (redactorMode.selectedId === item.wId);
-                                let gap = isSel ? s(20) : 0;
-                                let chromeH = isSel ? s(90) : 0;
-
-                                let wX1 = item.wX - gap;
-                                let wY1 = item.wY - gap;
-                                let wX2 = item.wX + bw + gap;
-                                let wY2 = item.wY + bh + gap + chromeH;
-
-                                if (wX1 < zX2 && wX2 > zX1 && wY1 < zY2 && wY2 > zY1) {
-                                    obscured = true;
-                                    break;
-                                }
-                            }
-                        }
-                        toolbarObscured = obscured;
                     }
 
                     function getConstraints(loaderItem) {
@@ -936,11 +915,16 @@ Scope {
                         }
                     }
 
-                    function addWidget(typeKey) {
+                    // the style picked in the preview panel for an Image widget, used once its file is chosen
+                    property string pendingImageVariant: ""
+
+                    function addWidget(typeKey, variant) {
                         let t = WidgetRegistry.types[typeKey];
                         if (!t) return;
+                        let pickedVariant = (variant && t.variants && t.variants[variant]) ? variant : WidgetRegistry.defaultVariant(typeKey);
                         if (t.requiresFilePicker) {
-                            openImagePicker(-1, "", "", false);
+                            redactorMode.pendingImageVariant = pickedVariant;
+                            openImagePicker(-1, "", "", pickedVariant === "round");
                             return;
                         }
                         let def = WidgetRegistry.defaultSize(typeKey);
@@ -958,7 +942,7 @@ Scope {
                             defH = snapped.h;
                         }
 
-                        let defVariant = WidgetRegistry.defaultVariant(typeKey);
+                        let defVariant = pickedVariant;
 
                         activeWidgetsModel.append({
                             "wType": typeKey,
@@ -978,7 +962,6 @@ Scope {
                         root.targetSelectedWidgetId = newId;
                         WidgetSync.addWidget(redactorWindow.safeMonitorName, newId, typeKey, spawnX, spawnY, defW, defH, 1.0, "", 0, defVariant);
                         WidgetSync.bringToFront(redactorWindow.safeMonitorName, newId);
-                        redactorMode.updateToolbarObscured();
                     }
 
                     function setWidgetProperty(propName, val, targetId) {
@@ -1116,7 +1099,6 @@ Scope {
 
                         activeWidgetsModel.clear();
                         for (let i = 0; i < target.length; i++) activeWidgetsModel.append(target[i]);
-                        redactorMode.updateToolbarObscured();
                         initTimer.restart();
                     }
 
@@ -1176,1414 +1158,1422 @@ Scope {
                         return ThemeBackend.text;
                     }
 
+                    // Backdrop: clear while the desktop is full size (it matches the real one), solid once open so the
+                    // windows behind the desktop do not show through between the panels.
                     Rectangle {
                         anchors.fill: parent
-                        color: Qt.rgba(ThemeBackend.crust.r, ThemeBackend.crust.g, ThemeBackend.crust.b, 0.55)
+                        color: Qt.rgba(ThemeBackend.crust.r, ThemeBackend.crust.g, ThemeBackend.crust.b, redactorMode.layoutP)
                     }
 
                     MouseArea {
                         anchors.fill: parent
-                        z: -1
                         onClicked: {
                             redactorMode.selectedId = "";
                             root.targetSelectedWidgetId = "";
                         }
                     }
 
+                    // The desktop at its real size, shrunk on screen by deskScale. Widget positions, snapping and
+                    // saving keep working in screen pixels because everything maps to workspaceArea inside it.
                     Item {
-                        id: snapOverlay
-                        anchors.fill: parent
-                        z: 100000
+                        id: deskCanvas
+                        width: redactorMode.width
+                        height: redactorMode.height
+                        transformOrigin: Item.TopLeft
+                        scale: redactorMode.deskScale
+                        x: redactorMode.deskXTarget * redactorMode.openProgress
+                        y: redactorMode.deskYTarget * redactorMode.openProgress
 
-                        readonly property real lineWidth: s(1)
-                        readonly property real capLength: s(7)
+                        // the wallpaper, so the shrunk desktop still looks like the desktop
+                        ClippingRectangle {
+                            id: deskWallpaper
+                            anchors.fill: parent
+                            color: "transparent"
+                            radius: ThemeBackend.borderRadius * redactorMode.layoutP / Math.max(0.05, redactorMode.deskScale)
 
-                        Repeater {
-                            model: redactorMode.guideLines
-                            delegate: Rectangle {
-                                x: modelData.x
-                                y: modelData.y
-                                width: modelData.w
-                                height: modelData.h
-                                color: ThemeBackend.mauve
+                            property string path: ""
+                            function refresh() {
+                                const name = redactorWindow.monitorName;
+                                const p = Wallpaper.getWallpaperPath(name);
+                                // a video wallpaper shows its saved still frame
+                                path = /\.(jpe?g|png|webp|bmp)$/i.test(p) ? "file://" + p
+                                    : "file://" + Caching.cacheDir + "/wallpaper/current_wallpaper_" + name + ".png";
+                            }
+                            Component.onCompleted: refresh()
+                            Connections { target: Wallpaper; function onWallpaperChanged() { deskWallpaper.refresh(); } }
+
+                            Image {
+                                anchors.fill: parent
+                                source: deskWallpaper.path
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                                cache: false
+                                sourceSize.width: 1600
+                                visible: status === Image.Ready
                             }
                         }
 
-                        Repeater {
-                            model: redactorMode.measureLines
-                            delegate: Item {
-                                id: measure
-                                readonly property bool horizontal: modelData.horizontal
-                                readonly property bool labelFits: horizontal
-                                    ? modelData.length >= measureLabel.width + snapOverlay.capLength * 2
-                                    : modelData.length >= measureLabel.height + snapOverlay.capLength * 2
+                        MouseArea {
+                            anchors.fill: parent
+                            z: -1
+                            onClicked: {
+                                redactorMode.selectedId = "";
+                                root.targetSelectedWidgetId = "";
+                            }
+                        }
 
-                                x: modelData.x
-                                y: modelData.y
-                                width: horizontal ? modelData.length : 0
-                                height: horizontal ? 0 : modelData.length
+                        Item {
+                            id: snapOverlay
+                            anchors.fill: parent
+                            z: 100000
 
-                                Rectangle {
-                                    x: measure.horizontal ? 0 : -width / 2
-                                    y: measure.horizontal ? -height / 2 : 0
-                                    width: measure.horizontal ? measure.width : snapOverlay.lineWidth
-                                    height: measure.horizontal ? snapOverlay.lineWidth : measure.height
+                            readonly property real lineWidth: s(1) * redactorMode.unshrink
+                            readonly property real capLength: s(7) * redactorMode.unshrink
+
+                            Repeater {
+                                model: redactorMode.guideLines
+                                delegate: Rectangle {
+                                    x: modelData.x
+                                    y: modelData.y
+                                    width: modelData.w
+                                    height: modelData.h
                                     color: ThemeBackend.mauve
                                 }
+                            }
 
-                                Repeater {
-                                    model: 2
-                                    delegate: Rectangle {
-                                        width: measure.horizontal ? snapOverlay.lineWidth : snapOverlay.capLength
-                                        height: measure.horizontal ? snapOverlay.capLength : snapOverlay.lineWidth
-                                        x: measure.horizontal ? index * measure.width - width / 2 : -width / 2
-                                        y: measure.horizontal ? -height / 2 : index * measure.height - height / 2
+                            Repeater {
+                                model: redactorMode.measureLines
+                                delegate: Item {
+                                    id: measure
+                                    readonly property bool horizontal: modelData.horizontal
+                                    readonly property bool labelFits: horizontal
+                                        ? modelData.length >= measureLabel.width + snapOverlay.capLength * 2
+                                        : modelData.length >= measureLabel.height + snapOverlay.capLength * 2
+
+                                    x: modelData.x
+                                    y: modelData.y
+                                    width: horizontal ? modelData.length : 0
+                                    height: horizontal ? 0 : modelData.length
+
+                                    Rectangle {
+                                        x: measure.horizontal ? 0 : -width / 2
+                                        y: measure.horizontal ? -height / 2 : 0
+                                        width: measure.horizontal ? measure.width : snapOverlay.lineWidth
+                                        height: measure.horizontal ? snapOverlay.lineWidth : measure.height
                                         color: ThemeBackend.mauve
                                     }
-                                }
 
-                                Rectangle {
-                                    id: measureLabel
-                                    width: measureText.implicitWidth + s(12)
-                                    height: s(20)
-                                    radius: Math.min(ThemeBackend.borderRadius, height / 2)
-                                    color: ThemeBackend.mauve
-                                    x: measure.horizontal
-                                        ? (measure.width - width) / 2
-                                        : (measure.labelFits ? -width / 2 : s(6))
-                                    y: measure.horizontal
-                                        ? (measure.labelFits ? -height / 2 : -height - s(6))
-                                        : (measure.height - height) / 2
+                                    Repeater {
+                                        model: 2
+                                        delegate: Rectangle {
+                                            width: measure.horizontal ? snapOverlay.lineWidth : snapOverlay.capLength
+                                            height: measure.horizontal ? snapOverlay.capLength : snapOverlay.lineWidth
+                                            x: measure.horizontal ? index * measure.width - width / 2 : -width / 2
+                                            y: measure.horizontal ? -height / 2 : index * measure.height - height / 2
+                                            color: ThemeBackend.mauve
+                                        }
+                                    }
 
-                                    Text {
-                                        id: measureText
-                                        anchors.centerIn: parent
-                                        text: modelData.value
-                                        font.family: ThemeBackend.fontFamily
-                                        font.pixelSize: s(11)
-                                        font.bold: true
-                                        color: ThemeBackend.crust
+                                    Rectangle {
+                                        id: measureLabel
+                                        width: measureText.implicitWidth + s(12)
+                                        height: s(20)
+                                        scale: redactorMode.unshrink
+                                        radius: Math.min(ThemeBackend.borderRadius, height / 2)
+                                        color: ThemeBackend.mauve
+                                        x: measure.horizontal
+                                            ? (measure.width - width) / 2
+                                            : (measure.labelFits ? -width / 2 : s(6))
+                                        y: measure.horizontal
+                                            ? (measure.labelFits ? -height / 2 : -height - s(6))
+                                            : (measure.height - height) / 2
+
+                                        Text {
+                                            id: measureText
+                                            anchors.centerIn: parent
+                                            text: modelData.value
+                                            font.family: ThemeBackend.fontFamily
+                                            font.pixelSize: s(11)
+                                            font.bold: true
+                                            color: ThemeBackend.crust
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    Item {
-                        id: workspaceArea
-                        anchors.fill: parent
-
-                        Loader {
+                        Item {
+                            id: workspaceArea
                             anchors.fill: parent
-                            active: redactorMode.gridEnabled
-                            sourceComponent: ShaderEffect {
-                                id: gridShader
+
+                            Loader {
                                 anchors.fill: parent
-                                property vector2d itemSize: Qt.vector2d(width, height)
-                                property real stepSize: s(20)
-                                property real lineWidth: 1.0
-                                property color lineColor: Qt.rgba(ThemeBackend.text.r, ThemeBackend.text.g, ThemeBackend.text.b, 0.1)
+                                active: redactorMode.gridEnabled
+                                sourceComponent: ShaderEffect {
+                                    id: gridShader
+                                    anchors.fill: parent
+                                    property vector2d itemSize: Qt.vector2d(width, height)
+                                    property real stepSize: s(20)
+                                    property real lineWidth: 1.0
+                                    property color lineColor: Qt.rgba(ThemeBackend.text.r, ThemeBackend.text.g, ThemeBackend.text.b, 0.1)
 
-                                fragmentShader: "file://" + Caching.anserinDir + "/assets/shaders/ui/grid_pattern.frag.qsb"
+                                    fragmentShader: "file://" + Caching.anserinDir + "/assets/shaders/ui/grid_pattern.frag.qsb"
+                                }
                             }
-                        }
 
-                        Repeater {
-                            id: widgetRepeater
-                            model: redactorMode.activeWidgetsModel
-                            delegate: Item {
-                                id: widgetProxy
-                                property real wRotation: (model.wRotation !== undefined && !isNaN(model.wRotation)) ? model.wRotation : 0
+                            Repeater {
+                                id: widgetRepeater
+                                model: redactorMode.activeWidgetsModel
+                                delegate: Item {
+                                    id: widgetProxy
+                                    property real wRotation: (model.wRotation !== undefined && !isNaN(model.wRotation)) ? model.wRotation : 0
 
-                                x: model.wX
-                                y: model.wY
-                                width: (Math.abs(Math.round(widgetProxy.wRotation || 0)) % 180 === 0) ? model.wWidth : model.wHeight
-                                height: (Math.abs(Math.round(widgetProxy.wRotation || 0)) % 180 === 0) ? model.wHeight : model.wWidth
+                                    x: model.wX
+                                    y: model.wY
+                                    width: (Math.abs(Math.round(widgetProxy.wRotation || 0)) % 180 === 0) ? model.wWidth : model.wHeight
+                                    height: (Math.abs(Math.round(widgetProxy.wRotation || 0)) % 180 === 0) ? model.wHeight : model.wWidth
 
-                                property int currentZ: index
-                                z: (widgetProxy.isSelected ? 50000 : 0) + currentZ
-                                opacity: (redactorMode.selectedId === "" || widgetProxy.isSelected) ? 1.0 : 0.6
-                                Behavior on opacity { NumberAnimation { duration: 150 } }
+                                    property int currentZ: index
+                                    z: (widgetProxy.isSelected ? 50000 : 0) + currentZ
+                                    opacity: (redactorMode.selectedId === "" || widgetProxy.isSelected) ? 1.0 : 0.6
+                                    Behavior on opacity { NumberAnimation { duration: 150 } }
 
-                                Component.onCompleted: {
-                                    if (!redactorMode.isInitializing) {
+                                    // a widget added while editing grows in softly instead of popping up
+                                    property real spawn: 1
+                                    NumberAnimation {
+                                        id: spawnAnim
+                                        target: widgetProxy
+                                        property: "spawn"
+                                        from: 0
+                                        to: 1
+                                        duration: 380
+                                        easing.type: Easing.OutBack
+                                        easing.overshoot: 1.4
+                                    }
+
+                                    Component.onCompleted: {
+                                        if (!redactorMode.isInitializing) {
+                                            redactorMode.topZ += 1;
+                                            widgetProxy.currentZ = redactorMode.topZ;
+                                            widgetProxy.spawn = 0;
+                                            spawnAnim.start();
+                                        }
+                                    }
+
+                                    Component.onDestruction: {
+                                        preview.active = false;
+                                        preview.source = "";
+                                    }
+
+                                    function bringToFront() {
                                         redactorMode.topZ += 1;
                                         widgetProxy.currentZ = redactorMode.topZ;
+                                        WidgetSync.bringToFront(redactorWindow.safeMonitorName, String(widgetProxy.wId));
                                     }
-                                }
 
-                                Component.onDestruction: {
-                                    preview.active = false;
-                                    preview.source = "";
-                                }
+                                    property real selectionGap: s(8)
 
-                                function bringToFront() {
-                                    redactorMode.topZ += 1;
-                                    widgetProxy.currentZ = redactorMode.topZ;
-                                    WidgetSync.bringToFront(redactorWindow.safeMonitorName, String(widgetProxy.wId));
-                                }
+                                    property alias preview: preview
+                                    property string wType: model.wType || ""
+                                    property string wVariant: model.wVariant || ""
+                                    property string wImagePath: model.wImagePath || ""
+                                    property string wId: model.wId || ""
+                                    property real wOpacity: model.wOpacity !== undefined ? model.wOpacity : 1.0
+                                    property int wIndex: index
 
-                                property real selectionGap: s(8)
+                                    property bool isSelected: redactorMode.selectedId === widgetProxy.wId
+                                    property bool hasUnsyncedChanges: false
 
-                                property alias preview: preview
-                                property string wType: model.wType || ""
-                                property string wVariant: model.wVariant || ""
-                                property string wImagePath: model.wImagePath || ""
-                                property string wId: model.wId || ""
-                                property real wOpacity: model.wOpacity !== undefined ? model.wOpacity : 1.0
-                                property int wIndex: index
+                                    property var savedAspects: ({})
 
-                                property bool isSelected: redactorMode.selectedId === widgetProxy.wId
-                                property bool hasUnsyncedChanges: false
+                                    function applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, mouseArea, edges, isCorner) {
+                                        let localPos = mouseArea.mapToItem(workspaceArea, mouse.x, mouse.y);
+                                        let dx = localPos.x - startMouseX;
+                                        let dy = localPos.y - startMouseY;
 
-                                property var savedAspects: ({})
+                                        let rot = widgetProxy.wRotation || 0;
+                                        let rad = rot * Math.PI / 180.0;
+                                        let cos = Math.cos(rad);
+                                        let sin = Math.sin(rad);
 
-                                Connections {
-                                    target: baseSelectMa
-                                    function onPressedChanged() {
-                                        if (!baseSelectMa.pressed) {
-                                            bottomChrome.posMode = bottomChrome.calculatedPosMode;
-                                        }
-                                    }
-                                }
+                                        let ldx = dx * cos + dy * sin;
+                                        let ldy = -dx * sin + dy * cos;
 
-                                function applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, mouseArea, edges, isCorner) {
-                                    let localPos = mouseArea.mapToItem(workspaceArea, mouse.x, mouse.y);
-                                    let dx = localPos.x - startMouseX;
-                                    let dy = localPos.y - startMouseY;
+                                        let passLdx = isCorner ? ldx : (edges.left || edges.right ? ldx : 0);
+                                        let passLdy = isCorner ? ldy : (edges.top || edges.bottom ? ldy : 0);
 
-                                    let rot = widgetProxy.wRotation || 0;
-                                    let rad = rot * Math.PI / 180.0;
-                                    let cos = Math.cos(rad);
-                                    let sin = Math.sin(rad);
+                                        let rot90 = Math.abs(Math.round(rot)) % 180 !== 0;
+                                        let startCX = startWidgetX + (rot90 ? startHeight : startWidth) / 2.0;
+                                        let startCY = startWidgetY + (rot90 ? startWidth : startHeight) / 2.0;
 
-                                    let ldx = dx * cos + dy * sin;
-                                    let ldy = -dx * sin + dy * cos;
+                                        let pxFixed = edges.left ? startWidth / 2.0 : (edges.right ? -startWidth / 2.0 : 0);
+                                        let pyFixed = edges.top ? startHeight / 2.0 : (edges.bottom ? -startHeight / 2.0 : 0);
+                                        let fixedX = startCX + pxFixed * cos - pyFixed * sin;
+                                        let fixedY = startCY + pxFixed * sin + pyFixed * cos;
 
-                                    let passLdx = isCorner ? ldx : (edges.left || edges.right ? ldx : 0);
-                                    let passLdy = isCorner ? ldy : (edges.top || edges.bottom ? ldy : 0);
-
-                                    let rot90 = Math.abs(Math.round(rot)) % 180 !== 0;
-                                    let startCX = startWidgetX + (rot90 ? startHeight : startWidth) / 2.0;
-                                    let startCY = startWidgetY + (rot90 ? startWidth : startHeight) / 2.0;
-
-                                    let pxFixed = edges.left ? startWidth / 2.0 : (edges.right ? -startWidth / 2.0 : 0);
-                                    let pyFixed = edges.top ? startHeight / 2.0 : (edges.bottom ? -startHeight / 2.0 : 0);
-                                    let fixedX = startCX + pxFixed * cos - pyFixed * sin;
-                                    let fixedY = startCY + pxFixed * sin + pyFixed * cos;
-
-                                    let place = (w, h) => {
-                                        let pxNew = edges.left ? w / 2.0 : (edges.right ? -w / 2.0 : 0);
-                                        let pyNew = edges.top ? h / 2.0 : (edges.bottom ? -h / 2.0 : 0);
-                                        let bw = rot90 ? h : w;
-                                        let bh = rot90 ? w : h;
-                                        let x = fixedX - (pxNew * cos - pyNew * sin) - bw / 2.0;
-                                        let y = fixedY - (pxNew * sin + pyNew * cos) - bh / 2.0;
-                                        x = redactorMode.fitX(x, bw);
-                                        y = redactorMode.fitY(y, bh);
-                                        return { l: x, t: y, r: x + bw, b: y + bh };
-                                    };
-
-                                    let res = redactorMode.calculateResize(preview.item, startWidgetX, startWidgetY, startWidth, startHeight, passLdx, passLdy, edges, isCorner, rot);
-                                    let box = place(res.w, res.h);
-                                    let lines = { x: -1, y: -1 };
-                                    let free = !redactorMode.gridEnabled && (mouse.modifiers & Qt.ControlModifier) === 0;
-
-                                    if (free) {
-                                        let sides = { x: 0, y: 0 };
-                                        let addSide = (nx, ny) => {
-                                            sides.x += Math.round(nx * cos - ny * sin);
-                                            sides.y += Math.round(nx * sin + ny * cos);
+                                        let place = (w, h) => {
+                                            let pxNew = edges.left ? w / 2.0 : (edges.right ? -w / 2.0 : 0);
+                                            let pyNew = edges.top ? h / 2.0 : (edges.bottom ? -h / 2.0 : 0);
+                                            let bw = rot90 ? h : w;
+                                            let bh = rot90 ? w : h;
+                                            let x = fixedX - (pxNew * cos - pyNew * sin) - bw / 2.0;
+                                            let y = fixedY - (pxNew * sin + pyNew * cos) - bh / 2.0;
+                                            x = redactorMode.fitX(x, bw);
+                                            y = redactorMode.fitY(y, bh);
+                                            return { l: x, t: y, r: x + bw, b: y + bh };
                                         };
-                                        if (edges.left) addSide(-1, 0);
-                                        if (edges.right) addSide(1, 0);
-                                        if (edges.top) addSide(0, -1);
-                                        if (edges.bottom) addSide(0, 1);
 
-                                        let hit = redactorMode.snapEdges(widgetProxy, box, sides);
-                                        let aspect = selectionUI.isAspectLocked ? preview.item.minAspect : 0;
-                                        if (aspect > 0 && hit.x && hit.y) {
-                                            if (hit.x.diff <= hit.y.diff) hit.y = null;
-                                            else hit.x = null;
-                                        }
+                                        let res = redactorMode.calculateResize(preview.item, startWidgetX, startWidgetY, startWidth, startHeight, passLdx, passLdy, edges, isCorner, rot);
+                                        let box = place(res.w, res.h);
+                                        let lines = { x: -1, y: -1 };
+                                        let free = !redactorMode.gridEnabled && (mouse.modifiers & Qt.ControlModifier) === 0;
 
-                                        if (hit.x || hit.y) {
-                                            let w = res.w;
-                                            let h = res.h;
-                                            if (hit.x) {
-                                                let bw = sides.x < 0 ? box.r - hit.x.line : hit.x.line - box.l;
-                                                if (rot90) h = bw;
-                                                else w = bw;
-                                            }
-                                            if (hit.y) {
-                                                let bh = sides.y < 0 ? box.b - hit.y.line : hit.y.line - box.t;
-                                                if (rot90) w = bh;
-                                                else h = bh;
-                                            }
-                                            if (aspect > 0) {
-                                                if ((hit.x !== null) !== rot90) h = w / aspect;
-                                                else w = h * aspect;
+                                        if (free) {
+                                            let sides = { x: 0, y: 0 };
+                                            let addSide = (nx, ny) => {
+                                                sides.x += Math.round(nx * cos - ny * sin);
+                                                sides.y += Math.round(nx * sin + ny * cos);
+                                            };
+                                            if (edges.left) addSide(-1, 0);
+                                            if (edges.right) addSide(1, 0);
+                                            if (edges.top) addSide(0, -1);
+                                            if (edges.bottom) addSide(0, 1);
+
+                                            let hit = redactorMode.snapEdges(widgetProxy, box, sides);
+                                            let aspect = selectionUI.isAspectLocked ? preview.item.minAspect : 0;
+                                            if (aspect > 0 && hit.x && hit.y) {
+                                                if (hit.x.diff <= hit.y.diff) hit.y = null;
+                                                else hit.x = null;
                                             }
 
-                                            let sdx = edges.left ? startWidth - w : (edges.right ? w - startWidth : 0);
-                                            let sdy = edges.top ? startHeight - h : (edges.bottom ? h - startHeight : 0);
-                                            let snappedRes = redactorMode.calculateResize(preview.item, startWidgetX, startWidgetY, startWidth, startHeight, sdx, sdy, edges, isCorner, rot);
-                                            let snappedBox = place(snappedRes.w, snappedRes.h);
+                                            if (hit.x || hit.y) {
+                                                let w = res.w;
+                                                let h = res.h;
+                                                if (hit.x) {
+                                                    let bw = sides.x < 0 ? box.r - hit.x.line : hit.x.line - box.l;
+                                                    if (rot90) h = bw;
+                                                    else w = bw;
+                                                }
+                                                if (hit.y) {
+                                                    let bh = sides.y < 0 ? box.b - hit.y.line : hit.y.line - box.t;
+                                                    if (rot90) w = bh;
+                                                    else h = bh;
+                                                }
+                                                if (aspect > 0) {
+                                                    if ((hit.x !== null) !== rot90) h = w / aspect;
+                                                    else w = h * aspect;
+                                                }
 
-                                            let landsX = !hit.x || Math.abs((sides.x < 0 ? snappedBox.l : snappedBox.r) - hit.x.line) < 0.5;
-                                            let landsY = !hit.y || Math.abs((sides.y < 0 ? snappedBox.t : snappedBox.b) - hit.y.line) < 0.5;
-                                            if (landsX && landsY) {
-                                                res = snappedRes;
-                                                box = snappedBox;
-                                                lines = { x: hit.x ? hit.x.line : -1, y: hit.y ? hit.y.line : -1 };
+                                                let sdx = edges.left ? startWidth - w : (edges.right ? w - startWidth : 0);
+                                                let sdy = edges.top ? startHeight - h : (edges.bottom ? h - startHeight : 0);
+                                                let snappedRes = redactorMode.calculateResize(preview.item, startWidgetX, startWidgetY, startWidth, startHeight, sdx, sdy, edges, isCorner, rot);
+                                                let snappedBox = place(snappedRes.w, snappedRes.h);
+
+                                                let landsX = !hit.x || Math.abs((sides.x < 0 ? snappedBox.l : snappedBox.r) - hit.x.line) < 0.5;
+                                                let landsY = !hit.y || Math.abs((sides.y < 0 ? snappedBox.t : snappedBox.b) - hit.y.line) < 0.5;
+                                                if (landsX && landsY) {
+                                                    res = snappedRes;
+                                                    box = snappedBox;
+                                                    lines = { x: hit.x ? hit.x.line : -1, y: hit.y ? hit.y.line : -1 };
+                                                }
                                             }
                                         }
+
+                                        let boxW = box.r - box.l;
+                                        let boxH = box.b - box.t;
+                                        let newX = box.l;
+                                        let newY = box.t;
+
+                                        if (redactorMode.gridEnabled) {
+                                            let gridStep = s(20);
+                                            newX = redactorMode.fitX(Math.round(newX / gridStep) * gridStep, boxW);
+                                            newY = redactorMode.fitY(Math.round(newY / gridStep) * gridStep, boxH);
+                                        }
+
+                                        model.wWidth = res.w;
+                                        model.wHeight = res.h;
+                                        model.wX = newX;
+                                        model.wY = newY;
+
+                                        redactorMode.presentOverlay(widgetProxy, { l: newX, t: newY, r: newX + boxW, b: newY + boxH }, { lines: lines, refs: [] });
+                                        widgetProxy.triggerSync();
                                     }
 
-                                    let boxW = box.r - box.l;
-                                    let boxH = box.b - box.t;
-                                    let newX = box.l;
-                                    let newY = box.t;
+                                    function rotateWidget() {
+                                        let currentRot = Math.abs(Math.round(widgetProxy.wRotation || 0)) % 360;
+                                        let nextRot = currentRot + 90;
 
-                                    if (redactorMode.gridEnabled) {
-                                        let gridStep = s(20);
-                                        newX = redactorMode.fitX(Math.round(newX / gridStep) * gridStep, boxW);
-                                        newY = redactorMode.fitY(Math.round(newY / gridStep) * gridStep, boxH);
+                                        let curBW = (currentRot % 180 === 0) ? model.wWidth : model.wHeight;
+                                        let curBH = (currentRot % 180 === 0) ? model.wHeight : model.wWidth;
+
+                                        let centerX = model.wX + curBW / 2.0;
+                                        let centerY = model.wY + curBH / 2.0;
+
+                                        let unscaledBW = (nextRot % 180 === 0) ? model.wWidth : model.wHeight;
+                                        let unscaledBH = (nextRot % 180 === 0) ? model.wHeight : model.wWidth;
+
+                                        let limitX = redactorMode.safeWidth;
+                                        let limitY = redactorMode.safeHeight;
+
+                                        let maxBW = Math.max(20, 2.0 * Math.min(centerX, limitX - centerX));
+                                        let maxBH = Math.max(20, 2.0 * Math.min(centerY, limitY - centerY));
+
+                                        let scaleX = (maxBW > 0 && unscaledBW > maxBW) ? (maxBW / unscaledBW) : 1.0;
+                                        let scaleY = (maxBH > 0 && unscaledBH > maxBH) ? (maxBH / unscaledBH) : 1.0;
+                                        let scale = Math.min(scaleX, scaleY);
+
+                                        let targetW = model.wWidth;
+                                        let targetH = model.wHeight;
+
+                                        if (scale < 1.0) {
+                                            targetW = model.wWidth * scale;
+                                            targetH = model.wHeight * scale;
+                                        }
+
+                                        let clamped = redactorMode.clampResize(preview.item, targetW, targetH, 0, 0, true);
+                                        let finalW = clamped.w;
+                                        let finalH = clamped.h;
+
+                                        let nextBW = (nextRot % 180 === 0) ? finalW : finalH;
+                                        let nextBH = (nextRot % 180 === 0) ? finalH : finalW;
+
+                                        let newX = centerX - nextBW / 2.0;
+                                        let newY = centerY - nextBH / 2.0;
+
+                                        newX = redactorMode.fitX(newX, nextBW);
+                                        newY = redactorMode.fitY(newY, nextBH);
+
+                                        if (redactorMode.gridEnabled) {
+                                            let gridStep = s(20);
+                                            newX = redactorMode.fitX(Math.round(newX / gridStep) * gridStep, nextBW);
+                                            newY = redactorMode.fitY(Math.round(newY / gridStep) * gridStep, nextBH);
+                                        }
+
+                                        model.wWidth = finalW;
+                                        model.wHeight = finalH;
+                                        model.wRotation = nextRot;
+                                        model.wX = newX;
+                                        model.wY = newY;
+
+                                        WidgetSync.setRotation(redactorWindow.safeMonitorName, String(widgetProxy.wId), nextRot);
+                                        finalizeSync();
                                     }
 
-                                    model.wWidth = res.w;
-                                    model.wHeight = res.h;
-                                    model.wX = newX;
-                                    model.wY = newY;
-
-                                    redactorMode.presentOverlay(widgetProxy, { l: newX, t: newY, r: newX + boxW, b: newY + boxH }, { lines: lines, refs: [] });
-                                    widgetProxy.triggerSync();
-                                }
-
-                                function rotateWidget() {
-                                    let currentRot = Math.abs(Math.round(widgetProxy.wRotation || 0)) % 360;
-                                    let nextRot = currentRot + 90;
-
-                                    let curBW = (currentRot % 180 === 0) ? model.wWidth : model.wHeight;
-                                    let curBH = (currentRot % 180 === 0) ? model.wHeight : model.wWidth;
-
-                                    let centerX = model.wX + curBW / 2.0;
-                                    let centerY = model.wY + curBH / 2.0;
-
-                                    let unscaledBW = (nextRot % 180 === 0) ? model.wWidth : model.wHeight;
-                                    let unscaledBH = (nextRot % 180 === 0) ? model.wHeight : model.wWidth;
-
-                                    let limitX = redactorMode.safeWidth;
-                                    let limitY = redactorMode.safeHeight;
-
-                                    if (toolbar && toolbar.visible && toolbar.opacity > 0.1 && toolbar.y > centerY) {
-                                        limitY = toolbar.y;
+                                    function getDefaultSize(loaderItem) {
+                                        let defSize = WidgetRegistry.defaultSize(widgetProxy.wType);
+                                        let defW = defSize.w;
+                                        let defH = defSize.h;
+                                        if (loaderItem && loaderItem.minAspect !== undefined && loaderItem.maxAspect !== undefined && loaderItem.minAspect === loaderItem.maxAspect && loaderItem.minAspect > 0) {
+                                            let aspect = loaderItem.minAspect;
+                                            if (aspect === 1.0) {
+                                                defW = 180;
+                                                defH = 180;
+                                            } else {
+                                                defH = 120;
+                                                defW = Math.round(defH * aspect);
+                                            }
+                                        }
+                                        return { w: defW, h: defH };
                                     }
 
-                                    let maxBW = Math.max(20, 2.0 * Math.min(centerX, limitX - centerX));
-                                    let maxBH = Math.max(20, 2.0 * Math.min(centerY, limitY - centerY));
+                                    function applyVariant(variantId) {
+                                        if (widgetProxy.wVariant === variantId) return;
 
-                                    let scaleX = (maxBW > 0 && unscaledBW > maxBW) ? (maxBW / unscaledBW) : 1.0;
-                                    let scaleY = (maxBH > 0 && unscaledBH > maxBH) ? (maxBH / unscaledBH) : 1.0;
-                                    let scale = Math.min(scaleX, scaleY);
+                                        let currentAspect = model.wWidth / model.wHeight;
+                                        savedAspects[widgetProxy.wVariant] = currentAspect;
 
-                                    let targetW = model.wWidth;
-                                    let targetH = model.wHeight;
+                                        let targetAspect = savedAspects[variantId];
 
-                                    if (scale < 1.0) {
-                                        targetW = model.wWidth * scale;
-                                        targetH = model.wHeight * scale;
+                                        model.wVariant = variantId;
+
+                                        if (targetAspect) {
+                                            let area = model.wWidth * model.wHeight;
+                                            let newH = Math.max(10, Math.sqrt(area / targetAspect));
+                                            let newW = Math.max(10, newH * targetAspect);
+                                            model.wWidth = newW;
+                                            model.wHeight = newH;
+                                        }
+
+                                        WidgetSync.setVariant(redactorWindow.safeMonitorName, String(widgetProxy.wId), variantId);
+                                        finalizeSync();
                                     }
 
-                                    let clamped = redactorMode.clampResize(preview.item, targetW, targetH, 0, 0, true);
-                                    let finalW = clamped.w;
-                                    let finalH = clamped.h;
+                                    function resetWidgetSize() {
+                                        let currentRot = Math.abs(Math.round(widgetProxy.wRotation || 0)) % 360;
+                                        let curBW = (currentRot % 180 === 0) ? model.wWidth : model.wHeight;
+                                        let curBH = (currentRot % 180 === 0) ? model.wHeight : model.wWidth;
+                                        let cx = model.wX + curBW / 2.0;
+                                        let cy = model.wY + curBH / 2.0;
 
-                                    let nextBW = (nextRot % 180 === 0) ? finalW : finalH;
-                                    let nextBH = (nextRot % 180 === 0) ? finalH : finalW;
+                                        let def = getDefaultSize(preview.item);
+                                        let clamped = redactorMode.clampResize(preview.item, def.w, def.h, 0, 0, true);
+                                        let finalW = clamped.w;
+                                        let finalH = clamped.h;
 
-                                    let newX = centerX - nextBW / 2.0;
-                                    let newY = centerY - nextBH / 2.0;
+                                        let newX = cx - finalW / 2.0;
+                                        let newY = cy - finalH / 2.0;
 
-                                    newX = redactorMode.fitX(newX, nextBW);
-                                    newY = redactorMode.fitY(newY, nextBH);
+                                        newX = redactorMode.fitX(newX, finalW);
+                                        newY = redactorMode.fitY(newY, finalH);
 
-                                    if (redactorMode.gridEnabled) {
-                                        let gridStep = s(20);
-                                        newX = redactorMode.fitX(Math.round(newX / gridStep) * gridStep, nextBW);
-                                        newY = redactorMode.fitY(Math.round(newY / gridStep) * gridStep, nextBH);
+                                        if (redactorMode.gridEnabled) {
+                                            let snapped = redactorMode.snapBoxToGrid(preview.item, newX, newY, finalW, finalH);
+                                            newX = snapped.x;
+                                            newY = snapped.y;
+                                            finalW = snapped.w;
+                                            finalH = snapped.h;
+                                        }
+
+                                        model.wOpacity = 1.0;
+                                        model.wRotation = 0;
+                                        model.wWidth = finalW;
+                                        model.wHeight = finalH;
+                                        model.wX = newX;
+                                        model.wY = newY;
+
+                                        WidgetSync.setRotation(redactorWindow.safeMonitorName, String(widgetProxy.wId), 0);
+                                        finalizeSync();
                                     }
 
-                                    model.wWidth = finalW;
-                                    model.wHeight = finalH;
-                                    model.wRotation = nextRot;
-                                    model.wX = newX;
-                                    model.wY = newY;
-
-                                    WidgetSync.setRotation(redactorWindow.safeMonitorName, String(widgetProxy.wId), nextRot);
-                                    finalizeSync();
-                                }
-
-                                function getDefaultSize(loaderItem) {
-                                    let defSize = WidgetRegistry.defaultSize(widgetProxy.wType);
-                                    let defW = defSize.w;
-                                    let defH = defSize.h;
-                                    if (loaderItem && loaderItem.minAspect !== undefined && loaderItem.maxAspect !== undefined && loaderItem.minAspect === loaderItem.maxAspect && loaderItem.minAspect > 0) {
-                                        let aspect = loaderItem.minAspect;
-                                        if (aspect === 1.0) {
-                                            defW = 180;
-                                            defH = 180;
-                                        } else {
-                                            defH = 120;
-                                            defW = Math.round(defH * aspect);
+                                    Timer {
+                                        id: syncTimer
+                                        interval: 100
+                                        running: false
+                                        repeat: true
+                                        onTriggered: {
+                                            if (!widgetProxy.hasUnsyncedChanges) {
+                                                running = false;
+                                                return;
+                                            }
+                                            widgetProxy.hasUnsyncedChanges = false;
+                                            let curOp = widgetProxy.wOpacity;
+                                            let curRot = widgetProxy.wRotation;
+                                            WidgetSync.setGeometry(redactorWindow.safeMonitorName, String(widgetProxy.wId), model.wX, model.wY, model.wWidth, model.wHeight, curOp, curRot);
                                         }
                                     }
-                                    return { w: defW, h: defH };
-                                }
 
-                                function applyVariant(variantId) {
-                                    if (widgetProxy.wVariant === variantId) return;
-
-                                    let currentAspect = model.wWidth / model.wHeight;
-                                    savedAspects[widgetProxy.wVariant] = currentAspect;
-
-                                    let targetAspect = savedAspects[variantId];
-
-                                    model.wVariant = variantId;
-
-                                    if (targetAspect) {
-                                        let area = model.wWidth * model.wHeight;
-                                        let newH = Math.max(10, Math.sqrt(area / targetAspect));
-                                        let newW = Math.max(10, newH * targetAspect);
-                                        model.wWidth = newW;
-                                        model.wHeight = newH;
-                                    }
-
-                                    WidgetSync.setVariant(redactorWindow.safeMonitorName, String(widgetProxy.wId), variantId);
-                                    finalizeSync();
-                                }
-
-                                function resetWidgetSize() {
-                                    let currentRot = Math.abs(Math.round(widgetProxy.wRotation || 0)) % 360;
-                                    let curBW = (currentRot % 180 === 0) ? model.wWidth : model.wHeight;
-                                    let curBH = (currentRot % 180 === 0) ? model.wHeight : model.wWidth;
-                                    let cx = model.wX + curBW / 2.0;
-                                    let cy = model.wY + curBH / 2.0;
-
-                                    let def = getDefaultSize(preview.item);
-                                    let clamped = redactorMode.clampResize(preview.item, def.w, def.h, 0, 0, true);
-                                    let finalW = clamped.w;
-                                    let finalH = clamped.h;
-
-                                    let newX = cx - finalW / 2.0;
-                                    let newY = cy - finalH / 2.0;
-
-                                    newX = redactorMode.fitX(newX, finalW);
-                                    newY = redactorMode.fitY(newY, finalH);
-
-                                    if (redactorMode.gridEnabled) {
-                                        let snapped = redactorMode.snapBoxToGrid(preview.item, newX, newY, finalW, finalH);
-                                        newX = snapped.x;
-                                        newY = snapped.y;
-                                        finalW = snapped.w;
-                                        finalH = snapped.h;
-                                    }
-
-                                    model.wOpacity = 1.0;
-                                    model.wRotation = 0;
-                                    model.wWidth = finalW;
-                                    model.wHeight = finalH;
-                                    model.wX = newX;
-                                    model.wY = newY;
-
-                                    WidgetSync.setRotation(redactorWindow.safeMonitorName, String(widgetProxy.wId), 0);
-                                    finalizeSync();
-                                }
-
-                                Timer {
-                                    id: syncTimer
-                                    interval: 100
-                                    running: false
-                                    repeat: true
-                                    onTriggered: {
-                                        if (!widgetProxy.hasUnsyncedChanges) {
-                                            running = false;
-                                            return;
+                                    function triggerSync() {
+                                        if (redactorMode.isInitializing) return;
+                                        widgetProxy.hasUnsyncedChanges = true;
+                                        if (!syncTimer.running) {
+                                            syncTimer.restart();
                                         }
+                                    }
+
+                                    function finalizeSync() {
+                                        redactorMode.clearOverlay();
+                                        syncTimer.stop();
                                         widgetProxy.hasUnsyncedChanges = false;
                                         let curOp = widgetProxy.wOpacity;
                                         let curRot = widgetProxy.wRotation;
                                         WidgetSync.setGeometry(redactorWindow.safeMonitorName, String(widgetProxy.wId), model.wX, model.wY, model.wWidth, model.wHeight, curOp, curRot);
-                                    }
-                                }
-
-                                function triggerSync() {
-                                    if (redactorMode.isInitializing) return;
-                                    redactorMode.queueUpdateToolbarObscured();
-                                    widgetProxy.hasUnsyncedChanges = true;
-                                    if (!syncTimer.running) {
-                                        syncTimer.restart();
-                                    }
-                                }
-
-                                function finalizeSync() {
-                                    redactorMode.clearOverlay();
-                                    toolbarCheckTimer.stop();
-                                    syncTimer.stop();
-                                    widgetProxy.hasUnsyncedChanges = false;
-                                    let curOp = widgetProxy.wOpacity;
-                                    let curRot = widgetProxy.wRotation;
-                                    WidgetSync.setGeometry(redactorWindow.safeMonitorName, String(widgetProxy.wId), model.wX, model.wY, model.wWidth, model.wHeight, curOp, curRot);
-                                    WidgetSync.setOpacity(redactorWindow.safeMonitorName, String(widgetProxy.wId), curOp);
-                                    WidgetSync.setRotation(redactorWindow.safeMonitorName, String(widgetProxy.wId), curRot);
-                                    WidgetSync.bringToFront(redactorWindow.safeMonitorName, String(widgetProxy.wId));
-                                    redactorMode.updateToolbarObscured();
-                                    redactorMode.commitHistory();
-                                }
-
-                                MouseArea {
-                                    id: baseSelectMa
-                                    z: 0
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    preventStealing: true
-                                    cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-
-                                    property real startDragX
-                                    property real startDragY
-                                    property real startWidgetX
-                                    property real startWidgetY
-
-                                    onPressed: (mouse) => {
-                                        redactorMode.selectedId = widgetProxy.wId;
-                                        root.targetSelectedWidgetId = widgetProxy.wId;
-                                        widgetProxy.bringToFront();
-                                        let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
-                                        startDragX = localPos.x;
-                                        startDragY = localPos.y;
-                                        startWidgetX = widgetProxy.x;
-                                        startWidgetY = widgetProxy.y;
+                                        WidgetSync.setOpacity(redactorWindow.safeMonitorName, String(widgetProxy.wId), curOp);
+                                        WidgetSync.setRotation(redactorWindow.safeMonitorName, String(widgetProxy.wId), curRot);
+                                        WidgetSync.bringToFront(redactorWindow.safeMonitorName, String(widgetProxy.wId));
+                                        redactorMode.commitHistory();
                                     }
 
-                                    onPositionChanged: (mouse) => {
-                                        if (pressed) {
-                                            let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
-                                            let dx = localPos.x - startDragX;
-                                            let dy = localPos.y - startDragY;
-
-                                            let rawX = startWidgetX + dx;
-                                            let rawY = startWidgetY + dy;
-
-                                            let snapInfo = redactorMode.calculateSnap(widgetProxy, rawX, rawY, (mouse.modifiers & Qt.ControlModifier) !== 0);
-
-                                            model.wX = snapInfo.x;
-                                            model.wY = snapInfo.y;
-
-                                            redactorMode.presentOverlay(widgetProxy, snapInfo.box, snapInfo);
-
-                                            widgetProxy.triggerSync();
-                                        }
-                                    }
-
-                                    onReleased: {
-                                        widgetProxy.finalizeSync();
-                                    }
-
-                                    onCanceled: {
-                                        widgetProxy.finalizeSync();
-                                    }
-                                }
-
-                                Item {
-                                    id: rotatableContainer
-                                    z: 1
-                                    width: model.wWidth
-                                    height: model.wHeight
-                                    anchors.centerIn: parent
-                                    rotation: widgetProxy.wRotation
-
-                                    Loader {
-                                        id: preview
-                                        property string wImagePath: widgetProxy.wImagePath
-                                        property string imagePath: widgetProxy.wImagePath
-                                        property string path: widgetProxy.wImagePath
+                                    MouseArea {
+                                        id: baseSelectMa
+                                        z: 0
                                         anchors.fill: parent
-                                        opacity: widgetProxy.isSelected ? Math.max(0.35, widgetProxy.wOpacity) : widgetProxy.wOpacity
-                                        source: WidgetRegistry.faceFile(widgetProxy.wType, widgetProxy.wVariant)
-                                        onLoaded: {
-                                            if (item) {
-                                                try {
-                                                    item.visible = Qt.binding(() => redactorWindow.visible);
-                                                    if (item.imagePath !== undefined) {
-                                                        item.imagePath = Qt.binding(() => widgetProxy.wImagePath);
-                                                    }
-                                                    if (item.wImagePath !== undefined) {
-                                                        item.wImagePath = Qt.binding(() => widgetProxy.wImagePath);
-                                                    }
-                                                    if (item.path !== undefined) {
-                                                        item.path = Qt.binding(() => widgetProxy.wImagePath);
-                                                    }
-                                                    if (item.source !== undefined && typeof item.source === "string") {
-                                                        item.source = Qt.binding(() => widgetProxy.wImagePath);
-                                                    }
-                                                } catch (e) {}
+                                        hoverEnabled: true
+                                        preventStealing: true
+                                        cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
 
-                                                let activeModel = redactorMode.activeWidgetsModel;
-                                                let row = (activeModel && widgetProxy.wIndex >= 0 && widgetProxy.wIndex < activeModel.count) ? activeModel.get(widgetProxy.wIndex) : null;
-                                                if (row) {
-                                                    let standardKeys = WidgetRegistry.standardKeys || [
-                                                        "wType", "wVariant", "wX", "wY", "wWidth", "wHeight",
-                                                        "wOpacity", "wRotation", "wImagePath", "wId"
-                                                    ];
-                                                    let ignoredProps = [
-                                                        "objectName", "destroyed", "deleteLater", "parent", "data",
-                                                        "resources", "children", "visible", "enabled", "x", "y", "z",
-                                                        "width", "height", "opacity", "rotation", "scale"
-                                                    ];
-                                                    for (let k in row) {
-                                                        if (!k || typeof k !== "string") continue;
-                                                        if (k.endsWith("Changed") || k.startsWith("on") || typeof row[k] === "function" || row[k] === undefined) continue;
-                                                        if (ignoredProps.includes(k) || standardKeys.includes(k)) continue;
-                                                        try {
-                                                            if (item[k] !== undefined && item[k] !== row[k]) {
-                                                                item[k] = row[k];
-                                                            }
-                                                        } catch (e) {}
-                                                    }
-                                                }
-                                                let res = redactorMode.gridEnabled
-                                                    ? redactorMode.snapBoxToGrid(item, model.wX, model.wY, model.wWidth, model.wHeight)
-                                                    : redactorMode.clampResize(item, model.wWidth, model.wHeight, 0, 0, true);
+                                        property real startDragX
+                                        property real startDragY
+                                        property real startWidgetX
+                                        property real startWidgetY
 
-                                                let changed = false;
-                                                if (res.x !== undefined && (model.wX !== res.x || model.wY !== res.y)) {
-                                                    model.wX = res.x;
-                                                    model.wY = res.y;
-                                                    changed = true;
-                                                }
-                                                if (res.w !== model.wWidth || res.h !== model.wHeight) {
-                                                    model.wWidth = res.w;
-                                                    model.wHeight = res.h;
-                                                    changed = true;
-                                                }
-                                                if (changed && !redactorMode.isInitializing) {
-                                                    widgetProxy.triggerSync();
-                                                }
+                                        onPressed: (mouse) => {
+                                            redactorMode.selectedId = widgetProxy.wId;
+                                            root.targetSelectedWidgetId = widgetProxy.wId;
+                                            widgetProxy.bringToFront();
+                                            let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
+                                            startDragX = localPos.x;
+                                            startDragY = localPos.y;
+                                            startWidgetX = widgetProxy.x;
+                                            startWidgetY = widgetProxy.y;
+                                        }
+
+                                        onPositionChanged: (mouse) => {
+                                            if (pressed) {
+                                                let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
+                                                let dx = localPos.x - startDragX;
+                                                let dy = localPos.y - startDragY;
+
+                                                let rawX = startWidgetX + dx;
+                                                let rawY = startWidgetY + dy;
+
+                                                let snapInfo = redactorMode.calculateSnap(widgetProxy, rawX, rawY, (mouse.modifiers & Qt.ControlModifier) !== 0);
+
+                                                model.wX = snapInfo.x;
+                                                model.wY = snapInfo.y;
+
+                                                redactorMode.presentOverlay(widgetProxy, snapInfo.box, snapInfo);
+
+                                                widgetProxy.triggerSync();
                                             }
+                                        }
+
+                                        onReleased: {
+                                            widgetProxy.finalizeSync();
+                                        }
+
+                                        onCanceled: {
+                                            widgetProxy.finalizeSync();
                                         }
                                     }
 
                                     Item {
-                                        id: selectionUI
-                                        z: 30
-                                        anchors.fill: parent
-                                        anchors.margins: -widgetProxy.selectionGap
+                                        id: rotatableContainer
+                                        z: 1
+                                        width: model.wWidth
+                                        height: model.wHeight
+                                        anchors.centerIn: parent
+                                        rotation: widgetProxy.wRotation
+                                        opacity: Math.min(1, widgetProxy.spawn)
+                                        scale: 0.85 + 0.15 * widgetProxy.spawn
+
+                                        Loader {
+                                            id: preview
+                                            // the redactor only moves widgets: their own buttons, scroll areas and inputs
+                                            // (GitHub's heatmap, YouTube's controls) must not take the drag; they work on the desktop
+                                            enabled: false
+                                            property string wImagePath: widgetProxy.wImagePath
+                                            property string imagePath: widgetProxy.wImagePath
+                                            property string path: widgetProxy.wImagePath
+                                            anchors.fill: parent
+                                            opacity: widgetProxy.isSelected ? Math.max(0.35, widgetProxy.wOpacity) : widgetProxy.wOpacity
+                                            source: WidgetRegistry.faceFile(widgetProxy.wType, widgetProxy.wVariant)
+                                            onLoaded: {
+                                                if (item) {
+                                                    try {
+                                                        item.visible = Qt.binding(() => redactorWindow.visible);
+                                                        if (item.imagePath !== undefined) {
+                                                            item.imagePath = Qt.binding(() => widgetProxy.wImagePath);
+                                                        }
+                                                        if (item.wImagePath !== undefined) {
+                                                            item.wImagePath = Qt.binding(() => widgetProxy.wImagePath);
+                                                        }
+                                                        if (item.path !== undefined) {
+                                                            item.path = Qt.binding(() => widgetProxy.wImagePath);
+                                                        }
+                                                        if (item.source !== undefined && typeof item.source === "string") {
+                                                            item.source = Qt.binding(() => widgetProxy.wImagePath);
+                                                        }
+                                                    } catch (e) {}
+
+                                                    let activeModel = redactorMode.activeWidgetsModel;
+                                                    let row = (activeModel && widgetProxy.wIndex >= 0 && widgetProxy.wIndex < activeModel.count) ? activeModel.get(widgetProxy.wIndex) : null;
+                                                    if (row) {
+                                                        let standardKeys = WidgetRegistry.standardKeys || [
+                                                            "wType", "wVariant", "wX", "wY", "wWidth", "wHeight",
+                                                            "wOpacity", "wRotation", "wImagePath", "wId"
+                                                        ];
+                                                        let ignoredProps = [
+                                                            "objectName", "destroyed", "deleteLater", "parent", "data",
+                                                            "resources", "children", "visible", "enabled", "x", "y", "z",
+                                                            "width", "height", "opacity", "rotation", "scale"
+                                                        ];
+                                                        for (let k in row) {
+                                                            if (!k || typeof k !== "string") continue;
+                                                            if (k.endsWith("Changed") || k.startsWith("on") || typeof row[k] === "function" || row[k] === undefined) continue;
+                                                            if (ignoredProps.includes(k) || standardKeys.includes(k)) continue;
+                                                            try {
+                                                                if (item[k] !== undefined && item[k] !== row[k]) {
+                                                                    item[k] = row[k];
+                                                                }
+                                                            } catch (e) {}
+                                                        }
+                                                    }
+                                                    let res = redactorMode.gridEnabled
+                                                        ? redactorMode.snapBoxToGrid(item, model.wX, model.wY, model.wWidth, model.wHeight)
+                                                        : redactorMode.clampResize(item, model.wWidth, model.wHeight, 0, 0, true);
+
+                                                    let changed = false;
+                                                    if (res.x !== undefined && (model.wX !== res.x || model.wY !== res.y)) {
+                                                        model.wX = res.x;
+                                                        model.wY = res.y;
+                                                        changed = true;
+                                                    }
+                                                    if (res.w !== model.wWidth || res.h !== model.wHeight) {
+                                                        model.wWidth = res.w;
+                                                        model.wHeight = res.h;
+                                                        changed = true;
+                                                    }
+                                                    if (changed && !redactorMode.isInitializing) {
+                                                        widgetProxy.triggerSync();
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Item {
+                                            id: selectionUI
+                                            z: 30
+                                            anchors.fill: parent
+                                            anchors.margins: -widgetProxy.selectionGap
+                                            opacity: widgetProxy.isSelected ? 1.0 : 0.0
+                                            visible: opacity > 0
+                                            Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                                            property bool isAspectLocked: preview.item && preview.item.minAspect !== undefined && preview.item.maxAspect !== undefined && preview.item.minAspect === preview.item.maxAspect && preview.item.minAspect > 0
+                                            readonly property bool isRotated90: Math.abs(Math.round(widgetProxy.wRotation || 0)) % 180 !== 0
+
+                                            // drawn at its on-screen size and scaled back up: its soft edge and wave are set in
+                                            // pixels, and shrunk with the desktop they turn sub-pixel and shimmer
+                                            SelectionOutline {
+                                                width: parent.width * redactorMode.deskScale
+                                                height: parent.height * redactorMode.deskScale
+                                                transformOrigin: Item.TopLeft
+                                                scale: redactorMode.unshrink
+                                                running: widgetProxy.isSelected && selectionUI.opacity > 0.001
+                                            }
+
+                                            MouseArea {
+                                                id: resizeTl
+                                                z: 20
+                                                width: s(24) * redactorMode.unshrink; height: s(24) * redactorMode.unshrink
+                                                anchors.left: parent.left; anchors.top: parent.top
+                                                anchors.margins: -s(6) * redactorMode.unshrink
+                                                enabled: preview.status === Loader.Ready && widgetProxy.isSelected
+                                                hoverEnabled: true
+                                                preventStealing: true
+                                                cursorShape: selectionUI.isRotated90 ? Qt.SizeBDiagCursor : Qt.SizeFDiagCursor
+
+                                                property real startMouseX
+                                                property real startMouseY
+                                                property real startWidth
+                                                property real startHeight
+                                                property real startWidgetX
+                                                property real startWidgetY
+
+                                                onPressed: (mouse) => {
+                                                    widgetProxy.bringToFront();
+                                                    let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
+                                                    startMouseX = localPos.x;
+                                                    startMouseY = localPos.y;
+                                                    startWidth = model.wWidth;
+                                                    startHeight = model.wHeight;
+                                                    startWidgetX = model.wX;
+                                                    startWidgetY = model.wY;
+                                                }
+
+                                                onPositionChanged: (mouse) => {
+                                                    if (pressed) {
+                                                        widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeTl, {left: true, top: true, right: false, bottom: false}, true);
+                                                    }
+                                                }
+
+                                                onReleased: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+
+                                                onCanceled: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: resizeTr
+                                                z: 20
+                                                width: s(24) * redactorMode.unshrink; height: s(24) * redactorMode.unshrink
+                                                anchors.right: parent.right; anchors.top: parent.top
+                                                anchors.margins: -s(6) * redactorMode.unshrink
+                                                enabled: preview.status === Loader.Ready && widgetProxy.isSelected
+                                                hoverEnabled: true
+                                                preventStealing: true
+                                                cursorShape: selectionUI.isRotated90 ? Qt.SizeFDiagCursor : Qt.SizeBDiagCursor
+
+                                                property real startMouseX
+                                                property real startMouseY
+                                                property real startWidth
+                                                property real startHeight
+                                                property real startWidgetX
+                                                property real startWidgetY
+
+                                                onPressed: (mouse) => {
+                                                    widgetProxy.bringToFront();
+                                                    let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
+                                                    startMouseX = localPos.x;
+                                                    startMouseY = localPos.y;
+                                                    startWidth = model.wWidth;
+                                                    startHeight = model.wHeight;
+                                                    startWidgetX = model.wX;
+                                                    startWidgetY = model.wY;
+                                                }
+
+                                                onPositionChanged: (mouse) => {
+                                                    if (pressed) {
+                                                        widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeTr, {left: false, top: true, right: true, bottom: false}, true);
+                                                    }
+                                                }
+
+                                                onReleased: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+
+                                                onCanceled: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: resizeBl
+                                                z: 20
+                                                width: s(24) * redactorMode.unshrink; height: s(24) * redactorMode.unshrink
+                                                anchors.left: parent.left; anchors.bottom: parent.bottom
+                                                anchors.margins: -s(6) * redactorMode.unshrink
+                                                enabled: preview.status === Loader.Ready && widgetProxy.isSelected
+                                                hoverEnabled: true
+                                                preventStealing: true
+                                                cursorShape: selectionUI.isRotated90 ? Qt.SizeFDiagCursor : Qt.SizeBDiagCursor
+
+                                                property real startMouseX
+                                                property real startMouseY
+                                                property real startWidth
+                                                property real startHeight
+                                                property real startWidgetX
+                                                property real startWidgetY
+
+                                                onPressed: (mouse) => {
+                                                    widgetProxy.bringToFront();
+                                                    let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
+                                                    startMouseX = localPos.x;
+                                                    startMouseY = localPos.y;
+                                                    startWidth = model.wWidth;
+                                                    startHeight = model.wHeight;
+                                                    startWidgetX = model.wX;
+                                                    startWidgetY = model.wY;
+                                                }
+
+                                                onPositionChanged: (mouse) => {
+                                                    if (pressed) {
+                                                        widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeBl, {left: true, top: false, right: false, bottom: true}, true);
+                                                    }
+                                                }
+
+                                                onReleased: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+
+                                                onCanceled: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: resizeBr
+                                                z: 20
+                                                width: s(24) * redactorMode.unshrink; height: s(24) * redactorMode.unshrink
+                                                anchors.right: parent.right; anchors.bottom: parent.bottom
+                                                anchors.margins: -s(6) * redactorMode.unshrink
+                                                enabled: preview.status === Loader.Ready && widgetProxy.isSelected
+                                                hoverEnabled: true
+                                                preventStealing: true
+                                                cursorShape: selectionUI.isRotated90 ? Qt.SizeBDiagCursor : Qt.SizeFDiagCursor
+
+                                                property real startMouseX
+                                                property real startMouseY
+                                                property real startWidth
+                                                property real startHeight
+                                                property real startWidgetX
+                                                property real startWidgetY
+
+                                                onPressed: (mouse) => {
+                                                    widgetProxy.bringToFront();
+                                                    let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
+                                                    startMouseX = localPos.x;
+                                                    startMouseY = localPos.y;
+                                                    startWidth = model.wWidth;
+                                                    startHeight = model.wHeight;
+                                                    startWidgetX = model.wX;
+                                                    startWidgetY = model.wY;
+                                                }
+
+                                                onPositionChanged: (mouse) => {
+                                                    if (pressed) {
+                                                        widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeBr, {left: false, top: false, right: true, bottom: true}, true);
+                                                    }
+                                                }
+
+                                                onReleased: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+
+                                                onCanceled: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: resizeTop
+                                                z: 20
+                                                height: s(16) * redactorMode.unshrink
+                                                anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+                                                anchors.leftMargin: s(18); anchors.rightMargin: s(18); anchors.topMargin: -s(8)
+                                                visible: !selectionUI.isAspectLocked
+                                                enabled: visible && preview.status === Loader.Ready && widgetProxy.isSelected
+                                                hoverEnabled: true
+                                                preventStealing: true
+                                                cursorShape: selectionUI.isRotated90 ? Qt.SizeHorCursor : Qt.SizeVerCursor
+
+                                                property real startMouseX
+                                                property real startMouseY
+                                                property real startWidth
+                                                property real startHeight
+                                                property real startWidgetX
+                                                property real startWidgetY
+
+                                                onPressed: (mouse) => {
+                                                    widgetProxy.bringToFront();
+                                                    let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
+                                                    startMouseX = localPos.x;
+                                                    startMouseY = localPos.y;
+                                                    startWidth = model.wWidth;
+                                                    startHeight = model.wHeight;
+                                                    startWidgetX = model.wX;
+                                                    startWidgetY = model.wY;
+                                                }
+
+                                                onPositionChanged: (mouse) => {
+                                                    if (pressed) {
+                                                        widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeTop, {left: false, top: true, right: false, bottom: false}, false);
+                                                    }
+                                                }
+
+                                                onReleased: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+
+                                                onCanceled: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: resizeBottom
+                                                z: 20
+                                                height: s(16) * redactorMode.unshrink
+                                                anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+                                                anchors.leftMargin: s(18); anchors.rightMargin: s(18); anchors.bottomMargin: -s(8)
+                                                visible: !selectionUI.isAspectLocked
+                                                enabled: visible && preview.status === Loader.Ready && widgetProxy.isSelected
+                                                hoverEnabled: true
+                                                preventStealing: true
+                                                cursorShape: selectionUI.isRotated90 ? Qt.SizeHorCursor : Qt.SizeVerCursor
+
+                                                property real startMouseX
+                                                property real startMouseY
+                                                property real startWidth
+                                                property real startHeight
+                                                property real startWidgetX
+                                                property real startWidgetY
+
+                                                onPressed: (mouse) => {
+                                                    widgetProxy.bringToFront();
+                                                    let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
+                                                    startMouseX = localPos.x;
+                                                    startMouseY = localPos.y;
+                                                    startWidth = model.wWidth;
+                                                    startHeight = model.wHeight;
+                                                    startWidgetX = model.wX;
+                                                    startWidgetY = model.wY;
+                                                }
+
+                                                onPositionChanged: (mouse) => {
+                                                    if (pressed) {
+                                                        widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeBottom, {left: false, top: false, right: false, bottom: true}, false);
+                                                    }
+                                                }
+
+                                                onReleased: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+
+                                                onCanceled: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: resizeLeft
+                                                z: 20
+                                                width: s(16) * redactorMode.unshrink
+                                                anchors.top: parent.top; anchors.bottom: parent.bottom; anchors.left: parent.left
+                                                anchors.topMargin: s(18); anchors.bottomMargin: s(18); anchors.leftMargin: -s(8)
+                                                visible: !selectionUI.isAspectLocked
+                                                enabled: visible && preview.status === Loader.Ready && widgetProxy.isSelected
+                                                hoverEnabled: true
+                                                preventStealing: true
+                                                cursorShape: selectionUI.isRotated90 ? Qt.SizeVerCursor : Qt.SizeHorCursor
+
+                                                property real startMouseX
+                                                property real startMouseY
+                                                property real startWidth
+                                                property real startHeight
+                                                property real startWidgetX
+                                                property real startWidgetY
+
+                                                onPressed: (mouse) => {
+                                                    widgetProxy.bringToFront();
+                                                    let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
+                                                    startMouseX = localPos.x;
+                                                    startMouseY = localPos.y;
+                                                    startWidth = model.wWidth;
+                                                    startHeight = model.wHeight;
+                                                    startWidgetX = model.wX;
+                                                    startWidgetY = model.wY;
+                                                }
+
+                                                onPositionChanged: (mouse) => {
+                                                    if (pressed) {
+                                                        widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeLeft, {left: true, top: false, right: false, bottom: false}, false);
+                                                    }
+                                                }
+
+                                                onReleased: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+
+                                                onCanceled: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: resizeRight
+                                                z: 20
+                                                width: s(16) * redactorMode.unshrink
+                                                anchors.top: parent.top; anchors.bottom: parent.bottom; anchors.right: parent.right
+                                                anchors.topMargin: s(18); anchors.bottomMargin: s(18); anchors.rightMargin: -s(8)
+                                                visible: !selectionUI.isAspectLocked
+                                                enabled: visible && preview.status === Loader.Ready && widgetProxy.isSelected
+                                                hoverEnabled: true
+                                                preventStealing: true
+                                                cursorShape: selectionUI.isRotated90 ? Qt.SizeVerCursor : Qt.SizeHorCursor
+
+                                                property real startMouseX
+                                                property real startMouseY
+                                                property real startWidth
+                                                property real startHeight
+                                                property real startWidgetX
+                                                property real startWidgetY
+
+                                                onPressed: (mouse) => {
+                                                    widgetProxy.bringToFront();
+                                                    let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
+                                                    startMouseX = localPos.x;
+                                                    startMouseY = localPos.y;
+                                                    startWidth = model.wWidth;
+                                                    startHeight = model.wHeight;
+                                                    startWidgetX = model.wX;
+                                                    startWidgetY = model.wY;
+                                                }
+
+                                                onPositionChanged: (mouse) => {
+                                                    if (pressed) {
+                                                        widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeRight, {left: false, top: false, right: true, bottom: false}, false);
+                                                    }
+                                                }
+
+                                                onReleased: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+
+                                                onCanceled: {
+                                                    widgetProxy.finalizeSync();
+                                                }
+                                            }
+                                        }
+                                    }
+
+
+                                    // The selected widget's tools sit in the strip above the shrunk desktop, at full size.
+                                    ColumnLayout {
+                                        id: bottomChrome
+                                        parent: redactorMode.topToolsHost
+                                        x: Math.round((parent.width - implicitWidth) / 2)
+                                        y: Math.round((parent.height - implicitHeight) / 2)
+                                        z: 40
                                         opacity: widgetProxy.isSelected ? 1.0 : 0.0
                                         visible: opacity > 0
                                         Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                                        property bool isAspectLocked: preview.item && preview.item.minAspect !== undefined && preview.item.maxAspect !== undefined && preview.item.minAspect === preview.item.maxAspect && preview.item.minAspect > 0
-                                        readonly property bool isRotated90: Math.abs(Math.round(widgetProxy.wRotation || 0)) % 180 !== 0
-
-                                        SelectionOutline {
-                                            anchors.fill: parent
-                                            running: widgetProxy.isSelected && selectionUI.opacity > 0.001
-                                        }
-
-                                        MouseArea {
-                                            id: resizeTl
-                                            z: 20
-                                            width: s(24); height: s(24)
-                                            anchors.left: parent.left; anchors.top: parent.top
-                                            anchors.margins: -s(6)
-                                            enabled: preview.status === Loader.Ready && widgetProxy.isSelected
-                                            hoverEnabled: true
-                                            preventStealing: true
-                                            cursorShape: selectionUI.isRotated90 ? Qt.SizeBDiagCursor : Qt.SizeFDiagCursor
-
-                                            property real startMouseX
-                                            property real startMouseY
-                                            property real startWidth
-                                            property real startHeight
-                                            property real startWidgetX
-                                            property real startWidgetY
-
-                                            onPressed: (mouse) => {
-                                                widgetProxy.bringToFront();
-                                                let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
-                                                startMouseX = localPos.x;
-                                                startMouseY = localPos.y;
-                                                startWidth = model.wWidth;
-                                                startHeight = model.wHeight;
-                                                startWidgetX = model.wX;
-                                                startWidgetY = model.wY;
-                                            }
-
-                                            onPositionChanged: (mouse) => {
-                                                if (pressed) {
-                                                    widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeTl, {left: true, top: true, right: false, bottom: false}, true);
-                                                }
-                                            }
-
-                                            onReleased: {
-                                                widgetProxy.finalizeSync();
-                                            }
-
-                                            onCanceled: {
-                                                widgetProxy.finalizeSync();
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: resizeTr
-                                            z: 20
-                                            width: s(24); height: s(24)
-                                            anchors.right: parent.right; anchors.top: parent.top
-                                            anchors.margins: -s(6)
-                                            enabled: preview.status === Loader.Ready && widgetProxy.isSelected
-                                            hoverEnabled: true
-                                            preventStealing: true
-                                            cursorShape: selectionUI.isRotated90 ? Qt.SizeFDiagCursor : Qt.SizeBDiagCursor
-
-                                            property real startMouseX
-                                            property real startMouseY
-                                            property real startWidth
-                                            property real startHeight
-                                            property real startWidgetX
-                                            property real startWidgetY
-
-                                            onPressed: (mouse) => {
-                                                widgetProxy.bringToFront();
-                                                let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
-                                                startMouseX = localPos.x;
-                                                startMouseY = localPos.y;
-                                                startWidth = model.wWidth;
-                                                startHeight = model.wHeight;
-                                                startWidgetX = model.wX;
-                                                startWidgetY = model.wY;
-                                            }
-
-                                            onPositionChanged: (mouse) => {
-                                                if (pressed) {
-                                                    widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeTr, {left: false, top: true, right: true, bottom: false}, true);
-                                                }
-                                            }
-
-                                            onReleased: {
-                                                widgetProxy.finalizeSync();
-                                            }
-
-                                            onCanceled: {
-                                                widgetProxy.finalizeSync();
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: resizeBl
-                                            z: 20
-                                            width: s(24); height: s(24)
-                                            anchors.left: parent.left; anchors.bottom: parent.bottom
-                                            anchors.margins: -s(6)
-                                            enabled: preview.status === Loader.Ready && widgetProxy.isSelected
-                                            hoverEnabled: true
-                                            preventStealing: true
-                                            cursorShape: selectionUI.isRotated90 ? Qt.SizeFDiagCursor : Qt.SizeBDiagCursor
-
-                                            property real startMouseX
-                                            property real startMouseY
-                                            property real startWidth
-                                            property real startHeight
-                                            property real startWidgetX
-                                            property real startWidgetY
-
-                                            onPressed: (mouse) => {
-                                                widgetProxy.bringToFront();
-                                                let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
-                                                startMouseX = localPos.x;
-                                                startMouseY = localPos.y;
-                                                startWidth = model.wWidth;
-                                                startHeight = model.wHeight;
-                                                startWidgetX = model.wX;
-                                                startWidgetY = model.wY;
-                                            }
-
-                                            onPositionChanged: (mouse) => {
-                                                if (pressed) {
-                                                    widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeBl, {left: true, top: false, right: false, bottom: true}, true);
-                                                }
-                                            }
-
-                                            onReleased: {
-                                                widgetProxy.finalizeSync();
-                                            }
-
-                                            onCanceled: {
-                                                widgetProxy.finalizeSync();
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: resizeBr
-                                            z: 20
-                                            width: s(24); height: s(24)
-                                            anchors.right: parent.right; anchors.bottom: parent.bottom
-                                            anchors.margins: -s(6)
-                                            enabled: preview.status === Loader.Ready && widgetProxy.isSelected
-                                            hoverEnabled: true
-                                            preventStealing: true
-                                            cursorShape: selectionUI.isRotated90 ? Qt.SizeBDiagCursor : Qt.SizeFDiagCursor
-
-                                            property real startMouseX
-                                            property real startMouseY
-                                            property real startWidth
-                                            property real startHeight
-                                            property real startWidgetX
-                                            property real startWidgetY
-
-                                            onPressed: (mouse) => {
-                                                widgetProxy.bringToFront();
-                                                let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
-                                                startMouseX = localPos.x;
-                                                startMouseY = localPos.y;
-                                                startWidth = model.wWidth;
-                                                startHeight = model.wHeight;
-                                                startWidgetX = model.wX;
-                                                startWidgetY = model.wY;
-                                            }
-
-                                            onPositionChanged: (mouse) => {
-                                                if (pressed) {
-                                                    widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeBr, {left: false, top: false, right: true, bottom: true}, true);
-                                                }
-                                            }
-
-                                            onReleased: {
-                                                widgetProxy.finalizeSync();
-                                            }
-
-                                            onCanceled: {
-                                                widgetProxy.finalizeSync();
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: resizeTop
-                                            z: 20
-                                            height: s(16)
-                                            anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
-                                            anchors.leftMargin: s(18); anchors.rightMargin: s(18); anchors.topMargin: -s(8)
-                                            visible: !selectionUI.isAspectLocked
-                                            enabled: visible && preview.status === Loader.Ready && widgetProxy.isSelected
-                                            hoverEnabled: true
-                                            preventStealing: true
-                                            cursorShape: selectionUI.isRotated90 ? Qt.SizeHorCursor : Qt.SizeVerCursor
-
-                                            property real startMouseX
-                                            property real startMouseY
-                                            property real startWidth
-                                            property real startHeight
-                                            property real startWidgetX
-                                            property real startWidgetY
-
-                                            onPressed: (mouse) => {
-                                                widgetProxy.bringToFront();
-                                                let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
-                                                startMouseX = localPos.x;
-                                                startMouseY = localPos.y;
-                                                startWidth = model.wWidth;
-                                                startHeight = model.wHeight;
-                                                startWidgetX = model.wX;
-                                                startWidgetY = model.wY;
-                                            }
-
-                                            onPositionChanged: (mouse) => {
-                                                if (pressed) {
-                                                    widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeTop, {left: false, top: true, right: false, bottom: false}, false);
-                                                }
-                                            }
-
-                                            onReleased: {
-                                                widgetProxy.finalizeSync();
-                                            }
-
-                                            onCanceled: {
-                                                widgetProxy.finalizeSync();
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: resizeBottom
-                                            z: 20
-                                            height: s(16)
-                                            anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-                                            anchors.leftMargin: s(18); anchors.rightMargin: s(18); anchors.bottomMargin: -s(8)
-                                            visible: !selectionUI.isAspectLocked
-                                            enabled: visible && preview.status === Loader.Ready && widgetProxy.isSelected
-                                            hoverEnabled: true
-                                            preventStealing: true
-                                            cursorShape: selectionUI.isRotated90 ? Qt.SizeHorCursor : Qt.SizeVerCursor
-
-                                            property real startMouseX
-                                            property real startMouseY
-                                            property real startWidth
-                                            property real startHeight
-                                            property real startWidgetX
-                                            property real startWidgetY
-
-                                            onPressed: (mouse) => {
-                                                widgetProxy.bringToFront();
-                                                let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
-                                                startMouseX = localPos.x;
-                                                startMouseY = localPos.y;
-                                                startWidth = model.wWidth;
-                                                startHeight = model.wHeight;
-                                                startWidgetX = model.wX;
-                                                startWidgetY = model.wY;
-                                            }
-
-                                            onPositionChanged: (mouse) => {
-                                                if (pressed) {
-                                                    widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeBottom, {left: false, top: false, right: false, bottom: true}, false);
-                                                }
-                                            }
-
-                                            onReleased: {
-                                                widgetProxy.finalizeSync();
-                                            }
-
-                                            onCanceled: {
-                                                widgetProxy.finalizeSync();
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: resizeLeft
-                                            z: 20
-                                            width: s(16)
-                                            anchors.top: parent.top; anchors.bottom: parent.bottom; anchors.left: parent.left
-                                            anchors.topMargin: s(18); anchors.bottomMargin: s(18); anchors.leftMargin: -s(8)
-                                            visible: !selectionUI.isAspectLocked
-                                            enabled: visible && preview.status === Loader.Ready && widgetProxy.isSelected
-                                            hoverEnabled: true
-                                            preventStealing: true
-                                            cursorShape: selectionUI.isRotated90 ? Qt.SizeVerCursor : Qt.SizeHorCursor
-
-                                            property real startMouseX
-                                            property real startMouseY
-                                            property real startWidth
-                                            property real startHeight
-                                            property real startWidgetX
-                                            property real startWidgetY
-
-                                            onPressed: (mouse) => {
-                                                widgetProxy.bringToFront();
-                                                let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
-                                                startMouseX = localPos.x;
-                                                startMouseY = localPos.y;
-                                                startWidth = model.wWidth;
-                                                startHeight = model.wHeight;
-                                                startWidgetX = model.wX;
-                                                startWidgetY = model.wY;
-                                            }
-
-                                            onPositionChanged: (mouse) => {
-                                                if (pressed) {
-                                                    widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeLeft, {left: true, top: false, right: false, bottom: false}, false);
-                                                }
-                                            }
-
-                                            onReleased: {
-                                                widgetProxy.finalizeSync();
-                                            }
-
-                                            onCanceled: {
-                                                widgetProxy.finalizeSync();
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: resizeRight
-                                            z: 20
-                                            width: s(16)
-                                            anchors.top: parent.top; anchors.bottom: parent.bottom; anchors.right: parent.right
-                                            anchors.topMargin: s(18); anchors.bottomMargin: s(18); anchors.rightMargin: -s(8)
-                                            visible: !selectionUI.isAspectLocked
-                                            enabled: visible && preview.status === Loader.Ready && widgetProxy.isSelected
-                                            hoverEnabled: true
-                                            preventStealing: true
-                                            cursorShape: selectionUI.isRotated90 ? Qt.SizeVerCursor : Qt.SizeHorCursor
-
-                                            property real startMouseX
-                                            property real startMouseY
-                                            property real startWidth
-                                            property real startHeight
-                                            property real startWidgetX
-                                            property real startWidgetY
-
-                                            onPressed: (mouse) => {
-                                                widgetProxy.bringToFront();
-                                                let localPos = mapToItem(workspaceArea, mouse.x, mouse.y);
-                                                startMouseX = localPos.x;
-                                                startMouseY = localPos.y;
-                                                startWidth = model.wWidth;
-                                                startHeight = model.wHeight;
-                                                startWidgetX = model.wX;
-                                                startWidgetY = model.wY;
-                                            }
-
-                                            onPositionChanged: (mouse) => {
-                                                if (pressed) {
-                                                    widgetProxy.applyResize(mouse, startMouseX, startMouseY, startWidth, startHeight, startWidgetX, startWidgetY, resizeRight, {left: false, top: false, right: true, bottom: false}, false);
-                                                }
-                                            }
-
-                                            onReleased: {
-                                                widgetProxy.finalizeSync();
-                                            }
-
-                                            onCanceled: {
-                                                widgetProxy.finalizeSync();
-                                            }
-                                        }
-                                    }
-                                }
-
-
-                                ColumnLayout {
-                                    id: bottomChrome
-                                    z: 40
-                                    opacity: (widgetProxy.isSelected && !baseSelectMa.pressed && !toolbar.panelOpen) ? 1.0 : 0.0
-                                    visible: opacity > 0
-                                    Behavior on opacity { NumberAnimation { duration: 150 } }
-                                    spacing: s(6)
-
-                                    Component {
-                                        id: defaultAdditionalButtonComponent
-                                        IconButton {
-                                            id: defBtn
-                                            property var settingData: null
-                                            size: s(34)
-                                            cornerRadius: ThemeBackend.borderRadius
-                                            buttonIcon: (defBtn.settingData && defBtn.settingData.icon) ? defBtn.settingData.icon : ""
-                                            iconFontSize: s((defBtn.settingData && defBtn.settingData.iconFontSize) ? defBtn.settingData.iconFontSize : 16)
-                                            accentColor: redactorMode.resolveThemeColor((defBtn.settingData && defBtn.settingData.accentColor) ? defBtn.settingData.accentColor : "surface0")
-                                            textColor: redactorMode.resolveThemeColor((defBtn.settingData && defBtn.settingData.textColor) ? defBtn.settingData.textColor : "mauve")
-                                            onClicked: {
-                                                if (defBtn.settingData && defBtn.settingData.action) {
-                                                    redactorMode.handleAdditionalAction(defBtn.settingData.action, widgetProxy.wIndex, widgetProxy.wId, widgetProxy);
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    readonly property real limitY: (toolbar.opacity > 0.1 && !redactorMode.toolbarObscured) ? toolbar.y : redactorMode.safeHeight
-
-                                    readonly property bool fitsBelow: (widgetProxy.y + widgetProxy.height + widgetProxy.selectionGap + implicitHeight + s(8)) <= limitY
-                                    readonly property bool fitsAbove: (widgetProxy.y - widgetProxy.selectionGap - implicitHeight - s(8)) >= 0
-
-                                    readonly property bool fitsRight: (widgetProxy.x + widgetProxy.width + widgetProxy.selectionGap + implicitWidth + s(8)) <= redactorMode.safeWidth
-                                    readonly property bool fitsLeft: (widgetProxy.x - widgetProxy.selectionGap - implicitWidth - s(8)) >= 0
-
-                                    readonly property int calculatedPosMode: {
-                                        if (fitsBelow) return 0;
-                                        if (fitsAbove) return 1;
-                                        if (fitsRight) return 2;
-                                        if (fitsLeft) return 3;
-                                        return 4;
-                                    }
-
-                                    property int posMode: 0
-
-                                    onCalculatedPosModeChanged: {
-                                        if (!baseSelectMa.pressed) {
-                                            posMode = calculatedPosMode;
-                                        }
-                                    }
-
-                                    Component.onCompleted: {
-                                        posMode = calculatedPosMode;
-                                    }
-
-                                    x: {
-                                        if (posMode === 2) {
-                                            return widgetProxy.width + widgetProxy.selectionGap + s(8);
-                                        } else if (posMode === 3) {
-                                            return -widgetProxy.selectionGap - implicitWidth - s(8);
-                                        } else {
-                                            let idealX = (widgetProxy.width - implicitWidth) / 2;
-                                            let screenX = widgetProxy.x + idealX;
-                                            let clampedScreenX = Math.max(s(8), Math.min(redactorMode.safeWidth - implicitWidth - s(8), screenX));
-                                            return clampedScreenX - widgetProxy.x;
-                                        }
-                                    }
-
-                                    y: {
-                                        if (posMode === 0) {
-                                            return widgetProxy.height + widgetProxy.selectionGap + s(8);
-                                        } else if (posMode === 1) {
-                                            return -widgetProxy.selectionGap - implicitHeight - s(8);
-                                        } else if (posMode === 2 || posMode === 3) {
-                                            let idealY = (widgetProxy.height - implicitHeight) / 2;
-                                            let screenY = widgetProxy.y + idealY;
-                                            let clampedScreenY = Math.max(s(8), Math.min(limitY - implicitHeight - s(8), screenY));
-                                            return clampedScreenY - widgetProxy.y;
-                                        } else {
-                                            let screenY = Math.min(limitY - implicitHeight - s(15), Math.max(s(15), widgetProxy.y + widgetProxy.height - implicitHeight - s(15)));
-                                            return screenY - widgetProxy.y;
-                                        }
-                                    }
-
-                                    property var variantsList: WidgetRegistry.variantList(widgetProxy.wType)
-                                    property bool hasVariants: variantsList.length > 1
-
-                                    RowLayout {
-                                        spacing: s(4)
-                                        Layout.alignment: Qt.AlignHCenter
-
-                                        Rectangle {
-                                            id: pxReadoutPill
-                                            implicitWidth: pxReadoutText.implicitWidth + s(16)
-                                            implicitHeight: s(34)
-                                            color: pxGlass.active ? "transparent" : ThemeBackend.surface0
-                                            radius: ThemeBackend.borderRadius
-
-                                            WallpaperBlur {
-                                                id: pxGlass
-                                                anchors.fill: parent
-                                                radius: parent.radius
-                                                tintColor: ThemeBackend.surface0
-                                                tintAmount: 0.3
-                                            }
-
-                                            Text {
-                                                id: pxReadoutText
-                                                anchors.centerIn: parent
-                                                text: Math.round(model.wWidth) + "x" + Math.round(model.wHeight)
-                                                font.family: ThemeBackend.fontFamily
-                                                font.pixelSize: s(12)
-                                                font.bold: true
-                                                color: ThemeBackend.text
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            id: arReadoutPill
-                                            implicitWidth: arReadoutText.implicitWidth + s(16)
-                                            implicitHeight: s(34)
-                                            color: arGlass.active ? "transparent" : ThemeBackend.surface0
-                                            radius: ThemeBackend.borderRadius
-
-                                            WallpaperBlur {
-                                                id: arGlass
-                                                anchors.fill: parent
-                                                radius: parent.radius
-                                                tintColor: ThemeBackend.surface0
-                                                tintAmount: 0.3
-                                            }
-
-                                            Text {
-                                                id: arReadoutText
-                                                anchors.centerIn: parent
-                                                text: (model.wWidth / model.wHeight).toFixed(2) + ":1"
-                                                font.family: ThemeBackend.fontFamily
-                                                font.pixelSize: s(12)
-                                                font.bold: true
-                                                color: ThemeBackend.text
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            id: pctReadoutPill
-                                            implicitWidth: pctReadoutText.implicitWidth + s(16)
-                                            implicitHeight: s(34)
-                                            color: pctGlass.active ? "transparent" : ThemeBackend.surface0
-                                            radius: ThemeBackend.borderRadius
-
-                                            WallpaperBlur {
-                                                id: pctGlass
-                                                anchors.fill: parent
-                                                radius: parent.radius
-                                                tintColor: ThemeBackend.surface0
-                                                tintAmount: 0.3
-                                            }
-
-                                            Text {
-                                                id: pctReadoutText
-                                                anchors.centerIn: parent
-                                                text: {
-                                                    let def = widgetProxy.getDefaultSize(preview.item);
-                                                    return Math.round((model.wWidth / def.w) * 100) + "%";
-                                                }
-                                                font.family: ThemeBackend.fontFamily
-                                                font.pixelSize: s(12)
-                                                font.bold: true
-                                                color: ThemeBackend.text
-                                            }
-                                        }
-
-                                        Repeater {
-                                            model: WidgetRegistry.additionalSettings(widgetProxy.wType, "top", widgetProxy.wVariant)
-                                            delegate: Loader {
-                                                id: settingLoaderTop
-                                                Layout.alignment: Qt.AlignVCenter
-
-                                                readonly property var currentSetting: modelData
-                                                readonly property var currentProxy: widgetProxy
-                                                readonly property var currentModel: (redactorMode.activeWidgetsModel && widgetProxy.wIndex >= 0 && widgetProxy.wIndex < redactorMode.activeWidgetsModel.count) ? redactorMode.activeWidgetsModel.get(widgetProxy.wIndex) : null
-                                                readonly property var currentFace: preview.item
-
-                                                sourceComponent: {
-                                                    if (modelData.component) return modelData.component;
-                                                    if (modelData.sourceComponent) return modelData.sourceComponent;
-                                                    if (modelData.source || modelData.file) return null;
-                                                    return defaultAdditionalButtonComponent;
-                                                }
-                                                source: {
-                                                    if (modelData.component || modelData.sourceComponent) return "";
-                                                    if (modelData.source) return Qt.resolvedUrl(modelData.source);
-                                                    if (modelData.file) return Qt.resolvedUrl(modelData.file);
-                                                    return "";
-                                                }
-
-                                                function setupControl() {
-                                                    if (!item) return;
-                                                    try { if (item.settingData !== undefined) item.settingData = currentSetting; } catch (e) {}
-                                                    try { if (item.typeData !== undefined) item.typeData = WidgetRegistry.types[widgetProxy.wType]; } catch (e) {}
-                                                    try { if (item.redactor !== undefined) item.redactor = redactorMode; } catch (e) {}
-                                                    try { if (item.proxy !== undefined) item.proxy = currentProxy; } catch (e) {}
-                                                    try { if (item.widgetProxy !== undefined) item.widgetProxy = currentProxy; } catch (e) {}
-                                                    try { if (item.widgetData !== undefined) item.widgetData = currentModel; } catch (e) {}
-                                                    try { if (item.item !== undefined) item.item = currentFace; } catch (e) {}
-                                                    try { if (item.widget !== undefined) item.widget = currentFace || currentProxy; } catch (e) {}
-                                                    try { if (item.targetWidget !== undefined) item.targetWidget = currentFace || currentProxy; } catch (e) {}
-                                                    try { if (item.activeWidgetsModel !== undefined) item.activeWidgetsModel = redactorMode.activeWidgetsModel; } catch (e) {}
-                                                }
-
-                                                onLoaded: setupControl()
-
-                                                Connections {
-                                                    target: preview
-                                                    function onItemChanged() {
-                                                        settingLoaderTop.setupControl();
-                                                    }
-                                                }
-
-                                                Connections {
-                                                    target: widgetProxy
-                                                    function onWIndexChanged() {
-                                                        settingLoaderTop.setupControl();
-                                                    }
-                                                    function onWVariantChanged() {
-                                                        settingLoaderTop.setupControl();
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        IconButton {
-                                            id: rotateBtn
-                                            size: s(34)
-                                            cornerRadius: ThemeBackend.borderRadius
-                                            buttonIcon: "󰑖"
-                                            iconFontSize: s(16)
-                                            accentColor: ThemeBackend.surface0
-                                            textColor: ThemeBackend.text
-                                            onClicked: widgetProxy.rotateWidget()
-                                        }
-
-                                        IconButton {
-                                            id: resetBtn
-                                            size: s(34)
-                                            cornerRadius: ThemeBackend.borderRadius
-                                            buttonIcon: "󰑐"
-                                            iconFontSize: s(15)
-                                            accentColor: ThemeBackend.surface0
-                                            textColor: ThemeBackend.text
-                                            onClicked: widgetProxy.resetWidgetSize()
-                                        }
-
-                                        DeleteButton {
-                                            id: closeBtn
-                                            size: s(34)
-                                            cornerRadius: ThemeBackend.borderRadius
-                                            iconFontSize: s(18)
-
-                                            onClicked: redactorMode.removeWidget(widgetProxy.wId)
-                                        }
-                                    }
-
-                                    RowLayout {
                                         spacing: s(6)
-                                        Layout.alignment: Qt.AlignHCenter
 
-                                        Repeater {
-                                            model: WidgetRegistry.additionalSettings(widgetProxy.wType, "bottom", widgetProxy.wVariant)
-                                            delegate: Loader {
-                                                id: settingLoaderBottom
-                                                Layout.alignment: Qt.AlignVCenter
-
-                                                readonly property var currentSetting: modelData
-                                                readonly property var currentProxy: widgetProxy
-                                                readonly property var currentModel: (redactorMode.activeWidgetsModel && widgetProxy.wIndex >= 0 && widgetProxy.wIndex < redactorMode.activeWidgetsModel.count) ? redactorMode.activeWidgetsModel.get(widgetProxy.wIndex) : null
-                                                readonly property var currentFace: preview.item
-
-                                                sourceComponent: {
-                                                    if (modelData.component) return modelData.component;
-                                                    if (modelData.sourceComponent) return modelData.sourceComponent;
-                                                    if (modelData.source || modelData.file) return null;
-                                                    return defaultAdditionalButtonComponent;
-                                                }
-                                                source: {
-                                                    if (modelData.component || modelData.sourceComponent) return "";
-                                                    if (modelData.source) return Qt.resolvedUrl(modelData.source);
-                                                    if (modelData.file) return Qt.resolvedUrl(modelData.file);
-                                                    return "";
-                                                }
-
-                                                function setupControl() {
-                                                    if (!item) return;
-                                                    try { if (item.settingData !== undefined) item.settingData = currentSetting; } catch (e) {}
-                                                    try { if (item.typeData !== undefined) item.typeData = WidgetRegistry.types[widgetProxy.wType]; } catch (e) {}
-                                                    try { if (item.redactor !== undefined) item.redactor = redactorMode; } catch (e) {}
-                                                    try { if (item.proxy !== undefined) item.proxy = currentProxy; } catch (e) {}
-                                                    try { if (item.widgetProxy !== undefined) item.widgetProxy = currentProxy; } catch (e) {}
-                                                    try { if (item.widgetData !== undefined) item.widgetData = currentModel; } catch (e) {}
-                                                    try { if (item.item !== undefined) item.item = currentFace; } catch (e) {}
-                                                    try { if (item.widget !== undefined) item.widget = currentFace || currentProxy; } catch (e) {}
-                                                    try { if (item.targetWidget !== undefined) item.targetWidget = currentFace || currentProxy; } catch (e) {}
-                                                    try { if (item.activeWidgetsModel !== undefined) item.activeWidgetsModel = redactorMode.activeWidgetsModel; } catch (e) {}
-                                                }
-
-                                                onLoaded: setupControl()
-
-                                                Connections {
-                                                    target: preview
-                                                    function onItemChanged() {
-                                                        settingLoaderBottom.setupControl();
-                                                    }
-                                                }
-
-                                                Connections {
-                                                    target: widgetProxy
-                                                    function onWIndexChanged() {
-                                                        settingLoaderBottom.setupControl();
-                                                    }
-                                                    function onWVariantChanged() {
-                                                        settingLoaderBottom.setupControl();
+                                        Component {
+                                            id: defaultAdditionalButtonComponent
+                                            IconButton {
+                                                id: defBtn
+                                                property var settingData: null
+                                                size: s(34)
+                                                cornerRadius: ThemeBackend.borderRadius
+                                                buttonIcon: (defBtn.settingData && defBtn.settingData.icon) ? defBtn.settingData.icon : ""
+                                                iconFontSize: s((defBtn.settingData && defBtn.settingData.iconFontSize) ? defBtn.settingData.iconFontSize : 16)
+                                                accentColor: redactorMode.resolveThemeColor((defBtn.settingData && defBtn.settingData.accentColor) ? defBtn.settingData.accentColor : "surface0")
+                                                textColor: redactorMode.resolveThemeColor((defBtn.settingData && defBtn.settingData.textColor) ? defBtn.settingData.textColor : "mauve")
+                                                onClicked: {
+                                                    if (defBtn.settingData && defBtn.settingData.action) {
+                                                        redactorMode.handleAdditionalAction(defBtn.settingData.action, widgetProxy.wIndex, widgetProxy.wId, widgetProxy);
                                                     }
                                                 }
                                             }
                                         }
 
-                                        Dropdown {
-                                            id: variantDropdown
-                                            property var variantsList: bottomChrome.variantsList
-                                            visible: bottomChrome.hasVariants
-                                            implicitHeight: s(34)
-                                            implicitWidth: s(150)
-                                            accentColor: ThemeBackend.mauve
-                                            baseColor: ThemeBackend.surface0
-                                            dropdownColor: ThemeBackend.base
-                                            borderColor: ThemeBackend.surface1
-                                            textColor: ThemeBackend.text
-                                            activeTextColor: ThemeBackend.crust
-                                            cornerRadius: ThemeBackend.borderRadius
-                                            fontPixelSize: s(11)
-                                            fuzzySearch: false
-                                            options: variantsList.map(v => v.label || v.id)
+                                        property var variantsList: WidgetRegistry.variantList(widgetProxy.wType)
+                                        property bool hasVariants: variantsList.length > 1
 
-                                            function updateCurrentIndex() {
-                                                let curVar = widgetProxy.wVariant;
-                                                for (let i = 0; i < variantsList.length; i++) {
-                                                    if (variantsList[i].id === curVar) {
-                                                        currentIndex = i;
-                                                        break;
-                                                    }
+                                        RowLayout {
+                                            spacing: s(4)
+                                            Layout.alignment: Qt.AlignHCenter
+
+                                            Rectangle {
+                                                id: pxReadoutPill
+                                                implicitWidth: pxReadoutText.implicitWidth + s(16)
+                                                implicitHeight: s(34)
+                                                color: pxGlass.active ? "transparent" : ThemeBackend.surface0
+                                                radius: ThemeBackend.borderRadius
+
+                                                WallpaperBlur {
+                                                    id: pxGlass
+                                                    anchors.fill: parent
+                                                    radius: parent.radius
+                                                    tintColor: ThemeBackend.surface0
+                                                    tintAmount: 0.3
                                                 }
-                                            }
-
-                                            Component.onCompleted: updateCurrentIndex()
-
-                                            Connections {
-                                                target: widgetProxy
-                                                function onWVariantChanged() {
-                                                    variantDropdown.updateCurrentIndex();
-                                                }
-                                            }
-
-                                            onSelected: (idx, value) => {
-                                                if (idx >= 0 && idx < variantsList.length) {
-                                                    widgetProxy.applyVariant(variantsList[idx].id);
-                                                }
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            id: opacityPill
-                                            implicitWidth: bottomChrome.hasVariants ? s(200) : s(280)
-                                            implicitHeight: s(34)
-                                            color: opacityGlass.active ? "transparent" : ThemeBackend.surface0
-                                            radius: ThemeBackend.borderRadius
-
-                                            WallpaperBlur {
-                                                id: opacityGlass
-                                                anchors.fill: parent
-                                                radius: parent.radius
-                                                tintColor: ThemeBackend.surface0
-                                                tintAmount: 0.3
-                                            }
-
-                                            RowLayout {
-                                                anchors.fill: parent
-                                                anchors.leftMargin: s(10)
-                                                anchors.rightMargin: s(10)
-                                                spacing: s(8)
 
                                                 Text {
-                                                    id: opReadoutText
-                                                    text: Math.round(widgetProxy.wOpacity * 100) + "%"
+                                                    id: pxReadoutText
+                                                    anchors.centerIn: parent
+                                                    text: Math.round(model.wWidth) + "x" + Math.round(model.wHeight)
                                                     font.family: ThemeBackend.fontFamily
-                                                    font.pixelSize: s(11)
+                                                    font.pixelSize: s(12)
                                                     font.bold: true
                                                     color: ThemeBackend.text
-                                                    Layout.preferredWidth: s(32)
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                id: arReadoutPill
+                                                implicitWidth: arReadoutText.implicitWidth + s(16)
+                                                implicitHeight: s(34)
+                                                color: arGlass.active ? "transparent" : ThemeBackend.surface0
+                                                radius: ThemeBackend.borderRadius
+
+                                                WallpaperBlur {
+                                                    id: arGlass
+                                                    anchors.fill: parent
+                                                    radius: parent.radius
+                                                    tintColor: ThemeBackend.surface0
+                                                    tintAmount: 0.3
                                                 }
 
-                                                Draggable {
-                                                    id: opacitySlider
-                                                    Layout.fillWidth: true
-                                                    Layout.preferredHeight: s(16)
+                                                Text {
+                                                    id: arReadoutText
+                                                    anchors.centerIn: parent
+                                                    text: (model.wWidth / model.wHeight).toFixed(2) + ":1"
+                                                    font.family: ThemeBackend.fontFamily
+                                                    font.pixelSize: s(12)
+                                                    font.bold: true
+                                                    color: ThemeBackend.text
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                id: pctReadoutPill
+                                                implicitWidth: pctReadoutText.implicitWidth + s(16)
+                                                implicitHeight: s(34)
+                                                color: pctGlass.active ? "transparent" : ThemeBackend.surface0
+                                                radius: ThemeBackend.borderRadius
+
+                                                WallpaperBlur {
+                                                    id: pctGlass
+                                                    anchors.fill: parent
+                                                    radius: parent.radius
+                                                    tintColor: ThemeBackend.surface0
+                                                    tintAmount: 0.3
+                                                }
+
+                                                Text {
+                                                    id: pctReadoutText
+                                                    anchors.centerIn: parent
+                                                    text: {
+                                                        let def = widgetProxy.getDefaultSize(preview.item);
+                                                        return Math.round((model.wWidth / def.w) * 100) + "%";
+                                                    }
+                                                    font.family: ThemeBackend.fontFamily
+                                                    font.pixelSize: s(12)
+                                                    font.bold: true
+                                                    color: ThemeBackend.text
+                                                }
+                                            }
+
+                                            Repeater {
+                                                model: WidgetRegistry.additionalSettings(widgetProxy.wType, "top", widgetProxy.wVariant)
+                                                delegate: Loader {
+                                                    id: settingLoaderTop
                                                     Layout.alignment: Qt.AlignVCenter
-                                                    from: 0.0
-                                                    to: 100.0
-                                                    value: Math.round(widgetProxy.wOpacity * 100)
-                                                    backgroundColor: ThemeBackend.surface1
-                                                    accentColor: ThemeBackend.mauve
-                                                    gradColor1: ThemeBackend.mauve
-                                                    gradColor2: Qt.lighter(ThemeBackend.mauve, 1.05)
-                                                    gradColor3: Qt.lighter(ThemeBackend.mauve, 1.10)
-                                                    cornerRadius: ThemeBackend.borderRadius
-                                                    handleSize: s(16)
-                                                    handleColor: Qt.lighter(ThemeBackend.mauve, 1.15)
-                                                    handleHoverColor: Qt.lighter(ThemeBackend.mauve, 1.3)
-                                                    handleDragColor: Qt.lighter(ThemeBackend.mauve, 1.45)
-                                                    handleBorderColor: Qt.rgba(0, 0, 0, 0.2)
-                                                    showValueBubble: false
+
+                                                    readonly property var currentSetting: modelData
+                                                    readonly property var currentProxy: widgetProxy
+                                                    readonly property var currentModel: (redactorMode.activeWidgetsModel && widgetProxy.wIndex >= 0 && widgetProxy.wIndex < redactorMode.activeWidgetsModel.count) ? redactorMode.activeWidgetsModel.get(widgetProxy.wIndex) : null
+                                                    readonly property var currentFace: preview.item
+
+                                                    sourceComponent: {
+                                                        if (modelData.component) return modelData.component;
+                                                        if (modelData.sourceComponent) return modelData.sourceComponent;
+                                                        if (modelData.source || modelData.file) return null;
+                                                        return defaultAdditionalButtonComponent;
+                                                    }
+                                                    source: {
+                                                        if (modelData.component || modelData.sourceComponent) return "";
+                                                        if (modelData.source) return Qt.resolvedUrl(modelData.source);
+                                                        if (modelData.file) return Qt.resolvedUrl(modelData.file);
+                                                        return "";
+                                                    }
+
+                                                    function setupControl() {
+                                                        if (!item) return;
+                                                        try { if (item.settingData !== undefined) item.settingData = currentSetting; } catch (e) {}
+                                                        try { if (item.typeData !== undefined) item.typeData = WidgetRegistry.types[widgetProxy.wType]; } catch (e) {}
+                                                        try { if (item.redactor !== undefined) item.redactor = redactorMode; } catch (e) {}
+                                                        try { if (item.proxy !== undefined) item.proxy = currentProxy; } catch (e) {}
+                                                        try { if (item.widgetProxy !== undefined) item.widgetProxy = currentProxy; } catch (e) {}
+                                                        try { if (item.widgetData !== undefined) item.widgetData = currentModel; } catch (e) {}
+                                                        try { if (item.item !== undefined) item.item = currentFace; } catch (e) {}
+                                                        try { if (item.widget !== undefined) item.widget = currentFace || currentProxy; } catch (e) {}
+                                                        try { if (item.targetWidget !== undefined) item.targetWidget = currentFace || currentProxy; } catch (e) {}
+                                                        try { if (item.activeWidgetsModel !== undefined) item.activeWidgetsModel = redactorMode.activeWidgetsModel; } catch (e) {}
+                                                    }
+
+                                                    onLoaded: setupControl()
 
                                                     Connections {
-                                                        target: widgetProxy
-                                                        function onWOpacityChanged() {
-                                                            opacitySlider.value = Math.round(widgetProxy.wOpacity * 100);
+                                                        target: preview
+                                                        function onItemChanged() {
+                                                            settingLoaderTop.setupControl();
                                                         }
                                                     }
 
-                                                    onMoved: val => {
-                                                        model.wOpacity = val / 100.0;
-                                                        widgetProxy.triggerSync();
+                                                    Connections {
+                                                        target: widgetProxy
+                                                        function onWIndexChanged() {
+                                                            settingLoaderTop.setupControl();
+                                                        }
+                                                        function onWVariantChanged() {
+                                                            settingLoaderTop.setupControl();
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            IconButton {
+                                                id: rotateBtn
+                                                size: s(34)
+                                                cornerRadius: ThemeBackend.borderRadius
+                                                buttonIcon: "󰑖"
+                                                iconFontSize: s(16)
+                                                accentColor: ThemeBackend.surface0
+                                                textColor: ThemeBackend.text
+                                                onClicked: widgetProxy.rotateWidget()
+                                            }
+
+                                            IconButton {
+                                                id: resetBtn
+                                                size: s(34)
+                                                cornerRadius: ThemeBackend.borderRadius
+                                                buttonIcon: "󰑐"
+                                                iconFontSize: s(15)
+                                                accentColor: ThemeBackend.surface0
+                                                textColor: ThemeBackend.text
+                                                onClicked: widgetProxy.resetWidgetSize()
+                                            }
+
+                                            DeleteButton {
+                                                id: closeBtn
+                                                size: s(34)
+                                                cornerRadius: ThemeBackend.borderRadius
+                                                iconFontSize: s(18)
+
+                                                onClicked: redactorMode.removeWidget(widgetProxy.wId)
+                                            }
+                                        }
+
+                                        RowLayout {
+                                            spacing: s(6)
+                                            Layout.alignment: Qt.AlignHCenter
+
+                                            Repeater {
+                                                model: WidgetRegistry.additionalSettings(widgetProxy.wType, "bottom", widgetProxy.wVariant)
+                                                delegate: Loader {
+                                                    id: settingLoaderBottom
+                                                    Layout.alignment: Qt.AlignVCenter
+
+                                                    readonly property var currentSetting: modelData
+                                                    readonly property var currentProxy: widgetProxy
+                                                    readonly property var currentModel: (redactorMode.activeWidgetsModel && widgetProxy.wIndex >= 0 && widgetProxy.wIndex < redactorMode.activeWidgetsModel.count) ? redactorMode.activeWidgetsModel.get(widgetProxy.wIndex) : null
+                                                    readonly property var currentFace: preview.item
+
+                                                    sourceComponent: {
+                                                        if (modelData.component) return modelData.component;
+                                                        if (modelData.sourceComponent) return modelData.sourceComponent;
+                                                        if (modelData.source || modelData.file) return null;
+                                                        return defaultAdditionalButtonComponent;
+                                                    }
+                                                    source: {
+                                                        if (modelData.component || modelData.sourceComponent) return "";
+                                                        if (modelData.source) return Qt.resolvedUrl(modelData.source);
+                                                        if (modelData.file) return Qt.resolvedUrl(modelData.file);
+                                                        return "";
                                                     }
 
-                                                    onDragFinished: {
-                                                        widgetProxy.finalizeSync();
+                                                    function setupControl() {
+                                                        if (!item) return;
+                                                        try { if (item.settingData !== undefined) item.settingData = currentSetting; } catch (e) {}
+                                                        try { if (item.typeData !== undefined) item.typeData = WidgetRegistry.types[widgetProxy.wType]; } catch (e) {}
+                                                        try { if (item.redactor !== undefined) item.redactor = redactorMode; } catch (e) {}
+                                                        try { if (item.proxy !== undefined) item.proxy = currentProxy; } catch (e) {}
+                                                        try { if (item.widgetProxy !== undefined) item.widgetProxy = currentProxy; } catch (e) {}
+                                                        try { if (item.widgetData !== undefined) item.widgetData = currentModel; } catch (e) {}
+                                                        try { if (item.item !== undefined) item.item = currentFace; } catch (e) {}
+                                                        try { if (item.widget !== undefined) item.widget = currentFace || currentProxy; } catch (e) {}
+                                                        try { if (item.targetWidget !== undefined) item.targetWidget = currentFace || currentProxy; } catch (e) {}
+                                                        try { if (item.activeWidgetsModel !== undefined) item.activeWidgetsModel = redactorMode.activeWidgetsModel; } catch (e) {}
+                                                    }
+
+                                                    onLoaded: setupControl()
+
+                                                    Connections {
+                                                        target: preview
+                                                        function onItemChanged() {
+                                                            settingLoaderBottom.setupControl();
+                                                        }
+                                                    }
+
+                                                    Connections {
+                                                        target: widgetProxy
+                                                        function onWIndexChanged() {
+                                                            settingLoaderBottom.setupControl();
+                                                        }
+                                                        function onWVariantChanged() {
+                                                            settingLoaderBottom.setupControl();
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Dropdown {
+                                                id: variantDropdown
+                                                property var variantsList: bottomChrome.variantsList
+                                                visible: bottomChrome.hasVariants
+                                                implicitHeight: s(34)
+                                                implicitWidth: s(150)
+                                                accentColor: ThemeBackend.mauve
+                                                baseColor: ThemeBackend.surface0
+                                                dropdownColor: ThemeBackend.base
+                                                borderColor: ThemeBackend.surface1
+                                                textColor: ThemeBackend.text
+                                                activeTextColor: ThemeBackend.crust
+                                                cornerRadius: ThemeBackend.borderRadius
+                                                fontPixelSize: s(11)
+                                                fuzzySearch: false
+                                                options: variantsList.map(v => v.label || v.id)
+
+                                                function updateCurrentIndex() {
+                                                    let curVar = widgetProxy.wVariant;
+                                                    for (let i = 0; i < variantsList.length; i++) {
+                                                        if (variantsList[i].id === curVar) {
+                                                            currentIndex = i;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+
+                                                Component.onCompleted: updateCurrentIndex()
+
+                                                Connections {
+                                                    target: widgetProxy
+                                                    function onWVariantChanged() {
+                                                        variantDropdown.updateCurrentIndex();
+                                                    }
+                                                }
+
+                                                onSelected: (idx, value) => {
+                                                    if (idx >= 0 && idx < variantsList.length) {
+                                                        widgetProxy.applyVariant(variantsList[idx].id);
+                                                    }
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                id: opacityPill
+                                                implicitWidth: bottomChrome.hasVariants ? s(200) : s(280)
+                                                implicitHeight: s(34)
+                                                color: opacityGlass.active ? "transparent" : ThemeBackend.surface0
+                                                radius: ThemeBackend.borderRadius
+
+                                                WallpaperBlur {
+                                                    id: opacityGlass
+                                                    anchors.fill: parent
+                                                    radius: parent.radius
+                                                    tintColor: ThemeBackend.surface0
+                                                    tintAmount: 0.3
+                                                }
+
+                                                RowLayout {
+                                                    anchors.fill: parent
+                                                    anchors.leftMargin: s(10)
+                                                    anchors.rightMargin: s(10)
+                                                    spacing: s(8)
+
+                                                    Text {
+                                                        id: opReadoutText
+                                                        text: Math.round(widgetProxy.wOpacity * 100) + "%"
+                                                        font.family: ThemeBackend.fontFamily
+                                                        font.pixelSize: s(11)
+                                                        font.bold: true
+                                                        color: ThemeBackend.text
+                                                        Layout.preferredWidth: s(32)
+                                                    }
+
+                                                    Draggable {
+                                                        id: opacitySlider
+                                                        Layout.fillWidth: true
+                                                        Layout.preferredHeight: s(16)
+                                                        Layout.alignment: Qt.AlignVCenter
+                                                        from: 0.0
+                                                        to: 100.0
+                                                        value: Math.round(widgetProxy.wOpacity * 100)
+                                                        backgroundColor: ThemeBackend.surface1
+                                                        accentColor: ThemeBackend.mauve
+                                                        gradColor1: ThemeBackend.mauve
+                                                        gradColor2: Qt.lighter(ThemeBackend.mauve, 1.05)
+                                                        gradColor3: Qt.lighter(ThemeBackend.mauve, 1.10)
+                                                        cornerRadius: ThemeBackend.borderRadius
+                                                        handleSize: s(16)
+                                                        handleColor: Qt.lighter(ThemeBackend.mauve, 1.15)
+                                                        handleHoverColor: Qt.lighter(ThemeBackend.mauve, 1.3)
+                                                        handleDragColor: Qt.lighter(ThemeBackend.mauve, 1.45)
+                                                        handleBorderColor: Qt.rgba(0, 0, 0, 0.2)
+                                                        showValueBubble: false
+
+                                                        Connections {
+                                                            target: widgetProxy
+                                                            function onWOpacityChanged() {
+                                                                opacitySlider.value = Math.round(widgetProxy.wOpacity * 100);
+                                                            }
+                                                        }
+
+                                                        onMoved: val => {
+                                                            model.wOpacity = val / 100.0;
+                                                            widgetProxy.triggerSync();
+                                                        }
+
+                                                        onDragFinished: {
+                                                            widgetProxy.finalizeSync();
+                                                        }
                                                     }
                                                 }
                                             }
@@ -2592,33 +2582,86 @@ Scope {
                                 }
                             }
                         }
+
+                        Item {
+                            anchors.centerIn: workspaceArea
+                            visible: redactorMode.isReady && (redactorMode.activeWidgetsModel ? redactorMode.activeWidgetsModel.count === 0 : true)
+                            scale: redactorMode.unshrink
+                            width: s(400)
+                            height: s(100)
+
+                            ColumnLayout {
+                                anchors.centerIn: parent
+                                spacing: s(8)
+
+                                Text {
+                                    text: I18n.t("widgets.redactor.no_widgets_active")
+                                    font.family: ThemeBackend.fontFamily
+                                    font.pixelSize: s(20)
+                                    font.bold: true
+                                    color: ThemeBackend.text
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+                                Text {
+                                    text: I18n.t("widgets.redactor.pick_style_to_add", "Pick a group below, then click a style on the left to add it")
+                                    font.family: ThemeBackend.fontFamily
+                                    font.pixelSize: s(14)
+                                    color: ThemeBackend.subtext0
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+                            }
+                        }
                     }
 
+                    // a thin frame around the shrunk desktop
+                    Rectangle {
+                        x: deskCanvas.x
+                        y: deskCanvas.y
+                        width: deskCanvas.width * redactorMode.deskScale
+                        height: deskCanvas.height * redactorMode.deskScale
+                        color: "transparent"
+                        radius: ThemeBackend.borderRadius * redactorMode.layoutP
+                        border.width: 1
+                        border.color: Qt.alpha(ThemeBackend.surface2, 0.8 * redactorMode.layoutP)
+                        visible: redactorMode.layoutP > 0.01
+                    }
+
+                    // the selected widget's tools (its bottomChrome is placed here) above the desktop
                     Item {
-                        anchors.centerIn: workspaceArea
-                        visible: redactorMode.isReady && (redactorMode.activeWidgetsModel ? redactorMode.activeWidgetsModel.count === 0 : true)
-                        width: s(400)
-                        height: s(100)
+                        id: topToolsHost
+                        x: redactorMode.deskAreaX
+                        width: redactorMode.deskAreaWidth
+                        y: redactorMode.frameInset + (redactorMode.deskYTarget - redactorMode.frameInset - height) / 2 - (1 - redactorMode.layoutP) * s(30)
+                        height: redactorMode.topStripHeight - s(8)
+                        opacity: redactorMode.layoutP
+                        z: 150000
+                    }
 
-                        ColumnLayout {
-                            anchors.centerIn: parent
-                            spacing: s(8)
+                    RedactorPreviewPanel {
+                        id: previewPanel
+                        z: 200000
+                        redactor: redactorMode
+                        typeId: categoryBar.typeId
+                        x: redactorMode.innerMargin - (1 - redactorMode.openProgress) * (width + redactorMode.innerMargin)
+                        y: redactorMode.innerMargin
+                        width: redactorMode.leftPanelWidth - redactorMode.innerMargin
+                        height: redactorMode.height - redactorMode.bottomBarHeight - redactorMode.innerMargin - redactorMode.edgeGap
+                        visible: redactorMode.openProgress > 0.001
+                    }
 
-                            Text {
-                                text: I18n.t("widgets.redactor.no_widgets_active")
-                                font.family: ThemeBackend.fontFamily
-                                font.pixelSize: s(20)
-                                font.bold: true
-                                color: ThemeBackend.text
-                                Layout.alignment: Qt.AlignHCenter
-                            }
-                            Text {
-                                text: I18n.t("widgets.redactor.click_to_add")
-                                font.family: ThemeBackend.fontFamily
-                                font.pixelSize: s(14)
-                                color: ThemeBackend.subtext0
-                                Layout.alignment: Qt.AlignHCenter
-                            }
+                    RedactorCategoryBar {
+                        id: categoryBar
+                        z: 200000
+                        redactor: redactorMode
+                        x: redactorMode.innerMargin
+                        width: redactorMode.width - redactorMode.innerMargin * 2
+                        height: redactorMode.bottomBarHeight - redactorMode.innerMargin
+                        y: redactorMode.height - height - redactorMode.innerMargin + (1 - redactorMode.openProgress) * (height + redactorMode.innerMargin)
+                        visible: redactorMode.openProgress > 0.001
+                        onDoneClicked: {
+                            redactorMode.selectedId = "";
+                            root.targetSelectedWidgetId = "";
+                            redactorWindow.exitRedactor();
                         }
                     }
 
@@ -2627,9 +2670,28 @@ Scope {
                         path: (Caching.getStateDir && redactorWindow.safeMonitorName) ? (Caching.getStateDir("widgets/" + redactorWindow.safeMonitorName) + "/layout.json") : ""
                         watchChanges: false
                         onLoaded: redactorMode.loadLayoutFromText(text())
+                        // no layout saved for this screen yet: open on an empty desktop
+                        printErrors: false
+                        onLoadFailed: redactorMode.loadLayoutFromText("")
+                    }
+
+                    // The layout file can arrive before the window has its size; fitting positions to a 0-wide screen
+                    // would push every widget into the top-left corner (and Done would then save that), so wait.
+                    property var pendingLayoutText: null
+                    onWidthChanged: flushPendingLayout()
+                    onHeightChanged: flushPendingLayout()
+                    function flushPendingLayout() {
+                        if (pendingLayoutText === null || width <= 0 || height <= 0) return;
+                        let text = pendingLayoutText;
+                        pendingLayoutText = null;
+                        loadLayoutFromText(text);
                     }
 
                     function loadLayoutFromText(content) {
+                        if (redactorMode.width <= 0 || redactorMode.height <= 0) {
+                            redactorMode.pendingLayoutText = content || "";
+                            return;
+                        }
                         let trimmed = (content || "").trim();
                         activeWidgetsModel.clear();
                         redactorMode.isInitializing = true;
@@ -2681,7 +2743,6 @@ Scope {
                         }
                         redactorMode.isReady = true;
                         redactorMode.resetHistory();
-                        redactorMode.updateToolbarObscured();
                         Qt.callLater(() => {
                             WidgetSync.setRedactMode(redactorWindow.safeMonitorName, true);
                             redactorWindow.sendIpc("setRedactMode", ["true"]);
@@ -2715,66 +2776,11 @@ Scope {
                         }
                     }
 
-                    WidgetPicker {
-                        id: toolbar
-                        anchors.bottom: parent.bottom
-                        anchors.bottomMargin: s(24)
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        z: 200000
-                        maxWidth: redactorMode.width - s(48)
-                        redactor: redactorMode
-
-                        opacity: (toolbar.panelOpen || !redactorMode.activeWidgetsModel || redactorMode.activeWidgetsModel.count === 0 || redactorMode.selectedId === "" || !redactorMode.toolbarObscured) ? 1.0 : 0.0
-                        visible: opacity > 0
-                        enabled: opacity > 0
-                        Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
-
-                        IconButton {
-                            size: toolbar.controlHeight
-                            cornerRadius: ThemeBackend.borderRadius
-                            buttonIcon: "󰕰"
-                            iconFontSize: s(16)
-                            accentColor: redactorMode.gridEnabled ? ThemeBackend.mauve : ThemeBackend.surface0
-                            textColor: redactorMode.gridEnabled ? ThemeBackend.crust : ThemeBackend.text
-                            Layout.alignment: Qt.AlignVCenter
-
-                            onClicked: {
-                                let turningOn = !redactorMode.gridEnabled;
-                                redactorMode.gridEnabled = turningOn;
-                                if (turningOn) {
-                                    redactorMode.snapAllWidgetsToGrid();
-                                }
-                            }
-                        }
-
-                        IconButton {
-                            size: toolbar.controlHeight
-                            cornerRadius: ThemeBackend.borderRadius
-                            buttonIcon: "󰑐"
-                            iconFontSize: s(16)
-                            accentColor: ThemeBackend.surface0
-                            textColor: ThemeBackend.text
-                            Layout.alignment: Qt.AlignVCenter
-                            visible: redactorMode.activeWidgetsModel ? (redactorMode.activeWidgetsModel.count > 0) : false
-                            onClicked: redactorMode.removeAllWidgets()
-                        }
-
-                        ClickButton {
-                            Layout.alignment: Qt.AlignVCenter
-                            maxWidth: s(100)
-                            implicitHeight: toolbar.controlHeight
-                            horizontalPadding: s(14)
-                            cornerRadius: ThemeBackend.borderRadius
-                            buttonText: I18n.t("widgets.redactor.done")
-                            textFontSize: s(12)
-                            accentColor: ThemeBackend.mauve
-                            textColor: ThemeBackend.crust
-                            onClicked: {
-                                redactorMode.selectedId = "";
-                                root.targetSelectedWidgetId = "";
-                                redactorWindow.exitRedactor();
-                            }
-                        }
+                    ScreenFrame {
+                        anchors.fill: parent
+                        z: 250000
+                        inset: redactorMode.frameInset
+                        visible: inset > 0
                     }
 
                     Loader {
@@ -2818,7 +2824,8 @@ Scope {
                                         defH = snapped.h;
                                     }
 
-                                    let defVar = WidgetRegistry.defaultVariant("image");
+                                    let defVar = redactorMode.pendingImageVariant || WidgetRegistry.defaultVariant("image");
+                                    redactorMode.pendingImageVariant = "";
 
                                     if (model) {
                                         model.append({
@@ -2840,7 +2847,6 @@ Scope {
                                     root.targetSelectedWidgetId = newId;
                                     WidgetSync.addWidget(redactorWindow.safeMonitorName, newId, "image", spawnX, spawnY, defW, defH, 1.0, filePath, 0, defVar);
                                     WidgetSync.bringToFront(redactorWindow.safeMonitorName, newId);
-                                    redactorMode.updateToolbarObscured();
                                 }
                             }
                         }
