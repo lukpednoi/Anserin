@@ -32,7 +32,7 @@ PACKAGES=(
     xdg-desktop-portal-gtk adw-gtk-theme adwaita-fonts
     python python-gobject python-psutil python-pillow python-jeepney python-websockets
     jq socat inotify-tools fd ripgrep bc file psmisc wget unzip git imagemagick ffmpeg libnotify
-    base-devel cmake pkgconf
+    base-devel cmake pkgconf libsndfile wayland
 )
 # Optional, from the AUR: only installed when an AUR helper (yay/paru) is already there.
 AUR_PACKAGES=(wl-gammarelay-rs)

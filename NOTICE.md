@@ -21,8 +21,9 @@ bundled with the Apache-2.0 license in config/sddm/themes/material-you-new/font/
 The audio processor is adapted from serpantinum-audio 0.4.0 (with its visualizer):
 https://github.com/ilyamiro/serpantinum-audio/tree/cf81973482c0f1cb7ef144b17afb3714d2c4f96d
 AGPL-3.0; source, license and local adaptations are in src/quickshell/native/audio/.
-System info, brightness, monitors, keyboard locks and the night light can use the
-optional serpantinum-core and serpantinum-gamma helpers when they are installed.
+System info, brightness, monitors, keyboard locks and the night light use Anserin's own
+anserin-core (src/quickshell/native/core). Its copy of wlr-gamma-control-unstable-v1.xml
+(Giulio Camuffo, Simon Ser) keeps the permission notice inside the file.
 Google Sans Flex (src/assets/fonts/GoogleSansFlex.ttf, used by the Material clocks) comes
 with upstream Serpantinum; Google LLC, SIL Open Font License 1.1 (https://openfontlicense.org).
 Bar utility actions and lyric position guards follow the selected Serpantinum

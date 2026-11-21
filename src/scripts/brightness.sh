@@ -162,16 +162,17 @@ watch_brightness() {
     exec inotifywait -m -e modify "${paths[@]}" 2>/dev/null
 }
 
-# serpantinum-core installed: it reads and sets the backlight (or DDC) itself, and reports every change
-if command -v serpantinum-core >/dev/null 2>&1; then
+# Anserin core built and a backlight there: it reads the backlight, sets it through logind and reports every
+# change. Screens without a backlight (DDC monitors) keep the ways below.
+if [[ -x "$ANSERIN_CORE" ]] && "$ANSERIN_CORE" brightness backend >/dev/null 2>&1; then
     case "$ACTION" in
-        get|backend|raise|lower) exec serpantinum-core brightness "$ACTION" ;;
-        set) exec serpantinum-core brightness set "$VALUE" ;;
+        get|backend|raise|lower) exec "$ANSERIN_CORE" brightness "$ACTION" ;;
+        set) exec "$ANSERIN_CORE" brightness set "$VALUE" ;;
         watch)
             mkdir -p "$QS_RUN_DIR" 2>/dev/null || true
             mo_stop_tree "$WATCH_PIDFILE"
             mo_pid_write "$WATCH_PIDFILE" "$$"
-            exec serpantinum-core watch brightness
+            exec "$ANSERIN_CORE" watch brightness
             ;;
     esac
 fi

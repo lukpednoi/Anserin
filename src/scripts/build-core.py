@@ -11,18 +11,20 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "src/quickshell/native/core"
 BUILD = ROOT / ".lab-data/core-build"
 LIBRARY = BUILD / "module/libanserincore.so"   # with its qmldir; imported by path from the shell
+TOOL = BUILD / "bin/anserin-core"              # the helper program the scripts call
 
 
 def main():
     qt_version = subprocess.check_output(["pkg-config", "--modversion", "Qt6Core"], text=True).strip()
     build = BUILD
     version_file = build / "qt-version"
-    inputs = [p for p in SOURCE.iterdir() if p.suffix in (".cpp", ".h") or p.name in ("CMakeLists.txt", "qmldir")]
-    if (LIBRARY.is_file() and version_file.is_file() and version_file.read_text() == qt_version
-            and all(path.stat().st_mtime <= LIBRARY.stat().st_mtime for path in inputs)):
+    inputs = [p for p in SOURCE.rglob("*") if p.suffix in (".cpp", ".h", ".xml") or p.name in ("CMakeLists.txt", "qmldir")]
+    built = [LIBRARY, TOOL]
+    if (all(p.is_file() for p in built) and version_file.is_file() and version_file.read_text() == qt_version
+            and all(path.stat().st_mtime <= min(p.stat().st_mtime for p in built) for path in inputs)):
         return
     if not shutil.which("cmake") or not shutil.which("c++"):
-        raise RuntimeError("Anserin core needs cmake, a C++ compiler and the Qt, PipeWire and libsndfile headers")
+        raise RuntimeError("Anserin core needs cmake, a C++ compiler, wayland-scanner and the Qt, PipeWire, libsndfile, Wayland and libsystemd headers")
     build.mkdir(parents=True, exist_ok=True)
     subprocess.run(["cmake", "-S", str(SOURCE), "-B", str(build), "-DCMAKE_BUILD_TYPE=Release"],
                    check=True, stdout=subprocess.DEVNULL)

@@ -11,9 +11,10 @@ source "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/caching.sh"
 qs_ensure_cache "bluelight"
 PIDDIR="$QS_RUN_BLUELIGHT"
 
-# serpantinum-gamma installed: it does the work (scripts/gamma.sh, same commands). The wl-gammarelay-rs and auto
-# loops this script started go first, by their own PID files.
-if command -v serpantinum-gamma >/dev/null 2>&1; then
+# Anserin core built and the compositor offers gamma control: its Night light daemon does the work
+# (scripts/gamma.sh, same commands). The wl-gammarelay-rs and auto loops this script started go first, by
+# their own PID files. Otherwise the wl-gammarelay-rs way below.
+if [[ -x "${ANSERIN_CORE:-}" ]] && { "$ANSERIN_CORE" gamma status >/dev/null 2>&1 || "$ANSERIN_CORE" gamma probe; }; then
     for pidfile in "$PIDDIR"/auto-*.pid "$PIDDIR/gammarelay.pid"; do
         [[ -f "$pidfile" ]] && mo_stop_tree "$pidfile"
     done

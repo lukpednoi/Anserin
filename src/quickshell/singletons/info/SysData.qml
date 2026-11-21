@@ -39,7 +39,7 @@ Item {
     signal sampled()
 
     // Parses one cpu|ram%|ramGB|temp|rx|tx|disk%|diskUsedGB|diskTotalGB line, or one JSON sample from
-    // serpantinum-core (CoreTools.core).
+    // anserin-core (CoreTools.core).
     function applyUsage(text, withNet) {
         text = text ? text.trim() : "";
         if (!text) return;

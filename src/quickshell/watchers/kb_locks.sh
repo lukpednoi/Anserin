@@ -243,27 +243,15 @@ else:
     done
 }
 
-# serpantinum-core installed: it reports Caps Lock and Num Lock from the compositor on every change (no polling).
-# Its first line is the current state; later lines are turned into "capslock 0|1" / "numlock 0|1" for what changed.
-core_watch_locks() {
-    local first=1 caps num last_c="" last_n=""
-    serpantinum-core watch locks 2>/dev/null | jq --unbuffered -r '"\(if .capsLock then 1 else 0 end) \(if .numLock then 1 else 0 end)"' | while read -r caps num; do
-        if [ "$first" = 1 ]; then first=0; last_c=$caps; last_n=$num; continue; fi
-        [ "$caps" != "$last_c" ] && { echo "capslock $caps"; last_c=$caps; }
-        [ "$num" != "$last_n" ] && { echo "numlock $num"; last_n=$num; }
-    done
-}
-
 case "$ACTION" in
     get)
         get_locks
         ;;
     watch)
-        if command -v serpantinum-core >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
-            # the shell stops only this script; take the pipeline (its own children) down with it
-            core_watch_locks &
-            trap 'pkill -TERM -P $! 2>/dev/null; kill $! 2>/dev/null; exit 0' TERM INT EXIT
-            wait $!
+        # Anserin core built: it reads the keyboard LEDs and prints "capslock 0|1" / "numlock 0|1" for what
+        # changed. exec, so the shell stops the watcher itself (a pipeline here was left running on reloads).
+        if [[ -x "${ANSERIN_CORE:-}" ]]; then
+            exec "$ANSERIN_CORE" watch locks --changes
         else
             watch_locks
         fi

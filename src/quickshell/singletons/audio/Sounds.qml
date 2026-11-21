@@ -25,25 +25,17 @@ Item {
     // starts in a few milliseconds without starting a process. Built on first start; until it is ready, or when
     // it cannot be built, sounds play through pw-play as before.
     property var core: null
-    Process {
-        id: coreBuild
-        running: Caching.anserinDir !== ""
-        command: ["python3", Caching.anserinDir + "/scripts/build-core.py"]
-        stderr: StdioCollector { id: coreBuildErrors }
-        onExited: code => {
-            if (code !== 0) {
-                console.warn("Anserin core: " + coreBuildErrors.text.trim() + " (sounds use pw-play)");
-                return;
-            }
-            // the module is built outside the config folder (Quickshell would not find its plugin there)
-            const module = Caching.anserinDir + "/../.lab-data/core-build/module";
-            try {
-                root.core = Qt.createQmlObject('import "file://' + module + '" as Core; Core.SfxEngine {}', root, "AnserinCore");
-            } catch (e) {
-                console.warn("Anserin core: " + e + " (sounds use pw-play)");
-            }
+    // made once CoreTools has built Anserin core (by path: Quickshell would not find the plugin in the config folder)
+    function makeCore() {
+        if (root.core || !CoreTools.core) return;
+        try {
+            root.core = Qt.createQmlObject('import "file://' + CoreTools.moduleDir + '" as Core; Core.SfxEngine {}', root, "AnserinCore");
+        } catch (e) {
+            console.warn("Anserin core: " + e + " (sounds use pw-play)");
         }
     }
+    Connections { target: CoreTools; function onCoreChanged() { root.makeCore(); } }
+    Component.onCompleted: makeCore()
     Component.onDestruction: if (root.core) root.core.destroy()
 
     Connections {

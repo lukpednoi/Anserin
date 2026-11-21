@@ -3,12 +3,14 @@ if [[ "${1:-}" == "--verbose" ]]; then
     VERBOSE=1
 fi
 
-# serpantinum-core installed: one answer for Hyprland, Sway, Niri and Mango (name, or name|WxH|refresh with --verbose)
-if command -v serpantinum-core &>/dev/null && command -v jq &>/dev/null; then
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/caching.sh" 2>/dev/null || true
+# Anserin core built: one answer from Hyprland's socket (name, or name|WxH|refresh with --verbose); other
+# compositors, or no core, use the ways below
+if [[ -x "${ANSERIN_CORE:-}" ]] && command -v jq &>/dev/null; then
     if [ "$VERBOSE" -eq 1 ]; then
-        out=$(serpantinum-core monitors 2>/dev/null | jq -r '.[] | "\(.name)|\(.width)x\(.height)|\(.refreshRate * 100 | round / 100)"' 2>/dev/null)
+        out=$("$ANSERIN_CORE" monitors 2>/dev/null | jq -r '.[] | "\(.name)|\(.width)x\(.height)|\(.refreshRate * 100 | round / 100)"' 2>/dev/null)
     else
-        out=$(serpantinum-core monitors 2>/dev/null | jq -r '.[].name' 2>/dev/null)
+        out=$("$ANSERIN_CORE" monitors 2>/dev/null | jq -r '.[].name' 2>/dev/null)
     fi
     if [ -n "$out" ]; then
         echo "$out"

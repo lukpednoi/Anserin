@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Night light through serpantinum-gamma, adapted from Serpantinum's gamma.sh. blue_light_filter.sh hands over here when
-# serpantinum-gamma is installed, after stopping the wl-gammarelay-rs it started itself (by its own PID file).
+# Night light through Anserin core's gamma daemon (anserin-core gamma). blue_light_filter.sh hands over here when
+# the core is built, after stopping the wl-gammarelay-rs it started itself (by its own PID file).
+source "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/caching.sh"
 set -euo pipefail
 
 TEMP_MIN=1000
@@ -43,21 +44,21 @@ usage() {
 
 gamma() {
     if [[ "$VERBOSE" -eq 1 ]]; then
-        serpantinum-gamma "$@"
+        "$ANSERIN_CORE" gamma "$@"
     else
-        serpantinum-gamma "$@" 2>/dev/null
+        "$ANSERIN_CORE" gamma "$@" 2>/dev/null
     fi
 }
 
 gamma_installed() {
-    if ! command -v serpantinum-gamma >/dev/null 2>&1; then
-        log "serpantinum-gamma is not installed."
+    if ! [[ -x "$ANSERIN_CORE" ]]; then
+        log "the Night light daemon is not installed."
         return 1
     fi
 }
 
 gamma_running() {
-    gamma_installed 2>/dev/null && serpantinum-gamma status >/dev/null 2>&1
+    gamma_installed 2>/dev/null && "$ANSERIN_CORE" gamma status >/dev/null 2>&1
 }
 
 target_args() {
@@ -74,16 +75,16 @@ gamma_start() {
 
     # a wl-gammarelay-rs not started by Anserin is left alone (never signalled by name)
     if pgrep -f "$GAMMARELAY_PATTERN" >/dev/null 2>&1; then
-        log "wl-gammarelay-rs still holds the gamma control; serpantinum-gamma may not take effect."
+        log "wl-gammarelay-rs still holds the gamma control; the Night light daemon may not take effect."
     fi
 
-    log "Starting serpantinum-gamma."
+    log "Starting the Night light daemon."
     gamma start
 }
 
 gamma_stop() {
-    command -v serpantinum-gamma >/dev/null 2>&1 || return 0
-    log "Stopping serpantinum-gamma."
+    [[ -x "$ANSERIN_CORE" ]] || return 0
+    log "Stopping the Night light daemon."
     gamma quit
 }
 

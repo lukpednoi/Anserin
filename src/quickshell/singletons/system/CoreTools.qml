@@ -2,28 +2,30 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../../"
 
-// The helper programs from Serpantinum that Anserin uses when they are installed: serpantinum-core (system usage,
-// brightness, monitors, wallpaper index, network) and serpantinum-gamma (Night light). Each user keeps its own
-// fallback (the shell scripts and tools it used before), so a missing helper only means the older path.
+// Anserin core (src/quickshell/native/core): built by scripts/build-core.py when the shell starts, only when its
+// source or Qt changed, into .lab-data/core-build (outside the config folder, where Quickshell finds a C++
+// plugin). It gives the sound engine (module/, used by Sounds) and anserin-core (bin/: system usage,
+// monitors, lock keys, backlight, Night light). Until it is ready, or when it cannot be built, every user keeps
+// its own older way (pw-play, the shell scripts).
 Item {
     id: root
     property bool ready: false
     property bool core: false
-    property bool gamma: false
-    readonly property string coreBin: "serpantinum-core"
-    readonly property string gammaBin: "serpantinum-gamma"
+    readonly property bool gamma: core
+    readonly property string buildDir: Caching.anserinDir + "/../.lab-data/core-build"
+    readonly property string coreBin: buildDir + "/bin/anserin-core"
+    readonly property string moduleDir: buildDir + "/module"
 
     Process {
-        running: true
-        command: ["sh", "-c", "command -v serpantinum-core >/dev/null 2>&1 && echo core; command -v serpantinum-gamma >/dev/null 2>&1 && echo gamma; true"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const found = text.split("\n").map(s => s.trim());
-                root.core = found.indexOf("core") >= 0;
-                root.gamma = found.indexOf("gamma") >= 0;
-                root.ready = true;
-            }
+        running: Caching.anserinDir !== ""
+        command: ["python3", Caching.anserinDir + "/scripts/build-core.py"]
+        stderr: StdioCollector { id: buildErrors }
+        onExited: code => {
+            root.core = code === 0;
+            root.ready = true;
+            if (code !== 0) console.warn("Anserin core: " + buildErrors.text.trim() + " (using the older ways)");
         }
     }
 }
