@@ -57,6 +57,7 @@ singleton Config 1.0 singletons/system/Config.qml
 singleton AnserinMode 1.0 singletons/system/AnserinMode.qml
 singleton ConfigProfiles 1.0 singletons/system/ConfigProfiles.qml
 singleton TerminalAppearance 1.0 singletons/system/TerminalAppearance.qml
+singleton ClaudePanel 1.0 singletons/system/ClaudePanel.qml
 singleton CurrentFocus 1.0 singletons/system/CurrentFocus.qml
 singleton DateTime 1.0 singletons/system/DateTime.qml
 singleton FirstLaunch 1.0 singletons/system/FirstLaunch.qml

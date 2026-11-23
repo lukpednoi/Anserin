@@ -152,6 +152,12 @@ PanelWindow {
         Quickshell.execDetached(["bash", dir + "/scripts/reload.sh"]);
     }
 
+    function openClaude() {
+        const target = desktopMenuWindow.screen;
+        DesktopMenuController.hide();
+        ClaudePanel.open(target);
+    }
+
     function lockScreen() {
         DesktopMenuController.hide();
         let dir = (typeof Caching !== "undefined" && Caching.anserinDir) ? Caching.anserinDir : "";
@@ -272,6 +278,21 @@ PanelWindow {
                             onClicked: {
                                 desktopMenuWindow.openRedactor();
                             }
+                        }
+
+                        ClickButton {
+                            width: parent.width
+                            height: desktopMenuWindow.s(29)
+                            cornerRadius: desktopMenuWindow.s(8)
+                            contentAlignment: Qt.AlignLeft
+                            horizontalPadding: desktopMenuWindow.s(10)
+                            iconPath: ClaudePanel.iconPath
+                            iconFontSize: desktopMenuWindow.s(15)
+                            textFontSize: desktopMenuWindow.s(12)
+                            buttonText: "Claude Code"
+                            accentColor: desktopMenuWindow.buttonColor
+                            textColor: ThemeBackend.text
+                            onClicked: desktopMenuWindow.openClaude()
                         }
 
                         ClickButton {

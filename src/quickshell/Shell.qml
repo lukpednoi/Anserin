@@ -3,6 +3,7 @@ import Quickshell
 import "widgets"
 import "lock/redactor"
 import "anserin"
+import "claude"
 
 ShellRoot {
     readonly property bool performanceMode: !!(Config.getSetting("general", {}).performance)
@@ -69,6 +70,15 @@ ShellRoot {
     }
 
     Polkit {}
+    // Claude Panel (right-click menu / SUPER + C): made only while open or folded into its corner dome
+    Loader {
+        active: ClaudePanel.shown
+        sourceComponent: ClaudeWelcomeOverlay {
+            targetScreen: ClaudePanel.screen
+            controller: ClaudePanel
+            onFinished: ClaudePanel.closed()
+        }
+    }
     PopoutManager {}
 
     Loader {
