@@ -68,6 +68,7 @@ Scope {
                 readonly property var targetScreen: Quickshell.screens.find(s => s.name === win.monitorName) || (Quickshell.screens.length > 0 ? Quickshell.screens[0] : null)
                 readonly property string safeMonitorName: (win.monitorName || "default").replace(/[^a-zA-Z0-9_-]/g, "_")
                 readonly property var lockSettings: Config.getSetting("lockscreen", {})
+                readonly property bool simpleStyle: lockSettings.style === "simple"
                 readonly property string customBackgroundPath: lockSettings.customBackground ? String(lockSettings.customBackground) : ""
                 readonly property bool customBackgroundActive: lockSettings.backgroundMode === "custom" && customBackgroundPath !== ""
                 readonly property string desktopWallpaperPath: {
@@ -119,14 +120,15 @@ Scope {
                 property bool gridScreen: false
                 property bool gridPanel: true
 
-                readonly property Item activeScene: win.page === 0 ? screenScene : panelStage.scene
-                readonly property bool gridOn: win.page === 0 ? win.gridScreen : win.gridPanel
+                readonly property Item activeScene: (win.simpleStyle || win.page === 0) ? screenScene : panelStage.scene
+                readonly property bool gridOn: (win.simpleStyle || win.page === 0) ? win.gridScreen : win.gridPanel
                 readonly property var selProxy: win.activeScene.selectedProxy
                 readonly property Item chromeTarget: win.selProxy
 
                 Behavior on pageProgress { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
 
                 function go(delta) {
+                    if (win.simpleStyle) return;
                     win.page = Math.max(0, Math.min(1, win.page + delta));
                 }
 
@@ -186,11 +188,13 @@ Scope {
 
                 Shortcut {
                     sequence: "Left"
+                    enabled: !win.simpleStyle
                     onActivated: win.go(-1)
                 }
 
                 Shortcut {
                     sequence: "Right"
+                    enabled: !win.simpleStyle
                     onActivated: win.go(1)
                 }
 
@@ -275,19 +279,20 @@ Scope {
 
                         LockStageFrame {
                             id: panelFrame
+                            visible: !win.simpleStyle
                             readonly property real distance: Math.abs(1 - win.pageProgress)
                             screenW: win.screenW
                             screenH: win.screenH
                             k: ui.k
-                            current: win.page === 1
-                            contentActive: current || distance < 0.999
+                            current: !win.simpleStyle && win.page === 1
+                            contentActive: !win.simpleStyle && (current || distance < 0.999)
                             wallpaper: win.wallpaperSource
                             videoPath: win.videoPath
                             x: pager.width / 2 + (1 - win.pageProgress) * (width + ui.frameGap) - width / 2
                             y: (pager.height - height) / 2
                             opacity: Math.max(0.3, 1 - distance * 0.7)
                             scale: 1 - 0.1 * Math.min(1, distance)
-                            onActivated: win.page = 1
+                            onActivated: if (!win.simpleStyle) win.page = 1
 
                             LockPanelStage {
                                 id: panelStage
@@ -295,13 +300,14 @@ Scope {
                                 width: win.screenW
                                 height: win.screenH
                                 k: ui.k
-                                active: win.page === 1
+                                active: !win.simpleStyle && win.page === 1
                                 gridEnabled: win.gridPanel
                                 Component.onCompleted: scene.imagePickRequested.connect((itemId, currentPath, rounded) => win.openImagePicker(itemId, currentPath, rounded))
                             }
                         }
 
                         IconButton {
+                            visible: !win.simpleStyle
                             anchors.left: parent.left
                             anchors.leftMargin: Scaler.s(32)
                             anchors.verticalCenter: parent.verticalCenter
@@ -312,12 +318,13 @@ Scope {
                             accentColor: ThemeBackend.surface0
                             textColor: ThemeBackend.text
                             opacity: win.page > 0 ? 1.0 : 0.0
-                            enabled: win.page > 0
+                            enabled: !win.simpleStyle && win.page > 0
                             Behavior on opacity { NumberAnimation { duration: 150 } }
                             onClicked: win.go(-1)
                         }
 
                         IconButton {
+                            visible: !win.simpleStyle
                             anchors.right: parent.right
                             anchors.rightMargin: Scaler.s(32)
                             anchors.verticalCenter: parent.verticalCenter
@@ -328,7 +335,7 @@ Scope {
                             accentColor: ThemeBackend.surface0
                             textColor: ThemeBackend.text
                             opacity: win.page < 1 ? 1.0 : 0.0
-                            enabled: win.page < 1
+                            enabled: !win.simpleStyle && win.page < 1
                             Behavior on opacity { NumberAnimation { duration: 150 } }
                             onClicked: win.go(1)
                         }

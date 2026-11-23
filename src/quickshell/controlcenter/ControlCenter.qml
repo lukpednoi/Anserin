@@ -10,7 +10,7 @@ import "../"
 import "../reusables"
 import "../bar"
 import "."
-import "./board" as Board
+import "./smart" as Smart
 
 // Control Center: right-edge panel opened by hovering the middle of the right screen edge.
 // Independent of the bar; same size as the System panel. Overview = sliders, quick toggles and notifications, Control = settings.
@@ -151,7 +151,9 @@ Item {
         target: Wallpaper
         function onLockPickInlineChanged() { if (!Wallpaper.lockPickInline && root.visible) root.waitForPointer = true; }
     }
-    readonly property bool holdOpen: isDraggingVol || isDraggingBri || Wallpaper.lockPickInline || waitForPointer
+    readonly property bool shortcutListening: root.visible && Boolean(controlLoader.item && controlLoader.item.shortcutListening)
+    onShortcutListeningChanged: if (typeof masterWindow !== "undefined" && masterWindow && masterWindow.shortcutListening !== undefined) masterWindow.shortcutListening = shortcutListening
+    readonly property bool holdOpen: isDraggingVol || isDraggingBri || Wallpaper.lockPickInline || waitForPointer || shortcutListening || (typeof masterWindow !== "undefined" && masterWindow.openModalCount > 0)
 
     function popupOpen() {
         const ov = Overlay.overlay;
@@ -900,12 +902,13 @@ Item {
                     visible: root.page === "control"
                     opacity: root.pageFade
 
-                    // Settings live only while the Control tab is open: the dial and board cards (board/)
+                    // Settings live only while the Control tab is open
                     Loader {
                         id: controlLoader
                         anchors.fill: parent
+                        asynchronous: true
                         active: root.visible && root.page === "control"
-                        sourceComponent: boardControl
+                        sourceComponent: smartControl
                         function showRequested() {
                             if (!item || root.requestedSettings === "") return;
                             item.gotoKey(root.requestedSettings);
@@ -914,9 +917,10 @@ Item {
                         onLoaded: showRequested()
                         Connections { target: root; function onRequestedSettingsChanged() { controlLoader.showRequested(); } }
                     }
+                    // the Smart Home Control (smart/SmartControl.qml: Antigravity's approved design on the real settings)
                     Component {
-                        id: boardControl
-                        Board.BoardSettings {
+                        id: smartControl
+                        Smart.SmartControl {
                             active: root.visible && root.page === "control"
                             onCloseRequested: closeSequence.start()
                         }

@@ -26,7 +26,7 @@ PanelWindow {
     Shortcut {
         sequence: "Escape"
         context: Qt.WindowShortcut
-        enabled: masterWindow.isVisible && !masterWindow.isClosing
+        enabled: masterWindow.isVisible && !masterWindow.isClosing && masterWindow.openModalCount === 0 && !masterWindow.shortcutListening
         // Esc closes the lock screen's Select first (lockPicker), the Control Center under it stays
         onActivated: { if (lockPicker.active) Wallpaper.closeLockPicker(); else switchWidget("hidden", ""); }
     }
@@ -228,7 +228,9 @@ PanelWindow {
     visible: isVisible
 
     readonly property Item popupOverlay: contentItem ? contentItem.Overlay.overlay : null
-    readonly property bool needsPopupInput: lockPicker.active
+    property int openModalCount: 0
+    property bool shortcutListening: false
+    readonly property bool needsPopupInput: lockPicker.active || openModalCount > 0
 
     mask: Region {
         item: masterWindow.needsPopupInput ? masterWindow.contentItem : (masterWindow.isCurrentDraggable ? animContainer : topBarHole)
@@ -329,7 +331,7 @@ PanelWindow {
 
     MouseArea {
         anchors.fill: parent
-        enabled: masterWindow.isVisible && !masterWindow.isCurrentDraggable && !masterWindow.isClosing
+        enabled: masterWindow.isVisible && !masterWindow.isCurrentDraggable && !masterWindow.isClosing && masterWindow.openModalCount === 0
         onClicked: switchWidget("hidden", "")
     }
 
@@ -394,19 +396,53 @@ PanelWindow {
         if (item) {
             item.visible = false;
             widgetCache[name] = item;
+            builtWidgets = Object.keys(widgetCache).length;
+            if (name === "wallpaper") pristineWallpaper = true;
         }
         return item;
+    }
+
+    // A panel is built on its first open and kept while it is in use, so reopening it soon is instant. Once every panel
+    // has been closed for a while they are all let go, giving back their pictures, textures and objects; the next open
+    // builds the panel again (the compiled component stays cached). The wallpaper picker is built again right away,
+    // hidden, as at start: unshown it holds almost nothing and its first open stays instant.
+    property int builtWidgets: 0
+    property bool pristineWallpaper: false
+    function releaseHiddenWidgets() {
+        if (masterWindow.currentActive !== "hidden" || masterWindow.targetActive !== "hidden" || masterWindow.isClosing
+            || masterWindow.isVisible) return;
+        let names = Object.keys(widgetCache);
+        widgetStack.clear(StackView.Immediate);
+        for (let name of names) {
+            let it = widgetCache[name];
+            delete widgetCache[name];
+            if (it) it.destroy();
+        }
+        builtWidgets = 0;
+        Qt.callLater(function() {
+            gc();
+            masterWindow.preloadWallpaper();
+        });
+    }
+    function preloadWallpaper() {
+        if (masterWindow.currentActive !== "hidden") return;
+        let w = masterWindow.getLayout("wallpaper");
+        if (w) masterWindow.ensureWidgetItem("wallpaper", w);
+    }
+
+    Timer {
+        // a picker that was only preloaded, never shown, is left alone
+        interval: 30000
+        running: masterWindow.currentActive === "hidden" && masterWindow.targetActive === "hidden" && !masterWindow.isVisible
+            && !masterWindow.isClosing
+            && masterWindow.builtWidgets > 0 && !(masterWindow.builtWidgets === 1 && masterWindow.pristineWallpaper)
+        onTriggered: masterWindow.releaseHiddenWidgets()
     }
 
     Component.onCompleted: {
         applyConfigSettings();
         reportWidgetState();
-        Qt.callLater(function() {
-            if (masterWindow.currentActive === "hidden") {
-                let w = masterWindow.getLayout("wallpaper");
-                if (w) masterWindow.ensureWidgetItem("wallpaper", w);
-            }
-        });
+        Qt.callLater(masterWindow.preloadWallpaper);
     }
 
     Component.onDestruction: {
@@ -763,6 +799,9 @@ PanelWindow {
                 return;
             }
         }
+        // A close asked for while one is already playing (Esc then a click outside, or the panel's own auto-hide) lets that
+        // one finish: starting over would drop its callback and leave the window stuck closing, never hidden.
+        if (newWidget === "hidden" && masterWindow.isClosing) return;
         if (newWidget !== "hidden") {
             masterWindow.popupScreenName = masterWindow.barRequestScreen;
             // Panels opened from a screen edge are independent of the bar: they must not reveal an auto-hidden bar.
@@ -859,6 +898,7 @@ PanelWindow {
 
         masterWindow.currentActive = newWidget;
         masterWindow.activeArg = arg;
+        if (newWidget === "wallpaper") masterWindow.pristineWallpaper = false;
 
         let finalW = (typeof cachedItem.targetMasterWidth === "number" && cachedItem.targetMasterWidth >= 50) ? cachedItem.targetMasterWidth : t.w;
         let finalH = (typeof cachedItem.targetMasterHeight === "number" && cachedItem.targetMasterHeight >= 50) ? cachedItem.targetMasterHeight : t.h;
