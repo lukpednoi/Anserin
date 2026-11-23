@@ -29,7 +29,6 @@ var tabs = [
         { id: "Apps", key: "apps", name: "Apps", icon: "󰵆", file: "", iconOffsetX: 0 },
         { id: "Terminal", key: "terminal", name: "Terminal", icon: "󰆍", file: "", iconOffsetX: 0 },
         { id: "Alerts", key: "alerts", name: "Alerts", icon: "󰂚", file: "", iconOffsetX: 0 },
-        { id: "Wellbeing", key: "wellbeing", name: "Wellbeing", icon: "󰄉", file: "wellbeing/DigitalWellbeingTab.qml", iconOffsetX: 0 },        
         { id: "Idle", key: "idle", name: "Idle", icon: "󰒲", file: "", iconOffsetX: 0 },
         { id: "Update", key: "update", name: "Update", icon: "󰚰", file: "UpdateTab.qml", iconOffsetX: 0 }
     ];

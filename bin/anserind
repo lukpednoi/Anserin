@@ -100,8 +100,7 @@ case "$COMMAND" in
             exit 0
         }
         trap cleanup EXIT INT TERM HUP
-        bash "$ANSERIN_DIR/quickshell/guide/wellbeing/launch_daemon.sh" 9>&- &
-        mo_pid_write "$QS_RUN_DIR/focus-daemon.pid" "$!"
+        # Wellbeing (its focus daemon) is gone; cleanup still stops one an older version started
         quickshell -p "$MAIN_QML" 9>&- &
         qs_pid=$!
         mo_pid_write "$QS_RUN_DIR/quickshell.pid" "$qs_pid"

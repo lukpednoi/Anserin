@@ -214,9 +214,27 @@ Item {
     property string launcherPosition: (rawLauncherSettings && rawLauncherSettings.position !== undefined) ? rawLauncherSettings.position : "center"
     property real customWidth: (rawLauncherSettings && rawLauncherSettings.width !== undefined && !isNaN(rawLauncherSettings.width) && rawLauncherSettings.width > 0) ? rawLauncherSettings.width : 755
     property int customItemCount: (rawLauncherSettings && rawLauncherSettings.itemCount !== undefined && !isNaN(rawLauncherSettings.itemCount) && rawLauncherSettings.itemCount > 0) ? rawLauncherSettings.itemCount : 6
-    property string terminalCommand: (rawLauncherSettings && rawLauncherSettings.terminalCommand !== undefined) ? rawLauncherSettings.terminalCommand : "kitty -e"
+    // The terminal for commands is found by itself (Control has no setting for it): $TERMINAL when it is installed,
+    // else the first installed of the common ones, each with its own "run this" flag.
+    property string terminalCommand: "kitty -e"
+    Process {
+        id: terminalFinder
+        running: true
+        command: ["sh", "-c", 'if [ -n "$TERMINAL" ] && command -v "${TERMINAL%% *}" >/dev/null 2>&1; then echo "env $TERMINAL"; exit; fi; '
+                  + 'for t in kitty foot alacritty wezterm ghostty konsole gnome-terminal xterm; do command -v "$t" >/dev/null 2>&1 && { echo "$t"; exit; }; done']
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const found = text.trim();
+                const flags = { kitty: "kitty -e", foot: "foot", alacritty: "alacritty -e", wezterm: "wezterm start --",
+                                ghostty: "ghostty -e", konsole: "konsole -e", "gnome-terminal": "gnome-terminal --", xterm: "xterm -e" };
+                if (found.indexOf("env ") === 0) root.terminalCommand = found.substring(4) + " -e";
+                else if (flags[found]) root.terminalCommand = flags[found];
+            }
+        }
+    }
     property string searchProvider: (rawLauncherSettings && rawLauncherSettings.searchProvider !== undefined) ? rawLauncherSettings.searchProvider : SearchProviders.DEFAULT_ID
-    property bool smartRanking: (rawLauncherSettings && rawLauncherSettings.smartRanking !== undefined) ? rawLauncherSettings.smartRanking : true
+    // Smart Rank by usage is always on (no setting any more)
+    readonly property bool smartRanking: true
 
     onSmartRankingChanged: {
         if (root.active) {
