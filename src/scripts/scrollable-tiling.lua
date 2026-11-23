@@ -46,7 +46,7 @@ return function(options)
                     page.native = page.native == true
                     Layout.validate(page.tree)
                 end
-                assert(state.focus == nil or type(state.focus) == "number", "Invalid scroll focus")
+                assert(state.focus == nil or type(state.focus) == "number" or type(state.focus) == "string", "Invalid scroll focus")
             end
             saved = old
         end

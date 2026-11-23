@@ -35,7 +35,7 @@ function layout.validate(node, seen, ids)
     assert(type(node) == "table" and not seen[node], "Invalid saved layout tree")
     seen[node] = true
     if node.id then
-        assert(finite(node.id) and node.id > 0 and not ids[node.id], "Invalid saved layout window")
+        assert(((finite(node.id) and node.id > 0) or (type(node.id) == "string" and node.id ~= "")) and not ids[node.id], "Invalid saved layout window")
         ids[node.id] = true
     else
         assert((node.axis == 1 or node.axis == 2) and finite(node.ratio) and node.ratio >= .1 and node.ratio <= 1.9

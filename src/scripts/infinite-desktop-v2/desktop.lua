@@ -45,7 +45,7 @@ return function(options)
             else legacy_zoom = saved.base_zoom end
         end
         for id, record in pairs(originals) do
-            assert(type(id) == "number" and type(record) == "table" and type(record.floating) == "boolean", "Invalid recovery record")
+            assert((type(id) == "number" or type(id) == "string") and type(record) == "table" and type(record.floating) == "boolean", "Invalid recovery record")
             for _, key in ipairs({"x", "y", "w", "h", "workspace", "monitor"}) do
                 assert(type(record[key]) == "number" and math.abs(record[key]) < math.huge, "Invalid recovery position")
             end
