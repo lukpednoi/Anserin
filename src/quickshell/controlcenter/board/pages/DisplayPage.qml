@@ -7,7 +7,7 @@ import ".."
 
 // Display → General as a board. It runs the Settings page's own logic (guide/display/DisplayLogic.qml): the
 // monitors: for every monitor its power (with more than one), night light, schedule
-// and warmth (BlueLight) and its UI scale (the compositor, a second after the last move), and the desktop
+// and warmth (BlueLight) and its UI scale (shown read-only from the compositor), and the desktop
 // widgets (WidgetsLogic: the redactor, each screen's presets as the real preview cards, its widgets).
 BoardPage {
     id: page
@@ -30,17 +30,14 @@ BoardPage {
             readonly property bool filterOn: ms.enabled !== undefined ? ms.enabled : false
             readonly property bool filterAuto: ms.auto !== undefined ? ms.auto : false
             property real dragTemp: NaN
-            readonly property var dims: modelData.dimensions ? modelData.dimensions.split("x") : ["1920", "1080"]
-            readonly property var scales: logic.validScalesForResolution(parseInt(dims[0]) || 1920, parseInt(dims[1]) || 1080)
-            property real shownScale: modelData.scale !== undefined ? modelData.scale : 1.0
-            readonly property int scaleIndex: {
-                const i = scales.indexOf(shownScale);
-                if (i >= 0) return i;
-                const n = scales.indexOf(logic.nearestValidScaleFromList(scales, shownScale));
-                return n >= 0 ? n : 0;
+            // UI Scale is only shown: each screen keeps the scale set for it in the compositor (Anserin never changes it)
+            readonly property string scaleInfo: {
+                const sc = modelData.scale !== undefined ? modelData.scale : 1.0;
+                const dims = modelData.dimensions ? modelData.dimensions.split("x") : [];
+                const w = parseInt(dims[0]) || 0, h = parseInt(dims[1]) || 0;
+                const text = sc.toFixed(3).replace(/0+$/, '').replace(/\.$/, '.0') + "×";
+                return w > 0 && h > 0 ? text + "  ·  " + Math.round(w / sc) + "×" + Math.round(h / sc) : text;
             }
-            onModelDataChanged: if (logic.pendingMonScaleName !== name) shownScale = modelData.scale !== undefined ? modelData.scale : 1.0
-            function scaleText(s) { return s.toFixed(3).replace(/0+$/, '').replace(/\.$/, '.0') + "×"; }
 
             title: name + "  ·  " + modelData.dimensions + " • " + modelData.framerate + "Hz"; icon: "󰍹"; accent: page.accent
             BoardCell {
@@ -74,15 +71,8 @@ BoardPage {
                 onReleased: { logic.flushMonitorSetting(mon.name); mon.dragTemp = NaN; }
             }
             BoardCell {
-                kind: "slider"; icon: "󰍍"; title: I18n.t("guide.display.uiscale.title")
-                from: 0; to: Math.max(0, mon.scales.length - 1); step: 1
-                value: mon.scaleIndex
-                valueText: (logic.scaleDebounceTimer.running && logic.pendingMonScaleName === mon.name ? "… " : "") + mon.scaleText(mon.shownScale)
-                onMoving: (v) => {
-                    const s = mon.scales[Math.round(v)] !== undefined ? mon.scales[Math.round(v)] : 1.0;
-                    if (mon.shownScale !== s) { mon.shownScale = s; logic.scaleMoved(mon.name, s); }
-                }
-                onReleased: logic.scaleReleased()
+                kind: "info"; icon: "󰍍"; title: I18n.t("guide.display.uiscale.title")
+                info: mon.scaleInfo
             }
         }
     }
