@@ -87,7 +87,7 @@ Where everything comes from, and what was changed: **[CREDITS.md](CREDITS.md)**
 
 <sub>Forked from <a href="https://github.com/ilyamiro/serpantinum"><b>ilyamiro/serpantinum</b></a> by <a href="https://github.com/ilyamiro">ilyamiro</a>. Thank you for building it and keeping it open.</sub>
 
-## Made by
+## My Team
 
 <p>
   <a href="https://github.com/lukpednoi"><img src="docs/made-by/lukpednoi.png" width="72" align="left" hspace="10" alt="lukpednoi" /></a>
