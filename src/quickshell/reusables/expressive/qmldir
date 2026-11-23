@@ -1,0 +1,12 @@
+singleton ExMotion 1.0 ExMotion.qml
+ExSpring 1.0 ExSpring.qml
+ExStateLayer 1.0 ExStateLayer.qml
+ExBump 1.0 ExBump.qml
+ExShape 1.0 ExShape.qml
+ExButton 1.0 ExButton.qml
+ExButtonGroup 1.0 ExButtonGroup.qml
+ExSwitch 1.0 ExSwitch.qml
+ExSlider 1.0 ExSlider.qml
+ExRing 1.0 ExRing.qml
+ExSegmented 1.0 ExSegmented.qml
+ExCard 1.0 ExCard.qml

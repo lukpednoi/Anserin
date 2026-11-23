@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
+import QtQuick.Shapes
 import Quickshell.Io
 import "../"
 
@@ -175,20 +176,45 @@ Item {
                 Repeater {
                     model: Array.from(parent.fullText)
                     Text {
+                        id: charItem
                         required property string modelData
                         required property int index
+                        readonly property bool isMain: index < titleRow.mainTitle.length
+                        readonly property bool isStarI: isMain && modelData === "i"
 
-                        text: modelData === " " ? "\u00A0" : modelData
+                        text: isStarI ? "\u0131" : (modelData === " " ? "\u00A0" : modelData)
                         font.family: ThemeBackend.fontFamily
-                        font.weight: index < titleRow.mainTitle.length ? Font.Black : Font.Bold
-                        font.pixelSize: index < titleRow.mainTitle.length ? rootObj.s(welcomeTabRoot.sideways ? 32 : 24) : rootObj.s(12)
-                        color: index < titleRow.mainTitle.length ? ThemeBackend.text : ThemeBackend.subtext0
+                        font.weight: isMain ? Font.Black : Font.Bold
+                        font.pixelSize: isMain ? rootObj.s(welcomeTabRoot.sideways ? 32 : 24) : rootObj.s(12)
+                        color: isMain ? ThemeBackend.text : ThemeBackend.subtext0
 
                         anchors.bottom: parent.bottom
-                        anchors.bottomMargin: index < titleRow.mainTitle.length ? 0 : rootObj.s(4)
+                        anchors.bottomMargin: isMain ? 0 : rootObj.s(4)
 
                         transform: Translate {
                             y: Math.sin(welcomeTabRoot.titleWavePhase - index * 0.35) * rootObj.s(2.5)
+                        }
+
+                        Shape {
+                            id: iStar
+                            visible: charItem.isStarI
+                            readonly property real sz: rootObj.s(welcomeTabRoot.sideways ? 12 : 9)
+                            width: sz
+                            height: sz
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: rootObj.s(welcomeTabRoot.sideways ? 2.5 : 2)
+                            preferredRendererType: Shape.CurveRenderer
+
+                            ShapePath {
+                                strokeWidth: 0
+                                strokeColor: "transparent"
+                                fillColor: welcomeTabRoot.accent
+                                startX: iStar.sz * 0.5; startY: 0
+                                PathQuad { x: iStar.sz; y: iStar.sz * 0.5; controlX: iStar.sz * 0.56; controlY: iStar.sz * 0.44 }
+                                PathQuad { x: iStar.sz * 0.5; y: iStar.sz; controlX: iStar.sz * 0.56; controlY: iStar.sz * 0.56 }
+                                PathQuad { x: 0; y: iStar.sz * 0.5; controlX: iStar.sz * 0.44; controlY: iStar.sz * 0.56 }
+                                PathQuad { x: iStar.sz * 0.5; y: 0; controlX: iStar.sz * 0.44; controlY: iStar.sz * 0.44 }
+                            }
                         }
                     }
                 }
