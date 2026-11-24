@@ -14,6 +14,7 @@ import "."
 import "pages" as Pages
 import "smartweather" as SmartWeather
 import "../reusables"
+import "../controlcenter/smart" as Smart
 
 // Panel on the left screen edge, joined to the screen frame like the Control Center. Opened by hovering the
 // middle of that edge, and hides again when the pointer leaves, using the Control Center's auto-hide settings.
@@ -29,6 +30,25 @@ Item {
     enabled: visible
 
     function s(v) { return Scaler.s(v); }
+
+    // Style B (Kinetic Light-Rail) palette + spring trackers
+    readonly property bool darkMode: (0.2126 * ThemeBackend.base.r + 0.7152 * ThemeBackend.base.g + 0.0722 * ThemeBackend.base.b) < 0.5
+    readonly property color cAccent: ThemeBackend.mauve
+    readonly property color cAccent2: ThemeBackend.peach
+    readonly property color cOnAccent: {
+        const lum = 0.2126 * cAccent.r + 0.7152 * cAccent.g + 0.0722 * cAccent.b;
+        return lum > 0.52 ? "#0b0e14" : "#ffffff";
+    }
+    Smart.SpringVal { id: railPulse; target: 0.0; stiffness: 180; damping: 0.55; eps: 0.005 }
+    readonly property real activeRailTargetY: {
+        if (root.fileMode) {
+            if (activePlaceHighlight.slot) return placeColumn.y + activePlaceHighlight.slot.y + activePlaceHighlight.slot.height * 0.5;
+            return placeColumn.y + root.s(22);
+        }
+        if (activeModuleHighlight.slot) return moduleColumn.y + activeModuleHighlight.slot.y + activeModuleHighlight.slot.height * 0.5;
+        return moduleColumn.y + root.s(22);
+    }
+    Smart.SpringVal { id: railY; target: root.activeRailTargetY; stiffness: 380; damping: 0.58; eps: 0.3 }
 
     readonly property var settings: Config.getSetting("controlcenter", null)
     readonly property bool autoHideEnabled: !settings || settings.autohide !== false
@@ -94,6 +114,8 @@ Item {
     function toggleFile() {
         if (!visible) return;
         fileMode = !fileMode;
+        cornerShape.change();
+        railPulse.snapAndGo(1.0, 0.0);
         fileSlide.stop();
         fileSlide.to = fileMode ? 1 : 0;
         fileSlide.restart();
@@ -217,8 +239,9 @@ Item {
         next = Math.max(0, Math.min(pageCount - 1, next));
         if (next === page) return;
         page = next;
-        if (!quiet) Sounds.playSfx("reusables/switch/sfx.wav");
+        if (!quiet) Sounds.playSfx("reusables/iconbutton/click.wav");
         cornerShape.change();
+        railPulse.snapAndGo(1.0, 0.0);
         pageSlide.stop();
         pageSlide.to = next;
         pageSlide.restart();
@@ -242,6 +265,7 @@ Item {
             if (starred !== -1) { pageSlide.stop(); page = starred; pagePos = starred; }
             built = true;
             hoverSeen = panelHover.hovered;
+            Qt.callLater(() => railY.snap(root.activeRailTargetY));
             closeSequence.stop();
             if (PanelLayout.expandFromCapsule) {
                 PanelLayout.expandFromCapsule = false;
@@ -391,7 +415,7 @@ Item {
             GlassFill { id: chromeGlass; anchors.fill: parent; field: chromeField; tintColor: ThemeBackend.surface0; tintAmount: ThemeBackend.glassTint; sharp: true; frost: ThemeBackend.glassFrost; rim: 0.9; z: -1 }
 
             ShapePath {
-                fillColor: chromeGlass.active ? "transparent" : ThemeBackend.surface0
+                fillColor: chromeGlass.active ? "transparent" : (root.darkMode ? Qt.darker(ThemeBackend.surface0, 1.38) : Qt.lighter(ThemeBackend.surface0, 1.04))
                 strokeWidth: -1
                 startX: chrome.r; startY: 0
                 PathLine { x: chrome.width - chrome.r; y: 0 }
@@ -407,9 +431,9 @@ Item {
                 PathLine { x: 0; y: chrome.r }
                 PathArc { x: chrome.r; y: 0; radiusX: chrome.r; radiusY: chrome.r }
             }
-            // the sidebar part in a darker tone, so topbar and sidebar read as two zones
+            // subtle darker recessed sidebar channel (Style B)
             ShapePath {
-                fillColor: chromeGlass.active ? "transparent" : Qt.darker(ThemeBackend.surface0, 1.22)
+                fillColor: chromeGlass.active ? "transparent" : (root.darkMode ? Qt.rgba(0.0, 0.0, 0.0, 0.26) : Qt.rgba(0.0, 0.0, 0.0, 0.05))
                 strokeWidth: -1
                 startX: chrome.width - chrome.sideW; startY: chrome.topH
                 PathLine { x: chrome.width; y: chrome.topH }
@@ -419,37 +443,155 @@ Item {
                 PathArc { x: chrome.width - chrome.sideW; y: chrome.height - chrome.r; radiusX: chrome.r; radiusY: chrome.r }
                 PathLine { x: chrome.width - chrome.sideW; y: chrome.topH }
             }
+
+            // Style B (Kinetic Light-Rail): glowing inner-L fiber-optic rail tracing Topbar -> concave fillet -> active sidebar slot + crisp outer hairline rim
+            Canvas {
+                id: railCanvas
+                anchors.fill: parent
+                readonly property var _k: [
+                    root.cAccent.toString(), root.cAccent2.toString(), root.darkMode,
+                    railY.value, railPulse.value, width, height, chrome.r
+                ]
+                on_KChanged: requestPaint()
+                onPaint: {
+                    const ctx = getContext("2d");
+                    ctx.reset();
+                    if (width <= 12 || height <= 12) return;
+
+                    const w = width, h = height;
+                    const topH = chrome.topH, sideW = chrome.sideW, r = chrome.r;
+                    const sx = w - sideW;
+
+                    function traceL() {
+                        ctx.beginPath();
+                        ctx.moveTo(r, 0);
+                        ctx.lineTo(w - r, 0);
+                        ctx.arcTo(w, 0, w, r, r);
+                        ctx.lineTo(w, h - r);
+                        ctx.arcTo(w, h, w - r, h, r);
+                        ctx.lineTo(sx + r, h);
+                        ctx.arcTo(sx, h, sx, h - r, r);
+                        ctx.lineTo(sx, topH + r);
+                        ctx.arcTo(sx, topH, sx - r, topH, r);
+                        ctx.lineTo(r, topH);
+                        ctx.arcTo(0, topH, 0, topH - r, r);
+                        ctx.lineTo(0, r);
+                        ctx.arcTo(0, 0, r, 0, r);
+                        ctx.closePath();
+                    }
+
+                    const acc = root.cAccent;
+                    const acc2 = root.cAccent2;
+                    const pulse = railPulse.value;
+
+                    ctx.save();
+                    traceL();
+                    ctx.clip();
+
+                    const slotMidY = Math.max(topH + r + root.s(8), railY.value - chrome.y);
+                    const railGrad = ctx.createLinearGradient(w * 0.25, topH, sx, slotMidY + root.s(40));
+                    railGrad.addColorStop(0.0, "transparent");
+                    railGrad.addColorStop(0.45, Qt.rgba(acc2.r, acc2.g, acc2.b, 0.45 + pulse * 0.40));
+                    railGrad.addColorStop(0.85, Qt.rgba(acc.r, acc.g, acc.b, 0.92));
+                    railGrad.addColorStop(1.0, "transparent");
+
+                    // Pass 1: soft outer luminous halo
+                    ctx.beginPath();
+                    ctx.moveTo(r + root.s(40), topH - 1.5);
+                    ctx.lineTo(sx - r, topH - 1.5);
+                    ctx.arcTo(sx + 1.5, topH - 1.5, sx + 1.5, topH + r, r + 1.5);
+                    ctx.lineTo(sx + 1.5, Math.min(h - r, slotMidY + root.s(42)));
+                    ctx.lineWidth = root.s(7);
+                    ctx.lineCap = "round";
+                    ctx.strokeStyle = Qt.rgba(acc.r, acc.g, acc.b, 0.18 + pulse * 0.22);
+                    ctx.stroke();
+
+                    // Pass 2: crisp inner fiber-optic gradient beam
+                    ctx.beginPath();
+                    ctx.moveTo(r + root.s(60), topH - 1.5);
+                    ctx.lineTo(sx - r, topH - 1.5);
+                    ctx.arcTo(sx + 1.5, topH - 1.5, sx + 1.5, topH + r, r + 1.5);
+                    ctx.lineTo(sx + 1.5, Math.min(h - r, slotMidY + root.s(34)));
+                    ctx.lineWidth = root.s(2.4);
+                    ctx.strokeStyle = railGrad;
+                    ctx.stroke();
+
+                    ctx.restore();
+
+                    // Crisp outer L-shape hairline rim
+                    traceL();
+                    ctx.lineWidth = 1.3;
+                    ctx.strokeStyle = root.darkMode ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.10);
+                    ctx.stroke();
+                }
+            }
         }
 
-        // In the topbar's rounded corner over the sidebar, as far from the top edge as from the right edge.
-        MorphShape {
-            id: cornerShape
+        // In the topbar's rounded corner over the sidebar, with Style B halo pulse ring and clickable morph.
+        Item {
+            id: cornerHub
             opacity: root.contentShown
-            x: chrome.x + chrome.width - chrome.topH / 2 - width / 2
-            y: chrome.y + (chrome.topH - height) / 2
-            width: root.s(28)
-            height: root.s(28)
-            active: root.visible
+            x: chrome.x + chrome.width - chrome.sideW * 0.5 - width * 0.5
+            y: chrome.y + chrome.topH * 0.5 - height * 0.5
+            width: root.s(36)
+            height: root.s(36)
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: root.s(34) + railPulse.value * root.s(10)
+                height: width
+                radius: width * 0.5
+                color: "transparent"
+                border.width: 1.4
+                border.color: Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.35 + railPulse.value * 0.5)
+            }
+
+            MorphShape {
+                id: cornerShape
+                anchors.centerIn: parent
+                width: root.s(26)
+                height: root.s(26)
+                color: root.cAccent
+                color2: root.cAccent2
+                active: root.visible
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    cornerShape.change();
+                    railPulse.snapAndGo(1.0, 0.0);
+                    Sounds.playSfx("system/quick_click.wav");
+                }
+            }
         }
 
-        // Edit panel, at the left end of the topbar.
-        Rectangle {
+        // Edit panel, at the left end of the topbar (spring bounce + accent hover).
+        Item {
             id: editButton
             opacity: root.contentShown
             x: chrome.x + (chrome.topH - width) / 2
             y: chrome.y + (chrome.topH - height) / 2
             width: root.s(32); height: width
-            radius: width / 2
-            color: editMa.containsMouse ? ThemeBackend.surface1 : "transparent"
-            scale: editMa.pressed ? 0.9 : 1
-            Behavior on color { ColorAnimation { duration: 150 } }
-            Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutQuart } }
+            Smart.SpringVal { id: edSc; target: editMa.pressed ? 0.86 : (editMa.containsMouse ? 1.08 : 1.0); stiffness: 520; damping: 0.42; eps: 0.001 }
+            scale: edSc.value
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: editMa.containsMouse
+                    ? Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.18)
+                    : (root.darkMode ? Qt.rgba(1, 1, 1, 0.05) : Qt.rgba(0, 0, 0, 0.06))
+                border.width: editMa.containsMouse ? 1 : 0
+                border.color: Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.42)
+                Behavior on color { ColorAnimation { duration: 150 } }
+            }
             Text {
                 anchors.centerIn: parent
                 text: "󰏫"
                 font.family: ThemeBackend.iconFont
-                font.pixelSize: root.s(16)
-                color: editMa.containsMouse ? ThemeBackend.text : ThemeBackend.subtext0
+                font.pixelSize: root.s(15)
+                color: editMa.containsMouse ? root.cAccent : ThemeBackend.subtext0
             }
             MouseArea {
                 id: editMa
@@ -457,6 +599,7 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
+                    edSc.kick(1.2);
                     Sounds.playSfx("reusables/clickbutton/click.wav");
                     if (typeof masterWindow !== "undefined" && masterWindow.switchWidget) masterWindow.switchWidget("hidden", "");
                     PanelLayout.startEdit(root.screenName);
@@ -464,24 +607,34 @@ Item {
             }
         }
 
-        // The File page, right of the pencil (the pencil's look and feedback); open, it shows an open folder.
-        Rectangle {
+        // The File page toggle, right of the pencil: morphs circle <-> squircle with accent gradient when File mode is ON.
+        Item {
             id: folderButton
             opacity: root.contentShown
-            x: editButton.x + editButton.width + root.s(4)
+            x: editButton.x + editButton.width + root.s(6)
             y: editButton.y
             width: root.s(32); height: width
-            radius: width / 2
-            color: folderMa.containsMouse ? ThemeBackend.surface1 : "transparent"
-            scale: folderMa.pressed ? 0.9 : 1
-            Behavior on color { ColorAnimation { duration: 150 } }
-            Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutQuart } }
+            Smart.SpringVal { id: flSc; target: folderMa.pressed ? 0.86 : (folderMa.containsMouse ? 1.08 : 1.0); stiffness: 520; damping: 0.42; eps: 0.001 }
+            Smart.SpringVal { id: flGeoM; target: root.fileMode ? 1.0 : 0.0; stiffness: 420; damping: 0.44; eps: 0.002 }
+            scale: flSc.value
+            Smart.SmartGeoShape {
+                anchors.fill: parent
+                fromShape: "circle"
+                toShape: "squircle"
+                morph: flGeoM.value
+                fill: root.fileMode
+                    ? root.cAccent
+                    : (folderMa.containsMouse
+                        ? Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.18)
+                        : (root.darkMode ? Qt.rgba(1, 1, 1, 0.05) : Qt.rgba(0, 0, 0, 0.06)))
+                fill2: root.fileMode ? root.cAccent2 : "transparent"
+            }
             Text {
                 anchors.centerIn: parent
                 text: root.fileMode ? "󰝰" : "󰉋"
                 font.family: ThemeBackend.iconFont
-                font.pixelSize: root.s(16)
-                color: folderMa.containsMouse || root.fileMode ? ThemeBackend.text : ThemeBackend.subtext0
+                font.pixelSize: root.s(15)
+                color: root.fileMode ? root.cOnAccent : (folderMa.containsMouse ? root.cAccent : ThemeBackend.subtext0)
             }
             MouseArea {
                 id: folderMa
@@ -489,7 +642,8 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                    Sounds.playSfx("reusables/clickbutton/click.wav");
+                    flSc.kick(1.25);
+                    Sounds.playSfx(root.fileMode ? "reusables/toggle/sfx.wav" : "reusables/switch/sfx.wav");
                     root.toggleFile();
                 }
             }
@@ -530,7 +684,7 @@ Item {
             transform: Translate { x: -crumbs.width * 0.3 * pathZone.fullT }
             x: folderButton.x + folderButton.width + root.s(10)
             y: chrome.y
-            width: cornerShape.x - root.s(10) - x
+            width: cornerHub.x - root.s(10) - x
             height: chrome.topH
             orientation: ListView.Horizontal
             clip: true
@@ -702,21 +856,24 @@ Item {
                     visible: root.fileT < 1
                     transform: Translate { y: root.fileT * sideClip.height }
 
-        // Behind the module of the page in use.
+        // Style B: Illuminated rounded-square capsule behind the active module
         Rectangle {
+            id: activeModuleHighlight
             readonly property int cell: PanelLayout.cells.indexOf(root.order[root.page] || "-")
             readonly property Item slot: cell >= 0 && moduleRepeater.count > cell ? moduleRepeater.itemAt(cell) : null
             readonly property real slotY: slot ? moduleColumn.y + slot.y : 0
             visible: slot !== null
             opacity: root.contentShown
-            x: moduleColumn.x + root.s(6)
-            y: slotY - root.s(6)
-            width: moduleColumn.width - root.s(12)
-            height: slot ? slot.height + root.s(12) : 0
-            radius: ThemeBackend.clampedBorderRadius
-            color: Qt.alpha(ThemeBackend.mauve, 0.22)
-            Behavior on y { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
-            Behavior on height { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+            x: moduleColumn.x + root.s(9)
+            y: slotY - root.s(5)
+            width: moduleColumn.width - root.s(17)
+            height: slot ? slot.height + root.s(10) : 0
+            radius: Math.min(ThemeBackend.clampedBorderRadius, root.s(14))
+            color: Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.22)
+            border.width: 1.4
+            border.color: root.cAccent
+            Behavior on y { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+            Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
         }
 
         // Liquid Glass: a lens slides to the module under the pointer (not the page already in use)
@@ -837,6 +994,7 @@ Item {
                     transform: Translate { y: (root.fileT - 1) * sideClip.height }
 
                     Rectangle {
+                        id: activePlaceHighlight
                         readonly property int cell: {
                             for (let i = 0; i < root.filePlaces.length; i++)
                                 if (root.filePlaces[i].path === root.filePath) return i;
@@ -846,13 +1004,15 @@ Item {
                         readonly property Item slot: cell >= 0 && placeRepeater.count > cell ? placeRepeater.itemAt(cell)
                                                    : devCell >= 0 && devRepeater.count > devCell ? devRepeater.itemAt(devCell) : null
                         opacity: slot ? 1 : 0
-                        x: placeColumn.x + root.s(6)
-                        y: placeColumn.y + (slot ? slot.y : 0) - root.s(6)
-                        width: placeColumn.width - root.s(12)
-                        height: root.s(44) + root.s(12)
-                        radius: ThemeBackend.clampedBorderRadius
-                        color: Qt.alpha(ThemeBackend.mauve, 0.22)
-                        Behavior on y { enabled: root.fileT === 1; NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                        x: placeColumn.x + root.s(9)
+                        y: placeColumn.y + (slot ? slot.y : 0) - root.s(4)
+                        width: placeColumn.width - root.s(17)
+                        height: root.s(44) + root.s(8)
+                        radius: Math.min(ThemeBackend.clampedBorderRadius, root.s(14))
+                        color: Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.22)
+                        border.width: 1.4
+                        border.color: root.cAccent
+                        Behavior on y { enabled: root.fileT === 1; NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
                         Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                     }
                     GlassLens {
@@ -988,6 +1148,22 @@ Item {
                             }
                         }
                     }
+                }
+            }
+            // Style B: Glowing spring vertical pill indicator hugging the left inner edge of the sidebar!
+            Rectangle {
+                id: lightRailPill
+                visible: root.contentShown > 0.05 && (root.fileMode ? activePlaceHighlight.slot !== null : activeModuleHighlight.slot !== null)
+                opacity: root.contentShown
+                x: chrome.x + chrome.width - chrome.sideW + root.s(1.5)
+                y: Math.max(root.s(8), Math.min(sideClip.height - height - root.s(8), railY.value - sideClip.y - height * 0.5))
+                width: root.s(3)
+                height: root.s(26)
+                radius: width * 0.5
+                gradient: Gradient {
+                    orientation: Gradient.Vertical
+                    GradientStop { position: 0.0; color: root.cAccent }
+                    GradientStop { position: 1.0; color: root.cAccent2 }
                 }
             }
         }

@@ -437,7 +437,9 @@ PanelWindow {
                             active: win.styleModule !== ""
                             readonly property Component style: ({ graphs: graphsPreview, rings: ringsPreview, hero: heroPreview, slide: slidePreview,
                                                classic: win.styleModule === "network" ? networkClassicPreview : weatherClassicPreview,
-                                               dashboard: weatherDashboardPreview, smart: weatherSmartPreview,
+                                               dashboard: weatherDashboardPreview,
+                                               smart: win.styleModule === "system" ? systemSmartPreview : weatherSmartPreview,
+                                               bento: bentoPreview,
                                                radar: networkRadarPreview, gargantua: networkGargantuaPreview,
                                                original: musicOriginalPreview, m3: musicM3Preview, m5: musicM5Preview,
                                                bubble: bubblePreview })[preview.modelData.id]
@@ -474,8 +476,9 @@ PanelWindow {
                         iconFontSize: win.s(14)
                         accentColor: ThemeBackend.surface0
                         textColor: ThemeBackend.text
-                        onClicked: win.openScene(frame, win.styleModule === "music" || preview.modelData.id !== "dashboard"
-                                                       ? preview.modelData.id : "weather")
+                        onClicked: win.openScene(frame, win.styleModule === "music" ? preview.modelData.id
+                                                       : (win.styleModule === "system" && preview.modelData.id === "smart") ? "smartSystem"
+                                                       : (preview.modelData.id !== "dashboard" ? preview.modelData.id : "weather"))
                     }
                 }
             }
@@ -491,6 +494,7 @@ PanelWindow {
             readonly property real barTop: win.s(28)
             readonly property real gap: win.s(22)
             readonly property real barH: sceneCard.visible ? sceneCard.implicitHeight : smartCard.visible ? smartCard.implicitHeight
+                                       : smartSystemCard.visible ? smartSystemCard.implicitHeight
                                        : gargantuaCard.visible ? gargantuaCard.implicitHeight : musicCard.implicitHeight
             readonly property real areaTop: barTop + barH + gap
             readonly property real k: Math.min(1.25, (width - win.s(96)) / win.s(win.sceneDesign.width), (height - areaTop - win.s(40)) / win.s(win.sceneDesign.height))
@@ -520,7 +524,12 @@ PanelWindow {
                     transformOrigin: Item.TopLeft
                     active: win.sceneEdit
                     sourceComponent: win.sceneMusic ? bigMusic : win.sceneKind === "smart" ? bigSmart
+                                   : win.sceneKind === "smartSystem" ? bigSmartSystem
                                    : win.sceneKind === "gargantua" ? bigGargantua : bigWeather
+                }
+                Component {
+                    id: bigSmartSystem
+                    Pages.SystemSmart { feed: previewFeed; preview: true }
                 }
                 Component {
                     id: bigGargantua
@@ -591,6 +600,18 @@ PanelWindow {
                 id: smartCard
                 visible: win.sceneKind === "smart"
                 open: win.sceneEdit && visible
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: sceneStage.barTop - (1 - sceneStage.cardIn) * win.s(24)
+                width: implicitWidth
+                height: implicitHeight
+                maxWidth: parent.width - win.s(48)
+                opacity: sceneStage.cardIn
+                enabled: win.sceneEdit && !sceneClose.running
+                onFinished: win.closeScene()
+            }
+            SmartSystemEditor {
+                id: smartSystemCard
+                visible: win.sceneKind === "smartSystem"
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: sceneStage.barTop - (1 - sceneStage.cardIn) * win.s(24)
                 width: implicitWidth
@@ -752,10 +773,12 @@ PanelWindow {
     }
 
     // ---------- live previews for Style (they never take input) ----------
-    Pages.SystemFeed { id: previewFeed; active: win.styleModule === "system" }
+    Pages.SystemFeed { id: previewFeed; active: win.styleModule === "system" || win.sceneKind === "smartSystem"; detailed: active }
     Pages.PowerActions { id: previewPower }
     Component { id: graphsPreview; Pages.SystemGraphs { feed: previewFeed } }
     Component { id: ringsPreview; Pages.SystemRings { feed: previewFeed } }
+    Component { id: bentoPreview; Pages.SystemBento { feed: previewFeed; preview: true } }
+    Component { id: systemSmartPreview; Pages.SystemSmart { feed: previewFeed; preview: true } }
     Component { id: bubblePreview; Pages.BubbleMonitor { preview: true } }
     Component { id: heroPreview; Pages.UserHero { power: previewPower; screenName: PanelLayout.editScreen; uptimeText: win.uptimeText } }
     Component { id: weatherClassicPreview; WeatherPage { active: false } }

@@ -10,7 +10,7 @@ import Quickshell.Services.Mpris
 import "../"
 import "../reusables"
 import "../reusables/media"
-import "ambient"
+import "smart"
 
 Item {
     id: root
@@ -32,8 +32,8 @@ Item {
         return ["original", "record", "image"].indexOf(value) >= 0 ? value : (appearance === "m3" ? "image" : "original");
     }
     readonly property bool active: root.visible && !root.previewMode
-    // Ambient's visualizer ring always follows the sound while it shows; the other styles follow the Cava setting
-    readonly property bool coverVisualizerEnabled: appearance === "m5" || appearanceSettings.cavaEnabled === true
+    // Smart style ("m5") uses its own Liquid Mercury EQ shader instead of Cava; other styles follow the Cava setting
+    readonly property bool coverVisualizerEnabled: appearance !== "m5" && appearanceSettings.cavaEnabled === true
     onAppearanceChanged: if (active) resetAndPlayIntro()
     onCoverVisualizerEnabledChanged: {
         if (active && coverVisualizerEnabled) registerCava();
@@ -115,6 +115,7 @@ Item {
     }
     function setEqBand(band, db) {
         if (!root.manualEqEnabled) return;
+        AudioProcessor.initialize();
         var temp = Object.assign({}, root.eqData);
         temp["b" + band] = db;
         temp.preset = "Custom";
@@ -135,6 +136,7 @@ Item {
         root.savedEqData = Object.assign({}, temp);
         root.lastEqUpdate = Date.now();
         root.triggerEqLightning();
+        AudioProcessor.initialize();
         root.execCmd(Caching.qsDir + "/media/equalizer.sh apply");
     }
 
@@ -544,7 +546,7 @@ Item {
     }
 
     function triggerEqLightning() {
-        Sounds.playSfx("musicpopup/swoosh.wav", 0.75);
+        if (root.appearance !== "m5") Sounds.playSfx("musicpopup/swoosh.wav", 0.75);
         eqLightningAnim.restart();
     }
 
@@ -698,6 +700,7 @@ Item {
             root.lastEqUpdate = Date.now();
 
             root.triggerEqLightning();
+            AudioProcessor.initialize();
             execCmd(Caching.qsDir + `/media/equalizer.sh preset ${presetName}`);
         }
     }
@@ -2273,7 +2276,7 @@ Item {
                     }
                 }
             }
-            // Ambient: its own stage over everything, drawn at 625 x 565 and stretched to the page, cut to its corners
+            // Smart ("m5"): Smart Glasses HUD + Liquid Mercury Wave EQ stage at 625 x 565, scaled to page
             Item {
                 id: ambientHost
                 anchors.fill: parent
@@ -2282,7 +2285,7 @@ Item {
                 layer.effect: MultiEffect { maskEnabled: true; maskSource: innerBgMask }
                 Loader {
                     active: root.appearance === "m5"
-                    sourceComponent: AmbientStage {
+                    sourceComponent: SmartMusicStage {
                         host: root
                         renderScale: ambientHost.width / 625 * (Screen.devicePixelRatio || 1)
                         pageScale: ambientHost.width / 625
