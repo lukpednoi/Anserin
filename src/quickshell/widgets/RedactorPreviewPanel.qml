@@ -2,15 +2,30 @@ import QtQuick
 import QtQuick.Layouts
 import "../"
 import "../reusables"
+import "../reusables/expressive"
 
-// Open Redactor's left panel: the styles of the widget picked in the bottom bar, two per row, each drawn
-// live. Clicking one puts that widget (in that style) on the desktop. The faces load only for the picked
-// widget and are released when another widget is picked or the redactor closes.
+// Open Redactor's left preview panel: hidden until a widget is clicked in the bottom bar,
+// showing two live styles per row. Every click spawns that widget onto the desktop (duplicates allowed).
 Item {
     id: root
 
     property var redactor: null
     property string typeId: ""
+    signal closeRequested()
+
+    // Defer mounting live widget faces until the left-panel spring slide nearly settles so 60fps stays silky smooth.
+    property bool facesReady: false
+    Timer {
+        id: faceDelay
+        interval: 190
+        repeat: false
+        onTriggered: root.facesReady = true
+    }
+    onTypeIdChanged: {
+        facesReady = false;
+        if (typeId !== "") faceDelay.restart();
+        else faceDelay.stop();
+    }
 
     function s(v) { return Scaler.s(v); }
 
@@ -22,23 +37,12 @@ Item {
     readonly property real cellWidth: Math.floor((width - pad * 2 - gap) / 2)
     readonly property real boxHeight: Math.round(cellWidth * 0.72)
 
-    // the widget selected on the desktop, so its style can be marked
-    readonly property var selectedRow: {
-        let r = root.redactor;
-        if (!r || !r.selectedId || !r.activeWidgetsModel) return null;
-        for (let i = 0; i < r.activeWidgetsModel.count; i++) {
-            let row = r.activeWidgetsModel.get(i);
-            if (String(row.wId) === String(r.selectedId)) return { type: row.wType, variant: row.wVariant };
-        }
-        return null;
-    }
-
     Rectangle {
         anchors.fill: parent
         radius: ThemeBackend.borderRadius
         color: panelGlass.active ? "transparent" : ThemeBackend.base
         border.width: 1
-        border.color: Qt.alpha(ThemeBackend.surface1, 0.6)
+        border.color: Qt.alpha(ThemeBackend.surface1, 0.65)
 
         WallpaperBlur {
             id: panelGlass
@@ -54,31 +58,6 @@ Item {
         }
     }
 
-    // Nothing picked yet
-    ColumnLayout {
-        anchors.centerIn: parent
-        width: parent.width - root.pad * 2
-        spacing: s(8)
-        visible: root.typeDef === null
-
-        Text {
-            Layout.alignment: Qt.AlignHCenter
-            text: "󰕰"
-            font.family: ThemeBackend.iconFont
-            font.pixelSize: s(40)
-            color: Qt.alpha(ThemeBackend.mauve, 0.8)
-        }
-        Text {
-            Layout.fillWidth: true
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-            text: I18n.t("widgets.redactor.pick_hint", "Pick a group below, then a widget, to see its styles here.")
-            font.family: ThemeBackend.fontFamily
-            font.pixelSize: s(14)
-            color: ThemeBackend.subtext0
-        }
-    }
-
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: root.pad
@@ -87,7 +66,7 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: s(10)
+            spacing: s(8)
 
             Text {
                 text: root.typeDef ? (root.typeDef.icon || "") : ""
@@ -100,9 +79,46 @@ Item {
                 text: root.typeDef ? (root.typeDef.name || root.typeId) : ""
                 elide: Text.ElideRight
                 font.family: ThemeBackend.fontFamily
-                font.pixelSize: s(18)
+                font.pixelSize: s(17)
                 font.bold: true
                 color: ThemeBackend.text
+            }
+            Rectangle {
+                ExSpring {
+                    id: closeSc
+                    token: "spatialFast"
+                    target: closeMa.pressed ? 0.86 : (closeMa.containsMouse ? 1.08 : 1.0)
+                }
+                scale: closeSc.value
+                width: s(28)
+                height: s(28)
+                radius: closeMa.pressed ? s(8) : width / 2
+                Behavior on radius {
+                    SpringAnimation {
+                        spring: ExMotion.qtSpring("spatialFast")
+                        damping: ExMotion.qtDamping("spatialFast")
+                        epsilon: 0.2
+                    }
+                }
+                color: closeMa.containsMouse ? ThemeBackend.surface1 : ThemeBackend.surface0
+                Behavior on color { ColorAnimation { duration: ExMotion.fast } }
+                Text {
+                    anchors.centerIn: parent
+                    text: "󰅖"
+                    font.family: ThemeBackend.iconFont
+                    font.pixelSize: s(14)
+                    color: closeMa.containsMouse ? ThemeBackend.text : ThemeBackend.subtext0
+                }
+                MouseArea {
+                    id: closeMa
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        Sounds.playSfx("reusables/clickbutton/click.wav");
+                        root.closeRequested();
+                    }
+                }
             }
         }
 
@@ -116,48 +132,67 @@ Item {
             boundsBehavior: Flickable.StopAtBounds
             interactive: contentHeight > height
 
+            WheelHandler {
+                acceptedDevices: PointerDevice.AllDevices
+                onWheel: (ev) => {
+                    let maxY = Math.max(0, flick.contentHeight - flick.height);
+                    flick.contentY = Math.max(0, Math.min(maxY, flick.contentY - ev.angleDelta.y * 0.65));
+                    ev.accepted = true;
+                }
+            }
+
             Grid {
                 id: grid
                 columns: 2
                 spacing: root.gap
 
                 Repeater {
-                    // re-created when the picked widget changes, so the old faces are released
+                    // re-created when the picked widget changes, so old faces are released
                     model: root.typeDef ? root.variants : []
 
                     delegate: Item {
                         id: card
                         required property var modelData
                         required property int index
-                        readonly property bool current: root.selectedRow !== null && root.selectedRow.type === root.typeId && root.selectedRow.variant === modelData.id
 
                         width: root.cellWidth
                         height: root.boxHeight + s(30)
 
-                        // pops in one after another when the widget is picked
                         opacity: 0
-                        scale: 0.9
+                        scale: 0.86
                         SequentialAnimation {
                             running: true
-                            PauseAnimation { duration: card.index * 45 }
+                            PauseAnimation { duration: Math.min(card.index, 10) * 35 }
                             ParallelAnimation {
-                                NumberAnimation { target: card; property: "opacity"; to: 1; duration: 220; easing.type: Easing.OutCubic }
-                                NumberAnimation { target: card; property: "scale"; to: 1; duration: 380; easing.type: Easing.OutBack; easing.overshoot: 1.6 }
+                                NumberAnimation { target: card; property: "opacity"; to: 1; duration: 190; easing.type: Easing.OutCubic }
+                                NumberAnimation { target: card; property: "scale"; to: 1; duration: 400; easing.type: Easing.OutBack; easing.overshoot: 1.7 }
                             }
+                        }
+
+                        ExSpring {
+                            id: cardSc
+                            token: "spatialFast"
+                            target: cardMa.pressed ? 0.92 : (cardMa.containsMouse ? 1.035 : 1.0)
                         }
 
                         Rectangle {
                             id: box
                             width: parent.width
                             height: root.boxHeight
-                            radius: ThemeBackend.borderRadius
+                            radius: cardMa.pressed ? s(10) : ThemeBackend.borderRadius
+                            Behavior on radius {
+                                SpringAnimation {
+                                    spring: ExMotion.qtSpring("spatialFast")
+                                    damping: ExMotion.qtDamping("spatialFast")
+                                    epsilon: 0.2
+                                }
+                            }
                             color: cardMa.containsMouse ? ThemeBackend.surface1 : ThemeBackend.surface0
-                            Behavior on color { ColorAnimation { duration: 140 } }
-                            border.width: card.current ? s(2) : 0
-                            border.color: ThemeBackend.mauve
+                            Behavior on color { ColorAnimation { duration: ExMotion.fast } }
+                            border.width: cardMa.containsMouse ? 1 : 0
+                            border.color: Qt.alpha(ThemeBackend.mauve, 0.55)
                             clip: true
-                            scale: cardMa.pressed ? 0.96 : (cardMa.containsMouse ? 1.02 : 1.0)
-                            Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
+                            scale: cardSc.value
 
                             Item {
                                 id: faceHolder
@@ -172,7 +207,10 @@ Item {
                                     id: face
                                     anchors.fill: parent
                                     asynchronous: true
-                                    source: WidgetRegistry.faceFile(root.typeId, card.modelData.id)
+                                    active: root.facesReady && root.typeId !== ""
+                                    opacity: status === Loader.Ready ? 1 : 0
+                                    Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                                    source: active ? WidgetRegistry.faceFile(root.typeId, card.modelData.id) : ""
                                     onLoaded: {
                                         if (!item) return;
                                         if ("variant" in item) item.variant = card.modelData.id;
@@ -186,7 +224,6 @@ Item {
                                 }
                             }
 
-                            // still loading, or a face that cannot be drawn without a file (Image)
                             Text {
                                 anchors.centerIn: parent
                                 visible: face.status !== Loader.Ready
@@ -206,8 +243,7 @@ Item {
                             elide: Text.ElideRight
                             font.family: ThemeBackend.fontFamily
                             font.pixelSize: s(13)
-                            font.bold: card.current
-                            color: card.current ? ThemeBackend.mauve : ThemeBackend.text
+                            color: cardMa.containsMouse ? ThemeBackend.mauve : ThemeBackend.text
                         }
 
                         MouseArea {
@@ -219,6 +255,7 @@ Item {
                                 Sounds.playSfx("reusables/clickbutton/click.wav");
                                 if (root.redactor) root.redactor.addWidget(root.typeId, card.modelData.id);
                             }
+                            onWheel: (w) => { w.accepted = false; }
                         }
                     }
                 }

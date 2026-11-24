@@ -184,6 +184,8 @@ PanelWindow {
                         item.widgetWindow = root;
                     }
                     item.visible = Qt.binding(() => root.visible);
+                    if (item.variant !== undefined) item.variant = Qt.binding(() => root.wVariant);
+                    if (item.wVariant !== undefined) item.wVariant = Qt.binding(() => root.wVariant);
                     if (item.imagePath !== undefined) {
                         item.imagePath = Qt.binding(() => root.wImagePath);
                     }

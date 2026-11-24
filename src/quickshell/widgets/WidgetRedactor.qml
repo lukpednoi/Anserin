@@ -8,6 +8,7 @@ import Quickshell.Io
 import Quickshell.Widgets
 import "../"
 import "../reusables"
+import "../reusables/expressive"
 import "faces"
 
 Scope {
@@ -155,7 +156,12 @@ Scope {
                     WidgetSync.setRedactMode(redactorWindow.safeMonitorName, false);
                     sendIpc("setRedactMode", ["false"]);
                     sendBarIpc("setRedactMode", ["false"]);
+                    Wallpaper.playbackChanged("all", "play");
                     exitTimer.start();
+                }
+
+                Component.onCompleted: {
+                    Wallpaper.playbackChanged("all", "pause");
                 }
 
                 Component.onDestruction: {
@@ -164,12 +170,14 @@ Scope {
                     WidgetSync.setRedactMode(redactorWindow.safeMonitorName, false);
                     sendIpc("setRedactMode", ["false"]);
                     sendBarIpc("setRedactMode", ["false"]);
+                    Wallpaper.playbackChanged("all", "play");
                 }
 
                 Shortcut {
                     sequence: "Escape"
                     onActivated: {
                         if (redactorMode.closing) return;
+                        if (categoryBar.typeId !== "") { categoryBar.typeId = ""; return; }
                         if (categoryBar.back()) return;
                         redactorMode.selectedId = "";
                         redactorWindow.exitRedactor();
@@ -257,43 +265,61 @@ Scope {
                     property bool isInitializing: true
                     property int topZ: 1
 
-                    // Layout: the preview panel takes the left 30%, the group bar the bottom 20% and the right 10% stays
-                    // empty; the desktop shrinks, keeping its shape, into what is left under the tools strip.
-                    // openProgress runs 0 (full-size desktop, as on screen) -> 1 (shrunk), with a soft bounce.
+                    // Bouncy Open Redactor layout: left preview panel stays hidden until a widget is clicked
+                    // (from the bottom bar or on the desktop), then springs in smoothly while the desktop & bars glide right.
                     property real openProgress: 0
                     readonly property real layoutP: Math.max(0, Math.min(1, openProgress))
+                    readonly property bool previewOpen: !closing && categoryBar.typeId !== ""
+                    property real previewP: previewOpen ? 1.0 : 0.0
+                    Behavior on previewP {
+                        SpringAnimation {
+                            spring: 4.0
+                            damping: 0.34
+                            epsilon: 0.0005
+                        }
+                    }
+                    // Keeps the preview faces alive during the bouncy slide-out, then unloads them once fully hidden.
+                    property string shownPreviewType: ""
+                    onPreviewPChanged: if (previewP <= 0.008 && !previewOpen) shownPreviewType = ""
+
                     // the Modern frame is the screen's edge: it stays drawn on top and everything sits inside it
                     readonly property real frameInset: ScreenEdges.inset(redactorWindow.screen)
                     readonly property real edgeGap: s(14)
-                    readonly property real innerMargin: frameInset + edgeGap
-                    readonly property real leftPanelWidth: Math.round(width * 0.30)
-                    readonly property real bottomBarHeight: Math.round(height * 0.20)
-                    readonly property real rightGapWidth: Math.round(width * 0.10)
-                    readonly property real topStripHeight: s(96)
-                    readonly property real deskAreaX: leftPanelWidth + edgeGap
-                    readonly property real deskAreaWidth: Math.max(1, width - leftPanelWidth - rightGapWidth - edgeGap * 2)
-                    readonly property real deskAreaY: frameInset + topStripHeight
-                    readonly property real deskAreaHeight: Math.max(1, height - bottomBarHeight - deskAreaY - edgeGap)
+                    readonly property real innerMargin: frameInset + s(12)
+                    readonly property real leftPanelWidth: Math.round(Math.max(s(280), Math.min(s(390), width * 0.28)))
+                    readonly property real bottomBarHeight: Math.round(Math.max(s(92), Math.min(s(118), height * 0.145)))
+                    readonly property real topStripHeight: s(78)
+                    readonly property real previewSpan: Math.max(0, previewP) * (leftPanelWidth + edgeGap)
+                    readonly property real deskAreaX: innerMargin + previewSpan
+                    readonly property real deskAreaWidth: Math.max(200, width - deskAreaX - innerMargin)
+                    readonly property real deskAreaY: innerMargin + topStripHeight + edgeGap
+                    readonly property real deskAreaHeight: Math.max(160, height - deskAreaY - bottomBarHeight - edgeGap - innerMargin)
                     readonly property real deskScaleTarget: Math.min(deskAreaWidth / Math.max(1, width), deskAreaHeight / Math.max(1, height))
-                    readonly property real deskXTarget: Math.round(deskAreaX + (deskAreaWidth - width * deskScaleTarget) / 2)
-                    readonly property real deskYTarget: Math.round(deskAreaY + (deskAreaHeight - height * deskScaleTarget) / 2)
+                    readonly property real deskTargetW: width * deskScaleTarget
+                    readonly property real deskTargetH: height * deskScaleTarget
+                    readonly property real deskXTarget: deskAreaX + (deskAreaWidth - deskTargetW) / 2
+                    readonly property real deskYTarget: deskAreaY + (deskAreaHeight - deskTargetH) / 2
                     readonly property real deskScale: 1 + (deskScaleTarget - 1) * openProgress
                     // multiply sizes inside the shrunk desktop by this to keep them their on-screen size
                     readonly property real unshrink: 1 / Math.max(0.05, deskScale)
                     property alias topToolsHost: topToolsHost
                     property bool closing: false
+                    readonly property bool canUndo: historyIndex > 0
+                    readonly property bool canRedo: historyIndex >= 0 && historyIndex < historyStack.length - 1
 
                     // Opens once the layout is in, so the shrinking desktop already shows the widgets.
-                    onIsReadyChanged: if (isReady && !closing) openAnim.start()
+                    onIsReadyChanged: {
+                        if (isReady && !closing) openAnim.start();
+                    }
 
                     NumberAnimation {
                         id: openAnim
                         target: redactorMode
                         property: "openProgress"
                         to: 1
-                        duration: 560
+                        duration: 580
                         easing.type: Easing.OutBack
-                        easing.overshoot: 1.15
+                        easing.overshoot: 1.3
                     }
 
                     SequentialAnimation {
@@ -302,9 +328,9 @@ Scope {
                             target: redactorMode
                             property: "openProgress"
                             to: 0
-                            duration: 460
-                            easing.type: Easing.OutBack
-                            easing.overshoot: 0.9
+                            duration: 420
+                            easing.type: Easing.InOutBack
+                            easing.overshoot: 0.75
                         }
                         ScriptAction { script: redactorWindow.finishExit() }
                     }
@@ -732,6 +758,62 @@ Scope {
                         return null;
                     }
 
+                    function moveSelectedLayer(dir) {
+                        if (!selectedId || !activeWidgetsModel || activeWidgetsModel.count < 2) return;
+                        let target = String(selectedId);
+                        let idx = -1;
+                        for (let i = 0; i < activeWidgetsModel.count; i++) {
+                            if (String(activeWidgetsModel.get(i).wId) === target) { idx = i; break; }
+                        }
+                        if (idx < 0) return;
+                        let dst = idx;
+                        if (dir === "up") dst = Math.min(activeWidgetsModel.count - 1, idx + 1);
+                        else if (dir === "down") dst = Math.max(0, idx - 1);
+                        else if (dir === "front") dst = activeWidgetsModel.count - 1;
+                        else if (dir === "back") dst = 0;
+                        if (dst === idx) return;
+                        activeWidgetsModel.move(idx, dst, 1);
+                        for (let j = 0; j < widgetRepeater.count; j++) {
+                            let p = widgetRepeater.itemAt(j);
+                            if (p) p.z = j + 1;
+                        }
+                        redactorMode.topZ = activeWidgetsModel.count + 10;
+                        saveConfig();
+                        recordHistory();
+                    }
+
+                    function alignSelected(dir) {
+                        let proxy = proxyFor(selectedId);
+                        if (!proxy) return;
+                        let bw = proxy.width;
+                        let bh = proxy.height;
+                        let margin = edgeInset + s(20);
+                        let nx = proxy.x;
+                        let ny = proxy.y;
+                        if (dir === "left") nx = margin;
+                        else if (dir === "hcenter") nx = Math.round((safeWidth - bw) / 2);
+                        else if (dir === "right") nx = Math.max(edgeInset, safeWidth - margin - bw);
+                        else if (dir === "top") ny = margin;
+                        else if (dir === "vcenter") ny = Math.round((safeHeight - bh) / 2);
+                        else if (dir === "bottom") ny = Math.max(edgeInset, safeHeight - margin - bh);
+                        else if (dir === "center") {
+                            nx = Math.round((safeWidth - bw) / 2);
+                            ny = Math.round((safeHeight - bh) / 2);
+                        }
+                        nx = fitX(nx, bw);
+                        ny = fitY(ny, bh);
+                        activeWidgetsModel.setProperty(proxy.wIndex, "wX", nx);
+                        activeWidgetsModel.setProperty(proxy.wIndex, "wY", ny);
+                        proxy.finalizeSync();
+                    }
+
+                    function applyVariantToSelected(variantId) {
+                        let proxy = proxyFor(selectedId);
+                        if (proxy && typeof proxy.applyVariant === "function") {
+                            proxy.applyVariant(variantId);
+                        }
+                    }
+
                     Timer {
                         id: nudgeTimer
                         interval: 600
@@ -887,8 +969,25 @@ Scope {
                         let def = WidgetRegistry.defaultSize(typeKey);
                         let defW = def.w;
                         let defH = def.h;
-                        let spawnX = Math.max(0, (redactorMode.safeWidth - s(defW)) / 2);
-                        let spawnY = Math.max(0, (redactorMode.safeHeight - s(defH)) / 2);
+                        let spawnX = Math.max(edgeInset, (redactorMode.safeWidth - s(defW)) / 2);
+                        let spawnY = Math.max(edgeInset, (redactorMode.safeHeight - s(defH)) / 2);
+                        // Offset repeated spawns slightly so duplicate widgets don't hide directly underneath each other
+                        let step = s(28);
+                        for (let tries = 0; tries < 12; tries++) {
+                            let clash = false;
+                            for (let i = 0; i < activeWidgetsModel.count; i++) {
+                                let row = activeWidgetsModel.get(i);
+                                if (Math.abs(row.wX - spawnX) < s(20) && Math.abs(row.wY - spawnY) < s(20)) {
+                                    clash = true;
+                                    break;
+                                }
+                            }
+                            if (!clash) break;
+                            spawnX += step;
+                            spawnY += step;
+                            if (spawnX + s(defW) > redactorMode.safeWidth - edgeInset) spawnX = edgeInset + s(24);
+                            if (spawnY + s(defH) > redactorMode.safeHeight - edgeInset) spawnY = edgeInset + s(24);
+                        }
                         let newId = "w_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
 
                         if (redactorMode.gridEnabled) {
@@ -1708,6 +1807,8 @@ Scope {
                                                 if (item) {
                                                     try {
                                                         item.visible = Qt.binding(() => redactorWindow.visible);
+                                                        if (item.variant !== undefined) item.variant = Qt.binding(() => widgetProxy.wVariant);
+                                                        if (item.wVariant !== undefined) item.wVariant = Qt.binding(() => widgetProxy.wVariant);
                                                         if (item.imagePath !== undefined) {
                                                             item.imagePath = Qt.binding(() => widgetProxy.wImagePath);
                                                         }
@@ -2148,12 +2249,12 @@ Scope {
                                     }
 
 
-                                    // The selected widget's tools sit in the strip above the shrunk desktop, at full size.
+                                    // The selected widget's original tools sitting in the strip above the shrunk desktop, at full size.
                                     ColumnLayout {
                                         id: bottomChrome
                                         parent: redactorMode.topToolsHost
-                                        x: Math.round((parent.width - implicitWidth) / 2)
-                                        y: Math.round((parent.height - implicitHeight) / 2)
+                                        x: (parent.width - implicitWidth) / 2
+                                        y: (parent.height - implicitHeight) / 2
                                         z: 40
                                         opacity: widgetProxy.isSelected ? 1.0 : 0.0
                                         visible: opacity > 0
@@ -2190,16 +2291,10 @@ Scope {
                                                 id: pxReadoutPill
                                                 implicitWidth: pxReadoutText.implicitWidth + s(16)
                                                 implicitHeight: s(34)
-                                                color: pxGlass.active ? "transparent" : ThemeBackend.surface0
+                                                color: Qt.alpha(ThemeBackend.surface0, 0.92)
+                                                border.width: 1
+                                                border.color: Qt.alpha(ThemeBackend.surface1, 0.7)
                                                 radius: ThemeBackend.borderRadius
-
-                                                WallpaperBlur {
-                                                    id: pxGlass
-                                                    anchors.fill: parent
-                                                    radius: parent.radius
-                                                    tintColor: ThemeBackend.surface0
-                                                    tintAmount: 0.3
-                                                }
 
                                                 Text {
                                                     id: pxReadoutText
@@ -2216,16 +2311,10 @@ Scope {
                                                 id: arReadoutPill
                                                 implicitWidth: arReadoutText.implicitWidth + s(16)
                                                 implicitHeight: s(34)
-                                                color: arGlass.active ? "transparent" : ThemeBackend.surface0
+                                                color: Qt.alpha(ThemeBackend.surface0, 0.92)
+                                                border.width: 1
+                                                border.color: Qt.alpha(ThemeBackend.surface1, 0.7)
                                                 radius: ThemeBackend.borderRadius
-
-                                                WallpaperBlur {
-                                                    id: arGlass
-                                                    anchors.fill: parent
-                                                    radius: parent.radius
-                                                    tintColor: ThemeBackend.surface0
-                                                    tintAmount: 0.3
-                                                }
 
                                                 Text {
                                                     id: arReadoutText
@@ -2242,16 +2331,10 @@ Scope {
                                                 id: pctReadoutPill
                                                 implicitWidth: pctReadoutText.implicitWidth + s(16)
                                                 implicitHeight: s(34)
-                                                color: pctGlass.active ? "transparent" : ThemeBackend.surface0
+                                                color: Qt.alpha(ThemeBackend.surface0, 0.92)
+                                                border.width: 1
+                                                border.color: Qt.alpha(ThemeBackend.surface1, 0.7)
                                                 radius: ThemeBackend.borderRadius
-
-                                                WallpaperBlur {
-                                                    id: pctGlass
-                                                    anchors.fill: parent
-                                                    radius: parent.radius
-                                                    tintColor: ThemeBackend.surface0
-                                                    tintAmount: 0.3
-                                                }
 
                                                 Text {
                                                     id: pctReadoutText
@@ -2421,63 +2504,14 @@ Scope {
                                                 }
                                             }
 
-                                            Dropdown {
-                                                id: variantDropdown
-                                                property var variantsList: bottomChrome.variantsList
-                                                visible: bottomChrome.hasVariants
-                                                implicitHeight: s(34)
-                                                implicitWidth: s(150)
-                                                accentColor: ThemeBackend.mauve
-                                                baseColor: ThemeBackend.surface0
-                                                dropdownColor: ThemeBackend.base
-                                                borderColor: ThemeBackend.surface1
-                                                textColor: ThemeBackend.text
-                                                activeTextColor: ThemeBackend.crust
-                                                cornerRadius: ThemeBackend.borderRadius
-                                                fontPixelSize: s(11)
-                                                fuzzySearch: false
-                                                options: variantsList.map(v => v.label || v.id)
-
-                                                function updateCurrentIndex() {
-                                                    let curVar = widgetProxy.wVariant;
-                                                    for (let i = 0; i < variantsList.length; i++) {
-                                                        if (variantsList[i].id === curVar) {
-                                                            currentIndex = i;
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-
-                                                Component.onCompleted: updateCurrentIndex()
-
-                                                Connections {
-                                                    target: widgetProxy
-                                                    function onWVariantChanged() {
-                                                        variantDropdown.updateCurrentIndex();
-                                                    }
-                                                }
-
-                                                onSelected: (idx, value) => {
-                                                    if (idx >= 0 && idx < variantsList.length) {
-                                                        widgetProxy.applyVariant(variantsList[idx].id);
-                                                    }
-                                                }
-                                            }
-
                                             Rectangle {
                                                 id: opacityPill
-                                                implicitWidth: bottomChrome.hasVariants ? s(200) : s(280)
+                                                implicitWidth: s(280)
                                                 implicitHeight: s(34)
-                                                color: opacityGlass.active ? "transparent" : ThemeBackend.surface0
+                                                color: Qt.alpha(ThemeBackend.surface0, 0.92)
+                                                border.width: 1
+                                                border.color: Qt.alpha(ThemeBackend.surface1, 0.7)
                                                 radius: ThemeBackend.borderRadius
-
-                                                WallpaperBlur {
-                                                    id: opacityGlass
-                                                    anchors.fill: parent
-                                                    radius: parent.radius
-                                                    tintColor: ThemeBackend.surface0
-                                                    tintAmount: 0.3
-                                                }
 
                                                 RowLayout {
                                                     anchors.fill: parent
@@ -2560,7 +2594,7 @@ Scope {
                                     Layout.alignment: Qt.AlignHCenter
                                 }
                                 Text {
-                                    text: I18n.t("widgets.redactor.pick_style_to_add", "Pick a group below, then click a style on the left to add it")
+                                    text: I18n.t("widgets.redactor.pick_style_to_add", "Pick a group below, then a widget to browse its styles")
                                     font.family: ThemeBackend.fontFamily
                                     font.pixelSize: s(14)
                                     color: ThemeBackend.subtext0
@@ -2583,38 +2617,48 @@ Scope {
                         visible: redactorMode.layoutP > 0.01
                     }
 
-                    // the selected widget's tools (its bottomChrome is placed here) above the desktop
+                    // the selected widget's tools (its bottomChrome is placed here) directly above the shrunk desktop
                     Item {
                         id: topToolsHost
-                        x: redactorMode.deskAreaX
-                        width: redactorMode.deskAreaWidth
-                        y: redactorMode.frameInset + (redactorMode.deskYTarget - redactorMode.frameInset - height) / 2 - (1 - redactorMode.layoutP) * s(30)
-                        height: redactorMode.topStripHeight - s(8)
+                        x: redactorMode.deskXTarget
+                        width: redactorMode.deskTargetW
+                        y: redactorMode.innerMargin - (1 - redactorMode.layoutP) * s(30)
+                        height: redactorMode.topStripHeight
                         opacity: redactorMode.layoutP
                         z: 150000
                     }
 
+                    // Full-height left preview panel: hidden until a widget is clicked, slides smoothly via GPU Translate
                     RedactorPreviewPanel {
                         id: previewPanel
                         z: 200000
                         redactor: redactorMode
-                        typeId: categoryBar.typeId
-                        x: redactorMode.innerMargin - (1 - redactorMode.openProgress) * (width + redactorMode.innerMargin)
+                        typeId: redactorMode.shownPreviewType
+                        x: redactorMode.innerMargin
                         y: redactorMode.innerMargin
-                        width: redactorMode.leftPanelWidth - redactorMode.innerMargin
-                        height: redactorMode.height - redactorMode.bottomBarHeight - redactorMode.innerMargin - redactorMode.edgeGap
-                        visible: redactorMode.openProgress > 0.001
+                        width: redactorMode.leftPanelWidth
+                        height: redactorMode.height - redactorMode.innerMargin * 2
+                        transform: Translate {
+                            x: -(1 - redactorMode.previewP) * (previewPanel.width + redactorMode.innerMargin * 1.4)
+                        }
+                        opacity: Math.max(0, Math.min(1, redactorMode.previewP * 1.5)) * redactorMode.layoutP
+                        visible: redactorMode.openProgress > 0.001 && redactorMode.previewP > 0.008 && redactorMode.shownPreviewType !== ""
+                        onCloseRequested: categoryBar.typeId = ""
                     }
 
+                    // Bottom category bar matching the exact width of the shrunk desktop (glides with the canvas)
                     RedactorCategoryBar {
                         id: categoryBar
                         z: 200000
                         redactor: redactorMode
-                        x: redactorMode.innerMargin
-                        width: redactorMode.width - redactorMode.innerMargin * 2
-                        height: redactorMode.bottomBarHeight - redactorMode.innerMargin
+                        x: redactorMode.deskXTarget
+                        width: redactorMode.deskTargetW
+                        height: redactorMode.bottomBarHeight
                         y: redactorMode.height - height - redactorMode.innerMargin + (1 - redactorMode.openProgress) * (height + redactorMode.innerMargin)
                         visible: redactorMode.openProgress > 0.001
+                        onTypeIdChanged: {
+                            if (typeId !== "") redactorMode.shownPreviewType = typeId;
+                        }
                         onDoneClicked: {
                             redactorMode.selectedId = "";
                             root.targetSelectedWidgetId = "";

@@ -5,6 +5,7 @@ import Quickshell.Wayland
 import Quickshell.Io
 import "../../"
 import "../../reusables"
+import "../../reusables/expressive"
 import "../../widgets"
 
 Scope {
@@ -95,23 +96,33 @@ Scope {
                 readonly property real screenH: win.targetScreen ? win.targetScreen.height : 1080
 
                 property int page: 0
+                property real pageProgress: win.page
+                property bool gridScreen: false
+                property bool gridPanel: true
+                property string pendingImageVariant: ""
 
                 Component.onCompleted: {
                     layoutStore.setReference(win.screenW, win.screenH);
                     layoutStore.beginHistory();
+                    Wallpaper.playbackChanged("all", "pause");
+                    openAnim.start();
                 }
 
-                Component.onDestruction: layoutStore.endHistory()
-                property real pageProgress: win.page
-                property bool gridScreen: false
-                property bool gridPanel: true
+                Component.onDestruction: {
+                    layoutStore.endHistory();
+                    Wallpaper.playbackChanged("all", "play");
+                }
 
                 readonly property Item activeScene: (win.simpleStyle || win.page === 0) ? screenScene : panelStage.scene
                 readonly property bool gridOn: (win.simpleStyle || win.page === 0) ? win.gridScreen : win.gridPanel
                 readonly property var selProxy: win.activeScene.selectedProxy
-                readonly property Item chromeTarget: win.selProxy
 
                 Behavior on pageProgress { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+
+                onPageChanged: {
+                    categoryBar.typeId = "";
+                    categoryBar.categoryId = "";
+                }
 
                 function go(delta) {
                     if (win.simpleStyle) return;
@@ -119,7 +130,7 @@ Scope {
                 }
 
                 function toggleGrid() {
-                    if (win.page === 0) {
+                    if (win.simpleStyle || win.page === 0) {
                         win.gridScreen = !win.gridScreen;
                         if (win.gridScreen) screenScene.snapAllToGrid();
                     } else {
@@ -128,19 +139,43 @@ Scope {
                     }
                 }
 
-                function addItem(type, imagePath) {
+                function addItem(type, imagePath, variantOverride) {
                     let scene = win.activeScene;
                     if (!LockElementRegistry.allowedIn(type, scene.scope)) return;
+                    if (type === "widget:image" && (!imagePath || imagePath === "")) {
+                        win.pendingImageVariant = variantOverride || LockElementRegistry.defaultVariant(type);
+                        win.openImagePicker("", "", false);
+                        return;
+                    }
                     let def = LockElementRegistry.defaultSize(type);
                     let w = def.w > 0 ? Math.min(def.w, scene.width) : 0;
                     let h = def.h > 0 ? Math.min(def.h, scene.height) : 0;
                     let x = w > 0 ? Math.max(0, (scene.width - w) / 2) : scene.width / 2;
                     let y = h > 0 ? Math.max(0, (scene.height - h) / 2) : scene.height / 2;
+                    // Offset repeated spawns slightly so duplicate widgets don't stack pixel-for-pixel
+                    if (scene.itemsModel) {
+                        for (let tries = 0; tries < 12; tries++) {
+                            let clash = false;
+                            for (let i = 0; i < scene.itemsModel.count; i++) {
+                                let row = scene.itemsModel.get(i);
+                                if (Math.abs(row.ix - x) < 20 && Math.abs(row.iy - y) < 20) {
+                                    clash = true;
+                                    break;
+                                }
+                            }
+                            if (!clash) break;
+                            x += 28;
+                            y += 28;
+                            if (w > 0 && x + w > scene.width) x = 24;
+                            if (h > 0 && y + h > scene.height) y = 24;
+                        }
+                    }
                     if (w > 0 && win.gridOn) {
                         x = Math.round(x / scene.gridStep) * scene.gridStep;
                         y = Math.round(y / scene.gridStep) * scene.gridStep;
                     }
-                    let entry = layoutStore.makeEntry(type, LockElementRegistry.defaultVariant(type), x, y, w, h);
+                    let v = (variantOverride && variantOverride !== "") ? variantOverride : LockElementRegistry.defaultVariant(type);
+                    let entry = layoutStore.makeEntry(type, v, x, y, w, h);
                     entry.iimage = imagePath || "";
                     scene.selectedId = layoutStore.addItem(scene.scope, entry);
                 }
@@ -153,23 +188,14 @@ Scope {
                     if (imagePickerLoader.item) imagePickerLoader.item.openPicker(currentPath, rounded);
                 }
 
-                QtObject {
-                    id: widgetAdder
-
-                    function addWidget(typeKey) {
-                        let t = WidgetRegistry.types[typeKey];
-                        if (!t) return;
-                        if (t.requiresFilePicker) {
-                            win.openImagePicker("", "", false);
-                            return;
-                        }
-                        win.addItem("widget:" + typeKey, "");
-                    }
-                }
-
                 Shortcut {
                     sequence: "Escape"
-                    onActivated: root.close()
+                    onActivated: {
+                        if (categoryBar.typeId !== "") { categoryBar.typeId = ""; return; }
+                        if (categoryBar.back()) return;
+                        if (win.activeScene.selectedId !== "") { win.activeScene.selectedId = ""; return; }
+                        root.close();
+                    }
                 }
 
                 Shortcut {
@@ -203,14 +229,49 @@ Scope {
                     id: ui
                     anchors.fill: parent
 
-                    readonly property real topH: Scaler.s(24)
-                    readonly property real bottomH: Scaler.s(136)
-                    readonly property real frameGap: ui.width * 0.03
-                    readonly property real k: Math.max(0.05, Math.min(ui.width * 0.84 / win.screenW, pager.height * 0.99 / win.screenH))
+                    function s(val) { return Scaler.s(val); }
 
-                    function s(val) {
-                        return Scaler.s(val);
+                    property real openProgress: 0
+                    readonly property real layoutP: Math.max(0, Math.min(1, openProgress))
+                    readonly property bool previewOpen: categoryBar.typeId !== ""
+                    property real previewP: previewOpen ? 1.0 : 0.0
+                    Behavior on previewP {
+                        SpringAnimation {
+                            spring: 4.0
+                            damping: 0.34
+                            epsilon: 0.0005
+                        }
                     }
+                    property string shownPreviewType: ""
+                    onPreviewPChanged: if (previewP <= 0.008 && !previewOpen) shownPreviewType = ""
+
+                    NumberAnimation {
+                        id: openAnim
+                        target: ui
+                        property: "openProgress"
+                        to: 1
+                        duration: 520
+                        easing.type: Easing.OutBack
+                        easing.overshoot: 1.2
+                    }
+
+                    readonly property real frameInset: ScreenEdges.inset(win.screen)
+                    readonly property real edgeGap: s(14)
+                    readonly property real innerMargin: frameInset + s(12)
+                    readonly property real leftPanelWidth: Math.round(Math.max(s(280), Math.min(s(390), width * 0.28)))
+                    readonly property real bottomBarHeight: Math.round(Math.max(s(92), Math.min(s(118), height * 0.145)))
+                    readonly property real topStripHeight: s(78)
+                    readonly property real previewSpan: Math.max(0, previewP) * (leftPanelWidth + edgeGap)
+                    readonly property real stageAreaX: innerMargin + previewSpan
+                    readonly property real stageAreaW: Math.max(200, width - stageAreaX - innerMargin)
+                    readonly property real stageAreaY: innerMargin + topStripHeight + edgeGap
+                    readonly property real stageAreaH: Math.max(160, height - stageAreaY - bottomBarHeight - edgeGap - innerMargin)
+                    readonly property real k: Math.max(0.05, Math.min(stageAreaW / Math.max(1, win.screenW), stageAreaH / Math.max(1, win.screenH)))
+                    readonly property real stageW: win.screenW * k
+                    readonly property real stageH: win.screenH * k
+                    readonly property real stageX: stageAreaX + (stageAreaW - stageW) / 2
+                    readonly property real stageY: stageAreaY + (stageAreaH - stageH) / 2
+                    readonly property real frameGap: width * 0.03
 
                     Image {
                         anchors.fill: parent
@@ -225,14 +286,16 @@ Scope {
                         color: Qt.rgba(ThemeBackend.crust.r, ThemeBackend.crust.g, ThemeBackend.crust.b, 0.78)
                     }
 
+                    // Lock screen stage (glides smoothly right when the left preview panel springs open)
                     Item {
                         id: pager
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.topMargin: ui.topH
-                        anchors.bottom: parent.bottom
-                        anchors.bottomMargin: ui.bottomH
+                        x: ui.stageAreaX
+                        y: ui.stageAreaY
+                        width: ui.stageAreaW
+                        height: ui.stageAreaH
+                        clip: true
+                        scale: 0.94 + 0.06 * ui.openProgress
+                        opacity: ui.layoutP
 
                         LockStageFrame {
                             id: clockFrame
@@ -240,7 +303,7 @@ Scope {
                             screenW: win.screenW
                             screenH: win.screenH
                             k: ui.k
-                            current: win.page === 0
+                            current: win.simpleStyle || win.page === 0
                             contentActive: current || distance < 0.999
                             wallpaper: win.wallpaperSource
                             videoPath: win.videoPath
@@ -257,7 +320,7 @@ Scope {
                                 height: win.screenH
                                 scope: "screen"
                                 k: ui.k
-                                active: win.page === 0
+                                active: win.simpleStyle || win.page === 0
                                 gridEnabled: win.gridScreen
                                 onImagePickRequested: (itemId, currentPath, rounded) => win.openImagePicker(itemId, currentPath, rounded)
                             }
@@ -295,12 +358,12 @@ Scope {
                         IconButton {
                             visible: !win.simpleStyle
                             anchors.left: parent.left
-                            anchors.leftMargin: Scaler.s(32)
+                            anchors.leftMargin: ui.s(16)
                             anchors.verticalCenter: parent.verticalCenter
-                            size: Scaler.s(52)
+                            size: ui.s(46)
                             cornerRadius: ThemeBackend.borderRadius
                             buttonIcon: "󰅁"
-                            iconFontSize: Scaler.s(24)
+                            iconFontSize: ui.s(22)
                             accentColor: ThemeBackend.surface0
                             textColor: ThemeBackend.text
                             opacity: win.page > 0 ? 1.0 : 0.0
@@ -312,12 +375,12 @@ Scope {
                         IconButton {
                             visible: !win.simpleStyle
                             anchors.right: parent.right
-                            anchors.rightMargin: Scaler.s(32)
+                            anchors.rightMargin: ui.s(16)
                             anchors.verticalCenter: parent.verticalCenter
-                            size: Scaler.s(52)
+                            size: ui.s(46)
                             cornerRadius: ThemeBackend.borderRadius
                             buttonIcon: "󰅂"
-                            iconFontSize: Scaler.s(24)
+                            iconFontSize: ui.s(22)
                             accentColor: ThemeBackend.surface0
                             textColor: ThemeBackend.text
                             opacity: win.page < 1 ? 1.0 : 0.0
@@ -327,252 +390,236 @@ Scope {
                         }
                     }
 
-                    ColumnLayout {
-                        id: chrome
-                        z: 100
-                        spacing: Scaler.s(6)
-                        visible: win.chromeTarget !== null
-                        opacity: win.chromeTarget !== null && !win.activeScene.dragging ? 1.0 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                    // Top toolbar strip above the lock stage (matches Open Redactor; tailored to lock-screen features)
+                    Item {
+                        id: topToolsHost
+                        x: ui.stageX
+                        width: ui.stageW
+                        y: ui.innerMargin - (1 - ui.layoutP) * ui.s(28)
+                        height: ui.topStripHeight
+                        opacity: ui.layoutP
+                        z: 150000
 
-                        readonly property bool hasProxy: win.selProxy !== null
-                        readonly property string pType: chrome.hasProxy ? win.selProxy.pType : ""
-                        readonly property bool isWidget: chrome.hasProxy && LockElementRegistry.isWidget(chrome.pType)
-                        readonly property string widgetKey: chrome.isWidget ? LockElementRegistry.widgetKey(chrome.pType) : ""
-                        readonly property var variantsList: chrome.hasProxy ? LockElementRegistry.variantList(chrome.pType) : []
-                        readonly property bool hasVariants: chrome.variantsList.length > 1
+                        // Page switcher pill when in two-page mode and no element is selected
+                        RowLayout {
+                            visible: !win.simpleStyle && win.selProxy === null
+                            anchors.centerIn: parent
+                            spacing: ui.s(6)
 
-                        function place() {
-                            let target = win.chromeTarget;
-                            if (!target) return;
-                            let tl = ui.mapFromItem(target, 0, 0);
-                            let br = ui.mapFromItem(target, target.width, target.height);
-                            let w = chrome.implicitWidth;
-                            let h = chrome.implicitHeight;
-                            let margin = Scaler.s(14);
-                            let limit = toolbar.y - Scaler.s(8);
-                            chrome.x = Math.max(Scaler.s(8), Math.min(ui.width - w - Scaler.s(8), (tl.x + br.x) / 2 - w / 2));
-                            let y = br.y + margin;
-                            if (y + h > limit) y = tl.y - h - margin;
-                            if (y < Scaler.s(8)) y = limit - h;
-                            chrome.y = Math.max(Scaler.s(8), y);
-                        }
+                            Repeater {
+                                model: [
+                                    { idx: 0, icon: "󰌾", label: I18n.t("lock.redactor.page.screen", "Lock Screen") },
+                                    { idx: 1, icon: "󰕮", label: I18n.t("lock.redactor.page.dashboard", "Dashboard") }
+                                ]
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    readonly property bool active: win.page === modelData.idx
+                                    implicitWidth: pgRow.implicitWidth + ui.s(20)
+                                    implicitHeight: ui.s(34)
+                                    radius: ThemeBackend.borderRadius
+                                    color: active ? ThemeBackend.mauve : (pgMa.containsMouse ? ThemeBackend.surface1 : Qt.alpha(ThemeBackend.surface0, 0.92))
+                                    border.width: 1
+                                    border.color: active ? ThemeBackend.mauve : Qt.alpha(ThemeBackend.surface1, 0.7)
+                                    Behavior on color { ColorAnimation { duration: ExMotion.fast } }
 
-                        onVisibleChanged: if (visible) chrome.place()
+                                    RowLayout {
+                                        id: pgRow
+                                        anchors.centerIn: parent
+                                        spacing: ui.s(6)
+                                        Text { text: modelData.icon; font.family: ThemeBackend.iconFont; font.pixelSize: ui.s(13); color: parent.parent.active ? ThemeBackend.crust : ThemeBackend.mauve }
+                                        Text { text: modelData.label; font.family: ThemeBackend.fontFamily; font.pixelSize: ui.s(12); font.bold: true; color: parent.parent.active ? ThemeBackend.crust : ThemeBackend.text }
+                                    }
 
-                        Timer {
-                            interval: 33
-                            repeat: true
-                            running: chrome.visible
-                            onTriggered: chrome.place()
-                        }
-
-                        Component {
-                            id: defaultSettingButton
-
-                            IconButton {
-                                id: defBtn
-                                property var settingData: null
-                                size: Scaler.s(34)
-                                cornerRadius: ThemeBackend.borderRadius
-                                buttonIcon: (defBtn.settingData && defBtn.settingData.icon) ? defBtn.settingData.icon : ""
-                                iconFontSize: Scaler.s((defBtn.settingData && defBtn.settingData.iconFontSize) ? defBtn.settingData.iconFontSize : 16)
-                                accentColor: win.activeScene.resolveThemeColor((defBtn.settingData && defBtn.settingData.accentColor) ? defBtn.settingData.accentColor : "surface0")
-                                textColor: win.activeScene.resolveThemeColor((defBtn.settingData && defBtn.settingData.textColor) ? defBtn.settingData.textColor : "mauve")
-                                onClicked: {
-                                    if (defBtn.settingData && defBtn.settingData.action && win.selProxy) {
-                                        win.activeScene.handleAdditionalAction(defBtn.settingData.action, win.selProxy);
+                                    MouseArea {
+                                        id: pgMa
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            Sounds.playSfx("reusables/clickbutton/click.wav");
+                                            win.page = modelData.idx;
+                                        }
                                     }
                                 }
                             }
                         }
 
-                        component Pill: Rectangle {
-                            id: pill
-                            property alias label: pillText.text
-                            implicitWidth: pillText.implicitWidth + Scaler.s(16)
-                            implicitHeight: Scaler.s(34)
-                            color: ThemeBackend.surface0
-                            radius: ThemeBackend.borderRadius
+                        ColumnLayout {
+                            id: chrome
+                            anchors.centerIn: parent
+                            spacing: ui.s(6)
+                            opacity: win.selProxy !== null ? 1.0 : 0.0
+                            visible: opacity > 0.01
+                            Behavior on opacity { NumberAnimation { duration: 150 } }
 
-                            Text {
-                                id: pillText
-                                anchors.centerIn: parent
-                                font.family: ThemeBackend.fontFamily
-                                font.pixelSize: Scaler.s(12)
-                                font.bold: true
-                                color: ThemeBackend.text
-                            }
-                        }
+                            readonly property bool hasProxy: win.selProxy !== null
+                            readonly property string pType: chrome.hasProxy ? win.selProxy.pType : ""
+                            readonly property bool isWidget: chrome.hasProxy && LockElementRegistry.isWidget(chrome.pType)
+                            readonly property string widgetKey: chrome.isWidget ? LockElementRegistry.widgetKey(chrome.pType) : ""
+                            readonly property var variantsList: chrome.hasProxy ? LockElementRegistry.variantList(chrome.pType) : []
+                            readonly property bool hasVariants: chrome.variantsList.length > 1
 
-                        RowLayout {
-                            Layout.alignment: Qt.AlignHCenter
-                            spacing: Scaler.s(4)
+                            Component {
+                                id: defaultSettingButton
 
-                            Pill {
-                                label: chrome.hasProxy
-                                    ? Math.round(win.selProxy.gW) + "x" + Math.round(win.selProxy.gH)
-                                    : Math.round(layoutStore.panelW) + "x" + Math.round(layoutStore.panelH)
-                            }
-
-                            Pill {
-                                label: chrome.hasProxy
-                                    ? (win.selProxy.gH > 0 ? (win.selProxy.gW / win.selProxy.gH).toFixed(2) : "0.00") + ":1"
-                                    : (layoutStore.panelW / layoutStore.panelH).toFixed(2) + ":1"
-                            }
-
-                            Pill {
-                                visible: chrome.hasProxy
-                                label: {
-                                    if (!chrome.hasProxy) return "";
-                                    let def = win.selProxy.getDefaultSize();
-                                    return def.w > 0 ? Math.round((win.selProxy.gW / def.w) * 100) + "%" : "100%";
-                                }
-                            }
-
-                            LockSettingsRepeater {
-                                row: "top"
-                                widgetKey: chrome.widgetKey
-                                proxy: win.selProxy
-                                scene: win.activeScene
-                                buttonComponent: defaultSettingButton
-                            }
-
-                            IconButton {
-                                visible: chrome.hasProxy
-                                size: Scaler.s(34)
-                                cornerRadius: ThemeBackend.borderRadius
-                                buttonIcon: "󰑖"
-                                iconFontSize: Scaler.s(16)
-                                accentColor: ThemeBackend.surface0
-                                textColor: ThemeBackend.text
-                                onClicked: if (win.selProxy) win.selProxy.rotateItem()
-                            }
-
-                            IconButton {
-                                visible: chrome.hasProxy
-                                size: Scaler.s(34)
-                                cornerRadius: ThemeBackend.borderRadius
-                                buttonIcon: "󰑐"
-                                iconFontSize: Scaler.s(15)
-                                accentColor: ThemeBackend.surface0
-                                textColor: ThemeBackend.text
-                                onClicked: if (win.selProxy) win.selProxy.resetItemSize()
-                            }
-
-                            DeleteButton {
-                                visible: chrome.hasProxy && win.selProxy.deletable
-                                size: Scaler.s(34)
-                                cornerRadius: ThemeBackend.borderRadius
-                                iconFontSize: Scaler.s(18)
-                                onClicked: win.activeScene.removeSelected()
-                            }
-                        }
-
-                        RowLayout {
-                            visible: chrome.hasProxy
-                            Layout.alignment: Qt.AlignHCenter
-                            spacing: Scaler.s(6)
-
-                            LockSettingsRepeater {
-                                row: "bottom"
-                                widgetKey: chrome.widgetKey
-                                elementType: chrome.pType
-                                proxy: win.selProxy
-                                scene: win.activeScene
-                                buttonComponent: defaultSettingButton
-                            }
-
-                            Dropdown {
-                                id: variantDropdown
-                                visible: chrome.hasVariants
-                                implicitHeight: Scaler.s(34)
-                                implicitWidth: Scaler.s(150)
-                                accentColor: ThemeBackend.mauve
-                                baseColor: ThemeBackend.surface0
-                                dropdownColor: ThemeBackend.base
-                                borderColor: ThemeBackend.surface1
-                                textColor: ThemeBackend.text
-                                activeTextColor: ThemeBackend.crust
-                                cornerRadius: ThemeBackend.borderRadius
-                                fontPixelSize: Scaler.s(11)
-                                fuzzySearch: false
-                                options: chrome.variantsList.map(v => v.name)
-
-                                function syncIndex() {
-                                    if (!win.selProxy) return;
-                                    let i = chrome.variantsList.findIndex(v => v.id === win.selProxy.pVariant);
-                                    variantDropdown.currentIndex = i >= 0 ? i : 0;
-                                }
-
-                                Component.onCompleted: syncIndex()
-
-                                Connections {
-                                    target: win
-                                    function onSelProxyChanged() { variantDropdown.syncIndex(); }
-                                }
-
-                                Connections {
-                                    target: win.selProxy
-                                    ignoreUnknownSignals: true
-                                    function onPVariantChanged() { variantDropdown.syncIndex(); }
-                                }
-
-                                onSelected: (idx, value) => {
-                                    if (win.selProxy && idx >= 0 && idx < chrome.variantsList.length) {
-                                        win.selProxy.applyVariant(chrome.variantsList[idx].id);
+                                IconButton {
+                                    id: defBtn
+                                    property var settingData: null
+                                    size: ui.s(34)
+                                    cornerRadius: ThemeBackend.borderRadius
+                                    buttonIcon: (defBtn.settingData && defBtn.settingData.icon) ? defBtn.settingData.icon : ""
+                                    iconFontSize: ui.s((defBtn.settingData && defBtn.settingData.iconFontSize) ? defBtn.settingData.iconFontSize : 16)
+                                    accentColor: win.activeScene.resolveThemeColor((defBtn.settingData && defBtn.settingData.accentColor) ? defBtn.settingData.accentColor : "surface0")
+                                    textColor: win.activeScene.resolveThemeColor((defBtn.settingData && defBtn.settingData.textColor) ? defBtn.settingData.textColor : "mauve")
+                                    onClicked: {
+                                        if (defBtn.settingData && defBtn.settingData.action && win.selProxy) {
+                                            win.activeScene.handleAdditionalAction(defBtn.settingData.action, win.selProxy);
+                                        }
                                     }
                                 }
                             }
 
-                            Rectangle {
-                                implicitWidth: chrome.hasVariants ? Scaler.s(200) : Scaler.s(280)
-                                implicitHeight: Scaler.s(34)
-                                color: ThemeBackend.surface0
+                            component Pill: Rectangle {
+                                property alias label: pillText.text
+                                implicitWidth: pillText.implicitWidth + ui.s(16)
+                                implicitHeight: ui.s(34)
+                                color: Qt.alpha(ThemeBackend.surface0, 0.92)
+                                border.width: 1
+                                border.color: Qt.alpha(ThemeBackend.surface1, 0.7)
                                 radius: ThemeBackend.borderRadius
 
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: Scaler.s(10)
-                                    anchors.rightMargin: Scaler.s(10)
-                                    spacing: Scaler.s(8)
+                                Text {
+                                    id: pillText
+                                    anchors.centerIn: parent
+                                    font.family: ThemeBackend.fontFamily
+                                    font.pixelSize: ui.s(12)
+                                    font.bold: true
+                                    color: ThemeBackend.text
+                                }
+                            }
 
-                                    Text {
-                                        text: Math.round((chrome.hasProxy ? win.selProxy.pOpacity : 1) * 100) + "%"
-                                        font.family: ThemeBackend.fontFamily
-                                        font.pixelSize: Scaler.s(11)
-                                        font.bold: true
-                                        color: ThemeBackend.text
-                                        Layout.preferredWidth: Scaler.s(32)
+                            RowLayout {
+                                Layout.alignment: Qt.AlignHCenter
+                                spacing: ui.s(4)
+
+                                Pill {
+                                    label: chrome.hasProxy ? (Math.round(win.selProxy.gW) + "x" + Math.round(win.selProxy.gH)) : ""
+                                }
+
+                                Pill {
+                                    label: chrome.hasProxy ? ((win.selProxy.gH > 0 ? (win.selProxy.gW / win.selProxy.gH).toFixed(2) : "0.00") + ":1") : ""
+                                }
+
+                                Pill {
+                                    label: {
+                                        if (!chrome.hasProxy) return "";
+                                        let def = win.selProxy.getDefaultSize();
+                                        return def.w > 0 ? Math.round((win.selProxy.gW / def.w) * 100) + "%" : "100%";
                                     }
+                                }
 
-                                    Draggable {
-                                        id: opacitySlider
-                                        Layout.fillWidth: true
-                                        Layout.preferredHeight: Scaler.s(16)
-                                        Layout.alignment: Qt.AlignVCenter
-                                        from: 0.0
-                                        to: 100.0
-                                        value: Math.round((chrome.hasProxy ? win.selProxy.pOpacity : 1) * 100)
-                                        backgroundColor: ThemeBackend.surface1
-                                        accentColor: ThemeBackend.mauve
-                                        gradColor1: ThemeBackend.mauve
-                                        gradColor2: Qt.lighter(ThemeBackend.mauve, 1.05)
-                                        gradColor3: Qt.lighter(ThemeBackend.mauve, 1.10)
-                                        cornerRadius: ThemeBackend.borderRadius
-                                        handleSize: Scaler.s(16)
-                                        handleColor: Qt.lighter(ThemeBackend.mauve, 1.15)
-                                        handleHoverColor: Qt.lighter(ThemeBackend.mauve, 1.3)
-                                        handleDragColor: Qt.lighter(ThemeBackend.mauve, 1.45)
-                                        handleBorderColor: Qt.rgba(0, 0, 0, 0.2)
-                                        showValueBubble: false
+                                LockSettingsRepeater {
+                                    row: "top"
+                                    widgetKey: chrome.widgetKey
+                                    proxy: win.selProxy
+                                    scene: win.activeScene
+                                    buttonComponent: defaultSettingButton
+                                }
 
-                                        onMoved: val => {
-                                            if (win.selProxy) win.selProxy.setOpacity(val / 100.0);
+                                IconButton {
+                                    size: ui.s(34)
+                                    cornerRadius: ThemeBackend.borderRadius
+                                    buttonIcon: "󰑖"
+                                    iconFontSize: ui.s(16)
+                                    accentColor: ThemeBackend.surface0
+                                    textColor: ThemeBackend.text
+                                    onClicked: if (win.selProxy) win.selProxy.rotateItem()
+                                }
+
+                                IconButton {
+                                    size: ui.s(34)
+                                    cornerRadius: ThemeBackend.borderRadius
+                                    buttonIcon: "󰑐"
+                                    iconFontSize: ui.s(15)
+                                    accentColor: ThemeBackend.surface0
+                                    textColor: ThemeBackend.text
+                                    onClicked: if (win.selProxy) win.selProxy.resetItemSize()
+                                }
+
+                                DeleteButton {
+                                    visible: chrome.hasProxy && win.selProxy.deletable
+                                    size: ui.s(34)
+                                    cornerRadius: ThemeBackend.borderRadius
+                                    iconFontSize: ui.s(18)
+                                    onClicked: win.activeScene.removeSelected()
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.alignment: Qt.AlignHCenter
+                                spacing: ui.s(6)
+
+                                LockSettingsRepeater {
+                                    row: "bottom"
+                                    widgetKey: chrome.widgetKey
+                                    elementType: chrome.pType
+                                    proxy: win.selProxy
+                                    scene: win.activeScene
+                                    buttonComponent: defaultSettingButton
+                                }
+
+                                // Opacity slider
+                                Rectangle {
+                                    implicitWidth: ui.s(280)
+                                    implicitHeight: ui.s(34)
+                                    color: Qt.alpha(ThemeBackend.surface0, 0.92)
+                                    border.width: 1
+                                    border.color: Qt.alpha(ThemeBackend.surface1, 0.7)
+                                    radius: ThemeBackend.borderRadius
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: ui.s(10)
+                                        anchors.rightMargin: ui.s(10)
+                                        spacing: ui.s(8)
+
+                                        Text {
+                                            text: Math.round((chrome.hasProxy ? win.selProxy.pOpacity : 1) * 100) + "%"
+                                            font.family: ThemeBackend.fontFamily
+                                            font.pixelSize: ui.s(11)
+                                            font.bold: true
+                                            color: ThemeBackend.text
+                                            Layout.preferredWidth: ui.s(32)
                                         }
 
-                                        onDragFinished: {
-                                            if (win.selProxy) win.selProxy.finalizeSync();
+                                        Draggable {
+                                            id: opacitySlider
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: ui.s(16)
+                                            Layout.alignment: Qt.AlignVCenter
+                                            from: 0.0
+                                            to: 100.0
+                                            value: Math.round((chrome.hasProxy ? win.selProxy.pOpacity : 1) * 100)
+                                            backgroundColor: ThemeBackend.surface1
+                                            accentColor: ThemeBackend.mauve
+                                            gradColor1: ThemeBackend.mauve
+                                            gradColor2: Qt.lighter(ThemeBackend.mauve, 1.05)
+                                            gradColor3: Qt.lighter(ThemeBackend.mauve, 1.10)
+                                            cornerRadius: ThemeBackend.borderRadius
+                                            handleSize: ui.s(16)
+                                            handleColor: Qt.lighter(ThemeBackend.mauve, 1.15)
+                                            handleHoverColor: Qt.lighter(ThemeBackend.mauve, 1.3)
+                                            handleDragColor: Qt.lighter(ThemeBackend.mauve, 1.45)
+                                            handleBorderColor: Qt.rgba(0, 0, 0, 0.2)
+                                            showValueBubble: false
+
+                                            onMoved: val => {
+                                                if (win.selProxy) win.selProxy.setOpacity(val / 100.0);
+                                            }
+
+                                            onDragFinished: {
+                                                if (win.selProxy) win.selProxy.finalizeSync();
+                                            }
                                         }
                                     }
                                 }
@@ -580,122 +627,58 @@ Scope {
                         }
                     }
 
-                    Item {
-                        id: toolbar
-                        anchors.bottom: parent.bottom
-                        anchors.bottomMargin: Scaler.s(24)
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        width: Math.min(ui.width - Scaler.s(48), itemsRow.implicitWidth + actionsRow.implicitWidth + Scaler.s(80))
-                        height: Scaler.s(100)
-                        z: 50
-
-                        Rectangle {
-                            anchors.fill: parent
-                            color: ThemeBackend.base
-                            radius: ThemeBackend.borderRadius
-
+                    // Full-height left preview panel: hidden until clicked, slides smoothly via GPU Translate
+                    LockPreviewPanel {
+                        id: previewPanel
+                        z: 200000
+                        selectedProxy: win.selProxy
+                        scope: win.activeScene.scope
+                        typeId: ui.shownPreviewType
+                        x: ui.innerMargin
+                        y: ui.innerMargin
+                        width: ui.leftPanelWidth
+                        height: ui.height - ui.innerMargin * 2
+                        transform: Translate {
+                            x: -(1 - ui.previewP) * (previewPanel.width + ui.innerMargin * 1.4)
                         }
-
-                        Flickable {
-                            id: itemsFlick
-                            anchors.left: parent.left
-                            anchors.leftMargin: Scaler.s(16)
-                            anchors.right: actionsRow.left
-                            anchors.rightMargin: Scaler.s(20)
-                            anchors.verticalCenter: parent.verticalCenter
-                            height: parent.height - Scaler.s(32)
-                            contentWidth: itemsRow.implicitWidth
-                            contentHeight: height
-                            clip: true
-                            flickableDirection: Flickable.HorizontalFlick
-                            boundsBehavior: Flickable.StopAtBounds
-
-                            WheelHandler {
-                                onWheel: (event) => {
-                                    let delta = event.angleDelta.x !== 0 ? event.angleDelta.x : event.angleDelta.y;
-                                    itemsFlick.contentX = Math.max(0, Math.min(Math.max(0, itemsFlick.contentWidth - itemsFlick.width), itemsFlick.contentX - delta));
-                                }
-                            }
-
-                            RowLayout {
-                                id: itemsRow
-                                height: itemsFlick.height
-                                spacing: Scaler.s(14)
-
-                                Repeater {
-                                    model: LockElementRegistry.lockTypeList(win.activeScene.scope)
-
-                                    LockToolbarItem {
-                                        icon: modelData.icon
-                                        caption: modelData.name
-                                        onClicked: win.addItem(modelData.id, "")
-                                    }
-                                }
-
-                                Rectangle {
-                                    Layout.preferredWidth: 1
-                                    Layout.preferredHeight: Scaler.s(52)
-                                    color: Qt.alpha(ThemeBackend.text, 0.15)
-                                }
-
-                                Repeater {
-                                    model: WidgetRegistry.typeList()
-
-                                    delegate: Loader {
-                                        Layout.alignment: Qt.AlignVCenter
-                                        sourceComponent: WidgetRegistry.toolbarComponent(modelData.id)
-                                        onLoaded: {
-                                            if (item) {
-                                                item.typeData = modelData;
-                                                item.redactor = widgetAdder;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                        opacity: Math.max(0, Math.min(1, ui.previewP * 1.5)) * ui.layoutP
+                        visible: ui.openProgress > 0.001 && ui.previewP > 0.008 && ui.shownPreviewType !== ""
+                        onCloseRequested: categoryBar.typeId = ""
+                        onVariantPicked: (tid, vid) => {
+                            if (win.selProxy && win.selProxy.pType === tid) win.selProxy.applyVariant(vid);
                         }
+                        onAddRequested: (tid, vid) => win.addItem(tid, "", vid)
+                    }
 
-                        RowLayout {
-                            id: actionsRow
-                            anchors.right: parent.right
-                            anchors.rightMargin: Scaler.s(16)
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: Scaler.s(10)
-
-                            IconButton {
-                                size: Scaler.s(40)
-                                cornerRadius: ThemeBackend.borderRadius
-                                buttonIcon: "󰕰"
-                                iconFontSize: Scaler.s(20)
-                                accentColor: win.gridOn ? ThemeBackend.mauve : ThemeBackend.surface0
-                                textColor: win.gridOn ? ThemeBackend.crust : ThemeBackend.text
-                                onClicked: win.toggleGrid()
-                            }
-
-                            IconButton {
-                                size: Scaler.s(40)
-                                cornerRadius: ThemeBackend.borderRadius
-                                buttonIcon: "󰑐"
-                                iconFontSize: Scaler.s(20)
-                                accentColor: ThemeBackend.surface0
-                                textColor: ThemeBackend.text
-                                onClicked: {
-                                    win.activeScene.selectedId = "";
-                                    layoutStore.resetScope(win.activeScene.scope);
-                                }
-                            }
-
-                            ClickButton {
-                                maxWidth: Scaler.s(100)
-                                implicitHeight: Scaler.s(40)
-                                cornerRadius: ThemeBackend.borderRadius
-                                buttonText: I18n.t("lock.redactor.done")
-                                textFontSize: Scaler.s(14)
-                                accentColor: ThemeBackend.mauve
-                                textColor: ThemeBackend.crust
-                                onClicked: root.close()
-                            }
+                    // Bottom category bar matching stage width
+                    LockCategoryBar {
+                        id: categoryBar
+                        z: 200000
+                        redactorWin: win
+                        layoutStore: layoutStore
+                        scope: win.activeScene.scope
+                        gridOn: win.gridOn
+                        x: ui.stageX
+                        width: ui.stageW
+                        height: ui.bottomBarHeight
+                        y: ui.height - height - ui.innerMargin + (1 - ui.openProgress) * (height + ui.innerMargin)
+                        visible: ui.openProgress > 0.001
+                        onTypeIdChanged: {
+                            if (typeId !== "") ui.shownPreviewType = typeId;
                         }
+                        onToggleGridRequested: win.toggleGrid()
+                        onResetScopeRequested: {
+                            win.activeScene.selectedId = "";
+                            layoutStore.resetScope(win.activeScene.scope);
+                        }
+                        onDoneClicked: root.close()
+                    }
+
+                    ScreenFrame {
+                        anchors.fill: parent
+                        z: 250000
+                        inset: ui.frameInset
+                        visible: inset > 0
                     }
 
                     Loader {
@@ -715,7 +698,9 @@ Scope {
                                 if (imagePickerLoader.targetItemId !== "") {
                                     layoutStore.setItemProperty(imagePickerLoader.targetItemId, "iimage", filePath);
                                 } else if (filePath !== "") {
-                                    win.addItem("widget:image", filePath);
+                                    let v = win.pendingImageVariant;
+                                    win.pendingImageVariant = "";
+                                    win.addItem("widget:image", filePath, v);
                                 }
                                 imagePickerLoader.targetItemId = "";
                             }

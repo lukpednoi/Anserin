@@ -2,10 +2,10 @@ import QtQuick
 import QtQuick.Layouts
 import "../"
 import "../reusables"
+import "../reusables/expressive"
 
-// Open Redactor's bottom bar. The first page lists the widget groups (Clocks, System, Media, Weather, Other);
-// picking one slides to its widgets, and picking a widget shows its styles in the preview panel (typeId).
-// Grid, Clear and Done stay at the right end on both pages.
+// Open Redactor's bottom bar: width matches the shrunk desktop canvas, smooth wheel scrolling,
+// bouncy expressive springs on tiles & page transitions, plus Undo / Redo / Grid / Clear / Done.
 Item {
     id: root
 
@@ -16,13 +16,11 @@ Item {
 
     function s(v) { return Scaler.s(v); }
 
-    readonly property real pad: s(14)
-    readonly property real tileGap: s(10)
-    // the tiles are 70% of the bar's inner height, centred in it
-    readonly property real tileHeight: Math.round(Math.max(s(64), height - pad * 2) * 0.7)
-    readonly property real tileWidth: Math.round(tileHeight * 1.15)
+    readonly property real pad: s(10)
+    readonly property real tileGap: s(8)
+    readonly property real tileHeight: Math.round(Math.max(s(56), height - pad * 2) * 0.78)
+    readonly property real tileWidth: Math.round(tileHeight * 1.18)
 
-    // Same grouping as WidgetPicker: the registry's categories, then anything left over under Other.
     readonly property var sections: {
         let types = WidgetRegistry.types;
         let placed = {};
@@ -49,7 +47,6 @@ Item {
         root.categoryId = id;
     }
 
-    // Steps back one page; false when already on the groups page (Escape then closes the redactor).
     function back() {
         if (root.categoryId === "") return false;
         root.typeId = "";
@@ -57,16 +54,21 @@ Item {
         return true;
     }
 
-    // 0 = groups page, 1 = a group's widgets
     property real page: root.categoryId === "" ? 0 : 1
-    Behavior on page { NumberAnimation { duration: 320; easing.type: Easing.OutBack; easing.overshoot: 1.1 } }
+    Behavior on page {
+        SpringAnimation {
+            spring: ExMotion.qtSpring("spatialDefault")
+            damping: ExMotion.qtDamping("spatialDefault") * 0.74
+            epsilon: 0.001
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
         radius: ThemeBackend.borderRadius
         color: barGlass.active ? "transparent" : ThemeBackend.base
         border.width: 1
-        border.color: Qt.alpha(ThemeBackend.surface1, 0.6)
+        border.color: Qt.alpha(ThemeBackend.surface1, 0.65)
 
         WallpaperBlur {
             id: barGlass
@@ -78,7 +80,14 @@ Item {
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.AllButtons
-            onWheel: (wheel) => wheel.accepted = true
+            onWheel: (wheel) => {
+                let target = root.categoryId === "" ? groupFlick : typeFlick;
+                if (!target) { wheel.accepted = true; return; }
+                let d = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x;
+                let maxX = Math.max(0, target.contentWidth - target.width);
+                if (maxX > 0) target.contentX = Math.max(0, Math.min(maxX, target.contentX - d * 0.75));
+                wheel.accepted = true;
+            }
         }
     }
 
@@ -89,18 +98,30 @@ Item {
         property bool selected: false
         signal activated()
 
+        ExSpring {
+            id: tileSc
+            token: "spatialFast"
+            target: tileMa.pressed ? 0.90 : (tileMa.containsMouse ? 1.055 : 1.0)
+        }
+
         width: root.tileWidth
         height: root.tileHeight
-        radius: ThemeBackend.borderRadius
+        radius: tileMa.pressed ? root.s(8) : (tile.selected ? root.s(15) : Math.max(8, ThemeBackend.borderRadius - 2))
+        Behavior on radius {
+            SpringAnimation {
+                spring: ExMotion.qtSpring("spatialFast")
+                damping: ExMotion.qtDamping("spatialFast")
+                epsilon: 0.2
+            }
+        }
         color: tile.selected ? ThemeBackend.mauve : (tileMa.containsMouse ? ThemeBackend.surface1 : ThemeBackend.surface0)
-        Behavior on color { ColorAnimation { duration: 140 } }
-        scale: tileMa.pressed ? 0.95 : (tileMa.containsMouse ? 1.03 : 1.0)
-        Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
+        Behavior on color { ColorAnimation { duration: ExMotion.fast } }
+        scale: tileSc.value
 
         ColumnLayout {
             anchors.centerIn: parent
-            width: parent.width - root.s(12)
-            spacing: root.s(4)
+            width: parent.width - root.s(8)
+            spacing: root.s(3)
 
             Text {
                 Layout.alignment: Qt.AlignHCenter
@@ -115,7 +136,7 @@ Item {
                 text: tile.title
                 elide: Text.ElideRight
                 font.family: ThemeBackend.fontFamily
-                font.pixelSize: root.s(13)
+                font.pixelSize: root.s(11)
                 font.bold: true
                 color: tile.selected ? ThemeBackend.crust : ThemeBackend.text
             }
@@ -130,13 +151,14 @@ Item {
                 Sounds.playSfx("reusables/clickbutton/click.wav");
                 tile.activated();
             }
+            onWheel: (wheel) => { wheel.accepted = false; }
         }
     }
 
     RowLayout {
         anchors.fill: parent
         anchors.margins: root.pad
-        spacing: root.pad
+        spacing: root.s(10)
 
         Item {
             id: pages
@@ -144,13 +166,12 @@ Item {
             Layout.fillHeight: true
             clip: true
 
-            // Groups page
             Flickable {
                 id: groupFlick
                 width: pages.width
                 height: pages.height
-                x: -root.page * s(60)
-                opacity: Math.max(0, 1 - root.page)
+                x: -root.page * s(48)
+                opacity: Math.max(0, Math.min(1, 1 - root.page))
                 visible: opacity > 0.01
                 enabled: root.categoryId === ""
                 contentWidth: groupRow.width
@@ -158,10 +179,22 @@ Item {
                 interactive: contentWidth > width
                 flickableDirection: Flickable.HorizontalFlick
                 boundsBehavior: Flickable.StopAtBounds
+                Behavior on contentX { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+
+                WheelHandler {
+                    acceptedDevices: PointerDevice.AllDevices
+                    onWheel: (event) => {
+                        let d = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x;
+                        let maxX = Math.max(0, groupFlick.contentWidth - groupFlick.width);
+                        groupFlick.contentX = Math.max(0, Math.min(maxX, groupFlick.contentX - d * 0.75));
+                        event.accepted = true;
+                    }
+                }
 
                 Row {
                     id: groupRow
-                    y: Math.round((groupFlick.height - root.tileHeight) / 2)
+                    height: root.tileHeight
+                    y: Math.round((groupFlick.height - height) / 2)
                     spacing: root.tileGap
                     Repeater {
                         model: root.sections
@@ -175,12 +208,11 @@ Item {
                 }
             }
 
-            // A group's widgets, with a back tile first
             Flickable {
                 id: typeFlick
                 width: pages.width
                 height: pages.height
-                x: (1 - root.page) * s(60)
+                x: (1 - root.page) * s(48)
                 opacity: Math.max(0, Math.min(1, root.page))
                 visible: opacity > 0.01
                 enabled: root.categoryId !== ""
@@ -189,16 +221,28 @@ Item {
                 interactive: contentWidth > width
                 flickableDirection: Flickable.HorizontalFlick
                 boundsBehavior: Flickable.StopAtBounds
+                Behavior on contentX { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+
+                WheelHandler {
+                    acceptedDevices: PointerDevice.AllDevices
+                    onWheel: (event) => {
+                        let d = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x;
+                        let maxX = Math.max(0, typeFlick.contentWidth - typeFlick.width);
+                        typeFlick.contentX = Math.max(0, Math.min(maxX, typeFlick.contentX - d * 0.75));
+                        event.accepted = true;
+                    }
+                }
 
                 Row {
                     id: typeRow
-                    y: Math.round((typeFlick.height - root.tileHeight) / 2)
+                    height: root.tileHeight
+                    y: Math.round((typeFlick.height - height) / 2)
                     spacing: root.tileGap
 
                     Tile {
-                        width: Math.round(root.tileHeight * 0.7)
+                        width: Math.round(root.tileHeight * 0.78)
                         icon: "󰁍"
-                        title: root.currentSection ? root.currentSection.name : ""
+                        title: I18n.t("common.back", "Back")
                         onActivated: root.back()
                     }
 
@@ -209,28 +253,56 @@ Item {
                             icon: modelData.icon
                             title: modelData.name
                             selected: root.typeId === modelData.id
-                            onActivated: root.typeId = modelData.id
+                            onActivated: root.typeId = (root.typeId === modelData.id ? "" : modelData.id)
                         }
                     }
                 }
             }
         }
 
+        Rectangle {
+            Layout.preferredWidth: 1
+            Layout.fillHeight: true
+            Layout.topMargin: root.s(6)
+            Layout.bottomMargin: root.s(6)
+            color: Qt.alpha(ThemeBackend.surface1, 0.7)
+        }
+
         ColumnLayout {
             Layout.alignment: Qt.AlignVCenter
-            Layout.preferredWidth: s(96)
-            Layout.maximumWidth: s(96)
-            spacing: s(8)
+            Layout.fillWidth: false
+            Layout.preferredWidth: actionsRow.implicitWidth
+            spacing: root.s(6)
 
             RowLayout {
-                Layout.alignment: Qt.AlignHCenter
-                spacing: s(8)
+                id: actionsRow
+                spacing: root.s(5)
 
                 IconButton {
-                    size: s(40)
-                    cornerRadius: ThemeBackend.borderRadius
-                    buttonIcon: "󰕰"
-                    iconFontSize: s(16)
+                    size: root.s(30)
+                    cornerRadius: Math.max(6, ThemeBackend.borderRadius - 4)
+                    buttonIcon: "󰕌"
+                    iconFontSize: root.s(15)
+                    accentColor: ThemeBackend.surface0
+                    textColor: (root.redactor && root.redactor.canUndo) ? ThemeBackend.text : ThemeBackend.overlay0
+                    enabled: !!(root.redactor && root.redactor.canUndo)
+                    onClicked: if (root.redactor) root.redactor.undo()
+                }
+                IconButton {
+                    size: root.s(30)
+                    cornerRadius: Math.max(6, ThemeBackend.borderRadius - 4)
+                    buttonIcon: "󰑎"
+                    iconFontSize: root.s(15)
+                    accentColor: ThemeBackend.surface0
+                    textColor: (root.redactor && root.redactor.canRedo) ? ThemeBackend.text : ThemeBackend.overlay0
+                    enabled: !!(root.redactor && root.redactor.canRedo)
+                    onClicked: if (root.redactor) root.redactor.redo()
+                }
+                IconButton {
+                    size: root.s(30)
+                    cornerRadius: Math.max(6, ThemeBackend.borderRadius - 4)
+                    buttonIcon: "󰋁"
+                    iconFontSize: root.s(15)
                     accentColor: root.redactor && root.redactor.gridEnabled ? ThemeBackend.mauve : ThemeBackend.surface0
                     textColor: root.redactor && root.redactor.gridEnabled ? ThemeBackend.crust : ThemeBackend.text
                     onClicked: {
@@ -240,12 +312,11 @@ Item {
                         if (turningOn) root.redactor.snapAllWidgetsToGrid();
                     }
                 }
-
                 IconButton {
-                    size: s(40)
-                    cornerRadius: ThemeBackend.borderRadius
+                    size: root.s(30)
+                    cornerRadius: Math.max(6, ThemeBackend.borderRadius - 4)
                     buttonIcon: "󰑐"
-                    iconFontSize: s(16)
+                    iconFontSize: root.s(15)
                     accentColor: ThemeBackend.surface0
                     textColor: ThemeBackend.text
                     enabled: root.redactor && root.redactor.activeWidgetsModel ? root.redactor.activeWidgetsModel.count > 0 : false
@@ -254,16 +325,46 @@ Item {
                 }
             }
 
-            ClickButton {
+            Rectangle {
+                id: doneBtn
+                ExSpring {
+                    id: doneSc
+                    token: "spatialFast"
+                    target: doneMa.pressed ? 0.92 : (doneMa.containsMouse ? 1.04 : 1.0)
+                }
                 Layout.fillWidth: true
-                implicitHeight: s(40)
-                horizontalPadding: s(14)
-                cornerRadius: ThemeBackend.borderRadius
-                buttonText: I18n.t("widgets.redactor.done")
-                textFontSize: s(13)
-                accentColor: ThemeBackend.mauve
-                textColor: ThemeBackend.crust
-                onClicked: root.doneClicked()
+                Layout.preferredHeight: root.s(32)
+                scale: doneSc.value
+                radius: doneMa.pressed ? root.s(7) : Math.max(8, ThemeBackend.borderRadius - 2)
+                Behavior on radius {
+                    SpringAnimation {
+                        spring: ExMotion.qtSpring("spatialFast")
+                        damping: ExMotion.qtDamping("spatialFast")
+                        epsilon: 0.2
+                    }
+                }
+                color: doneMa.pressed ? Qt.darker(ThemeBackend.mauve, 1.12) : (doneMa.containsMouse ? Qt.lighter(ThemeBackend.mauve, 1.08) : ThemeBackend.mauve)
+                Behavior on color { ColorAnimation { duration: ExMotion.fast } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: I18n.t("widgets.redactor.done", "Done")
+                    font.family: ThemeBackend.fontFamily
+                    font.pixelSize: root.s(12)
+                    font.bold: true
+                    color: ThemeBackend.crust
+                }
+
+                MouseArea {
+                    id: doneMa
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        Sounds.playSfx("reusables/clickbutton/click.wav");
+                        root.doneClicked();
+                    }
+                }
             }
         }
     }
