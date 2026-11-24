@@ -1,6 +1,159 @@
 {
   "versions": [
     {
+      "version": "0.2.0",
+      "date": "2026-11-25",
+      "posts": [
+        {
+          "id": "smart-control-center",
+          "tag": "improved",
+          "title": "Smart Home Control Center & faster pages",
+          "image": "docs/updates/0.2.0-control-after.jpg",
+          "images": [
+            { "label": "Before", "src": "docs/updates/0.2.0-control-before.jpg" },
+            { "label": "After",  "src": "docs/updates/0.2.0-control-after.jpg" }
+          ],
+          "details": "Before: Control Center used the board of small tiles and built all Settings pages at once (~616 ms pause on open).\n\nNow: Control has a new Smart Home card layout with spring switches, sliders, smooth mouse-wheel and touchpad scrolling, and 14 per-page async loaders (opening ~3–6x faster, ~100–180 ms). Overview gets three expressive Wave Dials (brightness, volume, mic) and icon-only quick actions with water-wave fills while keeping the sleeping duck notification nest.",
+          "resources": {
+            "ram": "~25 MB",
+            "cpu": "under 1% at rest",
+            "disk": "364 KB"
+          }
+        },
+        {
+          "id": "left-panel-light-rail",
+          "tag": "improved",
+          "title": "Kinetic Light-Rail left panel & 72% faster open",
+          "details": "Before: The left panel compiled all 9 pages together on its first open (~493 ms freeze) and paused 220 ms when expanding from the workspace capsule.\n\nNow: The L-shaped frame carries a glowing fiber-optic light rail, morphing corner emblem and spring indicator. Each page compiles and loads lazily on demand, cutting first-open time from ~493 ms to ~138 ms (-72%) and capsule wait to 45 ms.",
+          "resources": {
+            "ram": "less than before (only opened pages load)",
+            "cpu": "under 1% at rest",
+            "disk": "20 KB"
+          }
+        },
+        {
+          "id": "smart-music",
+          "tag": "feature",
+          "title": "Smart Music with Liquid Mercury Equalizer",
+          "image": "docs/updates/0.2.0-smart-music.jpg",
+          "details": "A new Music style (Smart, replacing Ambient) matching Smart Weather, with Mirror and Theme tones, a spinning vinyl disc, synced lyrics, and a 10-band Liquid Mercury Wave GPU equalizer with Ball-Impact Cascade animations and stereo harp sound effects.\n\nPick it in Edit panel → Style → Music.",
+          "resources": {
+            "ram": "~30 MB",
+            "cpu": "~8% of one core while EQ is open",
+            "disk": "3.0 MB"
+          }
+        },
+        {
+          "id": "music-bar",
+          "tag": "feature",
+          "title": "Floating Music bar with synced lyrics & Cava wave",
+          "image": "docs/updates/0.2.0-music-bar.jpg",
+          "details": "An optional floating pill at the top or bottom of your screen showing the playing cover, auto-paginating synced lyrics (English and Thai), and a seamless 360° GPU wave hugging the capsule with zero corner seams. Click to open Music; uses zero RAM when turned off or idle.\n\nTurn it on in Control Center → Control → Panel → Music.",
+          "resources": {
+            "ram": "~12 MB",
+            "cpu": "~3% of one core while playing",
+            "disk": "40 KB"
+          }
+        },
+        {
+          "id": "system-monitor-smart",
+          "tag": "feature",
+          "title": "Minimal & Smart System Monitor styles",
+          "image": "docs/updates/0.2.0-system-monitor.jpg",
+          "details": "Two new RAM-friendly System Monitor styles: Minimal (Hardware Bento cards for CPU P/E cores, GPU/VRAM, RAM, Disk, Network, Power profile, Battery, Ping and Top-5 Processes) and Smart (smoked-glass HUD in Mirror and Theme tones). Polling stops as soon as the panel closes.\n\nPick them in Edit panel → Style → System.",
+          "resources": {
+            "ram": "~15 MB",
+            "cpu": "~1% every 2 s while open",
+            "disk": "76 KB"
+          }
+        },
+        {
+          "id": "claude-panel",
+          "tag": "feature",
+          "title": "Claude Panel: Claude Code inside a collapsible overlay",
+          "image": "docs/updates/0.2.0-claude-panel.jpg",
+          "details": "Press Super + C (or right-click the desktop) to open a real Claude Code terminal with a liquid-wave GPU reveal, a corner dome with the waving Clawd mascot, and a side Studio rail showing live edited files/diffs, slash commands, recent sessions, model/effort switcher and context usage — without touching ~/.claude/settings.json.\n\nRequires claude CLI and Qt 6 qmltermwidget. Also available standalone at github.com/lukpednoi/Claude-Panel.",
+          "resources": {
+            "ram": "~45 MB (plus claude CLI)",
+            "cpu": "under 1% at rest",
+            "disk": "468 KB"
+          }
+        },
+        {
+          "id": "flip-clock-widget",
+          "tag": "feature",
+          "title": "Flip Clock desktop widget",
+          "image": "docs/updates/0.2.0-flip-clock.jpg",
+          "details": "A 3D split-flap HH:MM:SS clock widget that flips each card only when its digit changes, using zero animation frames at rest.\n\nAdd it from Open Redactor → Clocks → Clock → Flip.",
+          "resources": {
+            "ram": "~4 MB",
+            "cpu": "under 0.1%",
+            "disk": "8 KB"
+          }
+        },
+        {
+          "id": "bouncy-redactors",
+          "tag": "improved",
+          "title": "Unified bouncy Open Redactor & Custom Lock Screen",
+          "image": "docs/updates/0.2.0-redactors-after.jpg",
+          "images": [
+            { "label": "Before", "src": "docs/updates/0.2.0-redactors-before.jpg" },
+            { "label": "After",  "src": "docs/updates/0.2.0-redactors-after.jpg" }
+          ],
+          "details": "Before: Open Redactor kept an empty left panel before picking a widget, clicking a style replaced instead of adding duplicates, and Custom Lock Screen still used the old horizontal strip with floating tools.\n\nNow: Both editors share one clean layout. The left preview panel stays hidden until you pick a widget from the bottom bar, then springs out smoothly at 60 fps. Every click on a style card immediately adds a new widget (duplicates allowed with automatic offset), and the top toolbar stays clean above the canvas.",
+          "resources": {
+            "ram": "unloaded until opened",
+            "cpu": "no extra",
+            "disk": "56 KB"
+          }
+        },
+        {
+          "id": "idle-ram-reduction",
+          "tag": "improved",
+          "title": "40% lower idle RAM without cutting features",
+          "details": "Before: Anserin sat around ~632 MB PSS at rest because 11 overlays/popouts, wallpaper preloading, idle transition FBOs and helper daemons stayed resident even when never opened.\n\nNow: Overlays and popouts load lazily with grace-unload, wallpaper FBOs and audio/inhibit helpers run only when needed, and the native core trims freed heap pages back to the OS — cutting idle Anserin PSS from ~632 MB to ~379 MB (-40%).",
+          "resources": {
+            "ram": "~379 MB idle (down from ~632 MB)",
+            "cpu": "under 1% at rest",
+            "disk": "no extra"
+          }
+        },
+        {
+          "id": "soft-sfx-and-logo",
+          "tag": "improved",
+          "title": "Refreshed Anserin logo & balanced Soft Smart Home SFX",
+          "image": "docs/updates/0.2.0-logo-after.jpg",
+          "images": [
+            { "label": "Before", "src": "docs/updates/0.2.0-logo-before.jpg" },
+            { "label": "After",  "src": "docs/updates/0.2.0-logo-after.jpg" }
+          ],
+          "details": "Before: UI sound effects were quiet and uneven across controls.\n\nNow: Refreshed Anserin logo and expressive spring primitives, with normalized Soft Smart Home UI and stereo harp EQ sound effects played cleanly through anserin-core.",
+          "resources": {
+            "ram": "no extra",
+            "cpu": "no extra",
+            "disk": "56 KB"
+          }
+        },
+        {
+          "id": "wellbeing-and-wallpapers-split",
+          "tag": "removed",
+          "title": "Digital Wellbeing removed & Wallpapers moved to companion repo",
+          "details": "Digital Wellbeing has been removed from Control Center to keep the shell lighter, and Launcher now runs automatically on demand.\n\nThe wallpaper pack (200 images and 11 videos) now lives in its own repository (github.com/lukpednoi/Anserin-Wallpapers, linked in README) so the main Anserin repo stays fast to clone and update."
+        },
+        {
+          "id": "tiling-string-window-id-fix",
+          "tag": "fixbug",
+          "title": "Fixed tiling recovery with string window IDs",
+          "details": "Fixed an issue where infinite-desktop and scrollable-tiling recovery could skip windows whose Hyprland address arrived as a string.",
+          "report": {
+            "where": "Infinite desktop and scrollable tiling layout recovery",
+            "wrong": "Window addresses delivered as strings were not matched during recovery",
+            "changed": "Recovery scripts now normalize and accept string window IDs cleanly"
+          }
+        }
+      ]
+    },
+    {
       "version": "0.1.2",
       "date": "2026-11-23",
       "posts": [

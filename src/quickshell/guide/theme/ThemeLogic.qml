@@ -627,9 +627,9 @@ Item {
             "mkdir -p \"$D\"; " +
             "if [ ! -f \"$D/$B\" ]; then cp \"$S\" \"$D/$B\"; fi; " +
             "F=\"$D/$B\"; " +
-            "FAM=$(fc-query -f \"%{family}\" \"$F\" 2>/dev/null | cut -d, -f1); " +
+            "FAM=$(fc-query -f \"%{family}\\n\" \"$F\" 2>/dev/null | head -n 1 | cut -d, -f1); " +
             "if [ -z \"$FAM\" ]; then FAM=$(basename \"$F\" | sed 's/\\.[^.]*$//'); fi; " +
-            "STL=$(fc-query -f \"%{style}\" \"$F\" 2>/dev/null | cut -d, -f1); " +
+            "STL=$(fc-query -f \"%{style}\\n\" \"$F\" 2>/dev/null | head -n 1 | cut -d, -f1); " +
             "if [ -n \"$STL\" ] && [ \"$STL\" != \"Regular\" ]; then " +
                 "echo \"$FAM $STL|$F\"; " +
             "else " +

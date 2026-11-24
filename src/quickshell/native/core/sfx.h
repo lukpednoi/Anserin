@@ -39,6 +39,8 @@ public:
     Q_INVOKABLE void stopAll();
     // Decodes a sound in the background so its first play starts at once.
     Q_INVOKABLE void preload(const QString &path);
+    // Returns freed heap pages to the OS after heavy QML panels are unloaded.
+    Q_INVOKABLE void trimMemory();
 
     bool active() const;
     int cachedSounds() const;

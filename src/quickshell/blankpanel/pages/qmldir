@@ -10,6 +10,8 @@ PowerActions 1.0 PowerActions.qml
 SystemGraphs 1.0 SystemGraphs.qml
 WallpaperPage 1.0 WallpaperPage.qml
 SystemRings 1.0 SystemRings.qml
+SystemBento 1.0 SystemBento.qml
+SystemSmart 1.0 SystemSmart.qml
 BubbleMonitor 1.0 BubbleMonitor.qml
 UserHero 1.0 UserHero.qml
 UserSlide 1.0 UserSlide.qml

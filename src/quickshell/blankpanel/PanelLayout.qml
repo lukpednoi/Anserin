@@ -29,14 +29,14 @@ Singleton {
     // sidebar shows `icon`.
     readonly property var modules: ({
         music: { name: "Music", icon: "󰎈", face: "../bar/faces/media/SideMediaFace.qml",
-                 styles: [{ id: "original", name: "Classic" }, { id: "m3", name: "Split" }, { id: "m5", name: "Ambient" }] },
+                 styles: [{ id: "original", name: "Classic" }, { id: "m3", name: "Split" }, { id: "m5", name: "Smart" }] },
         weather: { name: "Weather", icon: "\u{F0C2}", face: "../bar/faces/weather/SideWeatherFace.qml",
                    styles: [{ id: "classic", name: "Classic" }, { id: "dashboard", name: "Dashboard" }, { id: "smart", name: "Smart" }] },
         network: { name: "Network", icon: "󰤨", face: "../bar/faces/wifi/SideWifiFace.qml",
                    styles: [{ id: "classic", name: "Classic" }, { id: "radar", name: "Radar" }, { id: "gargantua", name: "Gargantua" }] },
         launcher: { name: "Launcher", icon: "󰵆", face: "../bar/faces/LauncherFace.qml", live: true },
         timer: { name: "Timer", icon: "󰔛", face: "SideTimerFace.qml" },
-        system: { name: "System", icon: "󰍛", styles: [{ id: "graphs", name: "Graphs" }, { id: "rings", name: "Activity rings" }, { id: "bubble", name: "Bubble" }] },
+        system: { name: "System", icon: "󰍛", styles: [{ id: "graphs", name: "Graphs" }, { id: "rings", name: "Activity rings" }, { id: "bubble", name: "Bubble" }, { id: "bento", name: "Minimal" }, { id: "smart", name: "Smart" }] },
         user: { name: "User", icon: "󰀄", styles: [{ id: "hero", name: "Hero" }, { id: "slide", name: "Slide" }] },
         wallpaper: { name: "Wallpaper", icon: "󰸉" },
         calculator: { name: "Calculator", icon: "󰃬" }

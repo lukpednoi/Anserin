@@ -68,12 +68,15 @@ Item {
             browser: QtObject {
                 readonly property var browseModel: sampleModel
                 readonly property var thumbLookup: ({})
+                readonly property var favoriteKeys: ({})
                 readonly property var activeView: null
                 readonly property bool isApplying: false
                 readonly property bool isScrollingBlocked: false
                 readonly property bool isLoading: false
                 readonly property string currentFilter: "All"
                 readonly property string targetWallName: ""
+                function getCleanBaseName(name) { return String(name || ""); }
+                function toggleFavorite(name) {}
                 function s(value) { return value * root.unit; }
             }
         }

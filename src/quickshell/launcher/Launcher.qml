@@ -141,17 +141,19 @@ PanelWindow {
     }
     property bool isSideAttached: attachEdge === "left" || attachEdge === "right"
     property bool isCentered: attachEdge === "center"
+    property bool _ready: false
+    Component.onCompleted: Qt.callLater(() => { launcherWindow._ready = true; })
 
     onAttachEdgeChanged: {
-        LauncherController.hide();
+        if (_ready) LauncherController.hide();
     }
 
     onBarStyleChanged: {
-        LauncherController.hide();
+        if (_ready) LauncherController.hide();
     }
 
     onBarPositionChanged: {
-        LauncherController.hide();
+        if (_ready) LauncherController.hide();
     }
 
     property real cornerRadius: ThemeBackend.borderRadius <= 16 ? ThemeBackend.borderRadius * 2 : Math.min(32, 32 - 16 * Math.exp(-(ThemeBackend.borderRadius - 16) / 12))

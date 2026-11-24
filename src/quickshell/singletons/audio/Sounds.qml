@@ -16,6 +16,7 @@ Item {
 
     property var generalSettings: Config.getSetting("general", { "muteSfx": false, "sfxVolume": 100 })
     readonly property bool isMuted: generalSettings && generalSettings.muteSfx === true
+    readonly property real sfxBoost: 1.35
     readonly property real masterVolume: {
         let v = (generalSettings && generalSettings.sfxVolume !== undefined) ? Number(generalSettings.sfxVolume) : 100;
         return Math.max(0.0, Math.min(1.0, v / 100.0));
@@ -59,7 +60,7 @@ Item {
         if ((root.isMuted || root.masterVolume <= 0.0) && overrideSfxBlock !== true) return;
         if (!filePath || filePath.trim() === "") return;
         let vol = volume === undefined ? 1.0 : Math.max(0.0, Math.min(2.0, volume));
-        let finalVol = overrideSfxBlock === true ? vol : (vol * root.masterVolume);
+        let finalVol = Math.min(2.0, (overrideSfxBlock === true ? vol : (vol * root.masterVolume)) * root.sfxBoost);
         let dur = duration === undefined ? 0 : duration;
         root._pendingQueue.push({ filePath: filePath, volume: finalVol, duration: dur });
         Qt.callLater(root._drainQueue);
@@ -103,7 +104,7 @@ Item {
     function playUntilStopped(filenameOrPath, volume, loop, overrideSfxBlock) {
         if ((root.isMuted || root.masterVolume <= 0.0) && overrideSfxBlock !== true) return -1;
         let vol = Math.max(0.0, Math.min(2.0, volume === undefined ? 1.0 : volume));
-        let finalVol = overrideSfxBlock === true ? vol : (vol * root.masterVolume);
+        let finalVol = Math.min(2.0, (overrideSfxBlock === true ? vol : (vol * root.masterVolume)) * root.sfxBoost);
         let doLoop = loop === true;
         let cleanPath = (filenameOrPath.startsWith("/") || filenameOrPath.startsWith("file://")) ?
             (filenameOrPath.startsWith("file://") ? filenameOrPath.substring(7) : filenameOrPath) :
@@ -158,5 +159,9 @@ Item {
             else entry.running = false;
         }
         root.activeHandles = ({});
+    }
+
+    function trimMemory() {
+        if (root.core && typeof root.core.trimMemory === "function") root.core.trimMemory();
     }
 }

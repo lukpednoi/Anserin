@@ -8,12 +8,12 @@ import "../../widgets"
 
 Popup {
     id: savePresetPopup
-    parent: rootObj ? rootObj : undefined
+    parent: rootObj ? (rootObj.contentItem ? rootObj.contentItem : rootObj) : undefined
     x: parent && parent.width > 0 ? Math.max(0, Math.round((parent.width - width) / 2)) : 0
     y: parent && parent.height > 0 ? Math.max(0, Math.round((parent.height - height) / 2)) : 0
     modal: true
     dim: true
-    width: rootObj ? Math.min(rootObj.width - rootObj.s(32), rootObj.s(720)) : 720
+    width: parent && parent.width > 0 ? Math.min(parent.width - (rootObj ? rootObj.s(32) : 32), rootObj ? rootObj.s(720) : 720) : (rootObj ? Math.min(rootObj.width - rootObj.s(32), rootObj.s(720)) : 720)
     padding: rootObj ? rootObj.s(20) : 20
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
 

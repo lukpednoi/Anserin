@@ -13,8 +13,10 @@ SmartBar {
     property string styleId: "original"    // original, m3, m5
     signal finished()
 
+    Component.onCompleted: AudioProcessor.initialize()
+
     readonly property var music: PanelLayout.music
-    readonly property string styleName: ({ original: "Classic", m3: "Split", m5: "Ambient" })[styleId] || "Classic"
+    readonly property string styleName: ({ original: "Classic", m3: "Split", m5: "Smart" })[styleId] || "Classic"
     readonly property string cover: {
         const v = music[styleId + "Cover"];
         return ["original", "record", "image"].indexOf(v) >= 0 ? v : (styleId === "m3" ? "image" : "original");
@@ -27,6 +29,19 @@ SmartBar {
         SmartLabel { strong: true; text: "Music · " + card.styleName; rightPadding: card.s(4) }
         SmartDivider {}
         SmartPill { label: I18n.t("widgets.redactor.done"); onClicked: card.finished() }
+    }
+
+    // Smart style tone (Mirror white vs Theme accent)
+    Row {
+        visible: card.styleId === "m5"
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: card.s(6)
+        SmartChoices {
+            name: "Tone"
+            current: card.music.m5Tone === "theme" ? "theme" : "mirror"
+            options: [{ id: "mirror", name: "Mirror" }, { id: "theme", name: "Theme" }]
+            onChosen: (id) => PanelLayout.setMusic("m5Tone", id)
+        }
     }
 
     // the look

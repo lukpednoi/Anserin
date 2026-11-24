@@ -231,6 +231,10 @@ Scope {
             root.freezeTimestamp = "";
         }
         Config.sessionLocked = false;
+        Qt.callLater(function() {
+            gc();
+            if (typeof Sounds !== "undefined") Sounds.trimMemory();
+        });
     }
 
     IpcHandler {

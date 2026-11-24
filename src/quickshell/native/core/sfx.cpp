@@ -22,6 +22,9 @@
 #include <chrono>
 #include <cmath>
 #include <vector>
+#if defined(__GLIBC__)
+#include <malloc.h>
+#endif
 
 namespace {
 
@@ -214,7 +217,24 @@ SfxEngine::SfxEngine(QObject *parent)
     m_close = new QTimer(this);
     m_close->setSingleShot(true);
     m_close->setInterval(kCloseMs);
-    connect(m_close, &QTimer::timeout, this, [this] { if (m_playing.isEmpty()) closePipeWire(); });
+    connect(m_close, &QTimer::timeout, this, [this] {
+        if (m_playing.isEmpty()) {
+            closePipeWire();
+            if (!m_cache.empty()) {
+                m_cache.clear();
+                m_cacheBytes = 0;
+                emit activeChanged();
+            }
+            trimMemory();
+        }
+    });
+}
+
+void SfxEngine::trimMemory()
+{
+#if defined(__GLIBC__)
+    malloc_trim(0);
+#endif
 }
 
 SfxEngine::~SfxEngine()

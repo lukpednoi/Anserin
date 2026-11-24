@@ -137,7 +137,10 @@ PanelWindow {
     readonly property bool showNumLock: osdSettings.showNumLock !== undefined ? osdSettings.showNumLock : true
     readonly property bool showAirplane: osdSettings.showAirplane !== undefined ? osdSettings.showAirplane : true
 
-    onAttachToBarChanged: OsdController.hide()
+    property bool _ready: false
+    Component.onCompleted: Qt.callLater(() => { osdWindow._ready = true; })
+
+    onAttachToBarChanged: if (_ready) OsdController.hide()
 
     property var barConfig: {
         let dummy = configRevision;
@@ -152,7 +155,7 @@ PanelWindow {
     property bool barAutohide: true   // there is no Bar
 
     onBarAutohideChanged: {
-        OsdController.hide();
+        if (_ready) OsdController.hide();
     }
 
     property string barStyle: {
@@ -168,7 +171,7 @@ PanelWindow {
     }
 
     onBarStyleChanged: {
-        OsdController.hide();
+        if (_ready) OsdController.hide();
     }
 
     property string barPosition: {

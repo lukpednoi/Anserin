@@ -24,6 +24,9 @@ PopoutManager 1.0 popouts/PopoutManager.qml
 SideMusicPopout 1.0 popouts/SideMusicPopout.qml
 TrayBase 1.0 popouts/TrayBase.qml
 DesktopMenu 1.0 popouts/DesktopMenu.qml
+MusicBarCapsule 1.0 popouts/MusicBarCapsule.qml
+MusicBarWave 1.0 popouts/MusicBarWave.qml
+MusicBar 1.0 popouts/MusicBar.qml
 
 WidgetLoader 1.0 widgets/WidgetLoader.qml
 WidgetRedactor 1.0 widgets/WidgetRedactor.qml
@@ -57,6 +60,7 @@ singleton Config 1.0 singletons/system/Config.qml
 singleton AnserinMode 1.0 singletons/system/AnserinMode.qml
 singleton ConfigProfiles 1.0 singletons/system/ConfigProfiles.qml
 singleton TerminalAppearance 1.0 singletons/system/TerminalAppearance.qml
+singleton ClaudePanel 1.0 singletons/system/ClaudePanel.qml
 singleton CurrentFocus 1.0 singletons/system/CurrentFocus.qml
 singleton DateTime 1.0 singletons/system/DateTime.qml
 singleton FirstLaunch 1.0 singletons/system/FirstLaunch.qml

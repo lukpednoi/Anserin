@@ -10,7 +10,7 @@ import "../"
 import "../reusables"
 import "../bar"
 import "."
-import "./board" as Board
+import "./smart" as Smart
 
 // Control Center: right-edge panel opened by hovering the middle of the right screen edge.
 // Independent of the bar; same size as the System panel. Overview = sliders, quick toggles and notifications, Control = settings.
@@ -151,7 +151,9 @@ Item {
         target: Wallpaper
         function onLockPickInlineChanged() { if (!Wallpaper.lockPickInline && root.visible) root.waitForPointer = true; }
     }
-    readonly property bool holdOpen: isDraggingVol || isDraggingBri || Wallpaper.lockPickInline || waitForPointer
+    readonly property bool shortcutListening: root.visible && Boolean(controlLoader.item && controlLoader.item.shortcutListening)
+    onShortcutListeningChanged: if (typeof masterWindow !== "undefined" && masterWindow && masterWindow.shortcutListening !== undefined) masterWindow.shortcutListening = shortcutListening
+    readonly property bool holdOpen: isDraggingVol || isDraggingBri || isDraggingMic || Wallpaper.lockPickInline || waitForPointer || shortcutListening || (typeof masterWindow !== "undefined" && masterWindow.openModalCount > 0)
 
     function popupOpen() {
         const ov = Overlay.overlay;
@@ -464,30 +466,46 @@ Item {
         event.accepted = true;
     }
 
-    component QuickActionBtn : Rectangle {
+    readonly property bool darkMode: (0.2126 * ThemeBackend.base.r + 0.7152 * ThemeBackend.base.g + 0.0722 * ThemeBackend.base.b) < 0.5
+    readonly property color cAccent: ThemeBackend.mauve
+    readonly property color cAccent2: ThemeBackend.peach
+    readonly property color cOnAccent: {
+        const lum = 0.2126 * cAccent.r + 0.7152 * cAccent.g + 0.0722 * cAccent.b;
+        return lum > 0.52 ? "#0b0e14" : "#ffffff";
+    }
+
+    // Minimal Icon-Only Quick Action Tile:
+    // - Pure centered icon (NO geometric badge, NO names, NO On/Off labels)
+    // - Original WaveFill water-wave wipe sweep when toggling ON <-> OFF
+    // - Spring-animated 2-pass diagonal strikethrough slash ONLY on Wi-Fi & Bluetooth when OFF
+    component QuickActionBtn : Item {
         id: qaBtn
         Layout.fillWidth: true
         Layout.fillHeight: true
-        radius: root.cardRadius
+        Layout.preferredWidth: 1
 
         property bool isActive: false
         property string iconText: ""
-        property color activeColor: ThemeBackend.blue
+        property string dynamicText: ""
+        property bool slashWhenOff: false
+        property color activeColor: root.cAccent
+        property color activeColor2: root.cAccent2
         readonly property bool isHovered: qaMa.containsMouse
-        property real customFontSize: 0
-        property string customFontFamily: ""
 
         signal leftClicked()
         signal rightClicked()
 
-        // hover colour fades on its own; the on/off change is a water-wave wipe to the right (WaveFill)
+        Smart.SpringVal { id: qSc;     target: qaMa.pressed ? 0.94 : (qaMa.containsMouse ? 1.02 : 1.0); stiffness: 520; damping: 0.46; eps: 0.001 }
+        Smart.SpringVal { id: slashSp; target: (qaBtn.slashWhenOff && !qaBtn.isActive) ? 1.0 : 0.0; stiffness: 360; damping: 0.56; eps: 0.003 }
+        scale: qSc.value
+
         property color idleColor: qaMa.containsMouse ? ThemeBackend.surface1 : Qt.darker(ThemeBackend.surface0, 1.04)
         Behavior on idleColor {
             enabled: root.visible
             ColorAnimation { duration: 150 }
         }
-        color: isActive ? activeColor : (qaGlass.active ? "transparent" : idleColor)
-        GlassFill { id: qaGlass; anchors.fill: parent; radius: parent.radius; tintColor: ThemeBackend.surface0; tintAmount: ThemeBackend.glassTint; sharp: true; frost: ThemeBackend.glassFrost; rim: 0.9; z: -1 }
+        readonly property color tileBgColor: qaBtn.isActive ? qaBtn.activeColor : qaBtn.idleColor
+
         property real sweep: 1
         property color sweptFrom: "transparent"
         onIsActiveChanged: {
@@ -496,25 +514,105 @@ Item {
             sweepAnim.restart();
         }
         NumberAnimation { id: sweepAnim; target: qaBtn; property: "sweep"; from: 0; to: 1; duration: 560; easing.type: Easing.InOutCubic }
-        WaveFill { radius: qaBtn.radius; oldColor: qaBtn.sweptFrom; sweep: qaBtn.sweep }
 
-        scale: qaMa.pressed ? 0.95 : (qaMa.containsMouse ? 1.01 : 1.0)
-        Behavior on scale {
-            enabled: root.visible
-            NumberAnimation { duration: 200; easing.type: Easing.OutQuart }
+        Rectangle {
+            id: qaRect
+            anchors.fill: parent
+            radius: Math.min(ThemeBackend.borderRadius, root.s(16))
+            color: qaBtn.isActive ? qaBtn.activeColor : (qaGlass.active ? "transparent" : qaBtn.idleColor)
+            border.width: 1
+            border.color: qaBtn.isActive
+                ? Qt.rgba(qaBtn.activeColor.r, qaBtn.activeColor.g, qaBtn.activeColor.b, 0.55)
+                : (root.darkMode ? Qt.rgba(1, 1, 1, 0.07) : Qt.rgba(0, 0, 0, 0.07))
+            clip: true
+
+            GlassFill {
+                id: qaGlass
+                anchors.fill: parent
+                radius: parent.radius
+                tintColor: ThemeBackend.surface0
+                tintAmount: ThemeBackend.glassTint
+                sharp: true
+                frost: ThemeBackend.glassFrost
+                rim: 0.9
+                z: -1
+            }
+
+            // Original water-wave wipe sweep uncovering the new state underneath
+            WaveFill {
+                radius: qaRect.radius
+                oldColor: qaBtn.sweptFrom
+                sweep: qaBtn.sweep
+            }
         }
 
-        Text {
+        readonly property color activeInk: {
+            const c = qaBtn.activeColor;
+            return (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) > 0.52 ? "#0b0e14" : "#ffffff";
+        }
+
+        // Pure centered icon + 2-pass spring diagonal slash on OFF (Wi-Fi & Bluetooth only)
+        Item {
+            visible: qaBtn.dynamicText === ""
             anchors.centerIn: parent
-            font.family: qaBtn.customFontFamily !== "" ? qaBtn.customFontFamily : ThemeBackend.iconFont
-            font.pixelSize: qaBtn.customFontSize > 0 ? qaBtn.customFontSize : root.s(18)
-            font.weight: qaBtn.customFontSize > 0 ? Font.Bold : Font.Normal
-            color: qaBtn.isActive ? ThemeBackend.crust : (qaMa.containsMouse ? ThemeBackend.text : ThemeBackend.subtext0)
-            text: qaBtn.iconText
-            Behavior on color {
-                enabled: root.visible
-                ColorAnimation { duration: 150 }
+            width: root.s(32); height: root.s(32)
+
+            Text {
+                anchors.centerIn: parent
+                text: qaBtn.iconText
+                font.family: ThemeBackend.iconFont
+                font.pixelSize: root.s(19)
+                color: qaBtn.isActive ? qaBtn.activeInk : (qaMa.containsMouse ? ThemeBackend.text : ThemeBackend.subtext0)
+                opacity: qaBtn.isActive ? 1.0 : (qaBtn.slashWhenOff ? 0.78 : 0.88)
+                Behavior on color { enabled: root.visible; ColorAnimation { duration: 150 } }
+                Behavior on opacity { enabled: root.visible; NumberAnimation { duration: 150 } }
             }
+
+            Canvas {
+                anchors.fill: parent
+                visible: slashSp.value > 0.01
+                readonly property var _k: [slashSp.value, qaBtn.idleColor.toString(), ThemeBackend.subtext0.toString(), width, height]
+                on_KChanged: requestPaint()
+                onPaint: {
+                    const ctx = getContext("2d");
+                    ctx.reset();
+                    const t = Math.max(0, Math.min(1.08, slashSp.value));
+                    if (t <= 0.01 || width <= 4) return;
+                    const pad = root.s(6.5);
+                    const x0 = pad, y0 = pad;
+                    const x1 = x0 + (width - pad * 2) * Math.min(1.0, t);
+                    const y1 = y0 + (height - pad * 2) * Math.min(1.0, t);
+
+                    // Pass 1: cutout halo matching tile background so slash slices cleanly through icon
+                    ctx.beginPath();
+                    ctx.moveTo(x0, y0);
+                    ctx.lineTo(x1, y1);
+                    ctx.lineWidth = root.s(4.8);
+                    ctx.lineCap = "round";
+                    ctx.strokeStyle = qaBtn.idleColor;
+                    ctx.stroke();
+
+                    // Pass 2: crisp foreground diagonal slash
+                    ctx.beginPath();
+                    ctx.moveTo(x0, y0);
+                    ctx.lineTo(x1, y1);
+                    ctx.lineWidth = root.s(2.1);
+                    ctx.lineCap = "round";
+                    ctx.strokeStyle = ThemeBackend.subtext0;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // Dynamic live timer text (Caffeine hover countdown or active Recording MM:SS)
+        Text {
+            visible: qaBtn.dynamicText !== ""
+            anchors.centerIn: parent
+            text: qaBtn.dynamicText
+            font.family: ThemeBackend.fontFamily
+            font.pixelSize: root.s(12)
+            font.bold: true
+            color: qaBtn.isActive ? qaBtn.activeInk : ThemeBackend.text
         }
 
         MouseArea {
@@ -524,6 +622,7 @@ Item {
             cursorShape: Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             onClicked: (mouse) => {
+                qSc.kick(1.14);
                 if (mouse.button === Qt.RightButton) qaBtn.rightClicked();
                 else qaBtn.leftClicked();
             }
@@ -558,33 +657,83 @@ Item {
             anchors.bottomMargin: root.s(8) + sidebarPanel.joinRoom
             spacing: root.s(5)
 
-            // ---------- Overview / Control header ----------
+            // ---------- Overview / Control header (spring-sliding gradient pill) ----------
             Rectangle {
                 id: pageBox
                 Layout.fillWidth: true
-                Layout.preferredHeight: root.s(40)
-                Layout.maximumHeight: root.s(40)
-                radius: root.boxRadius
-                // the page switch is glass of its own; a glass box around it would wash out its highlight
-                color: ThemeBackend.liquidGlass ? "transparent" : Qt.darker(ThemeBackend.surface0, 1.04)
+                Layout.preferredHeight: root.s(42)
+                Layout.maximumHeight: root.s(42)
+                radius: Math.min(ThemeBackend.borderRadius, root.s(17))
+                color: ThemeBackend.liquidGlass ? "transparent" : ThemeBackend.mantle
+                border.width: 1
+                border.color: root.darkMode ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.07)
                 opacity: root.introTop
                 transform: Translate { x: root.rowSlideDistance * (1.0 - root.introTop) }
 
-                Switch {
-                    id: pageSwitch
+                readonly property real pad: root.s(4)
+                readonly property real halfW: Math.max(10, (width - pad * 2) * 0.5)
+                readonly property int tabIdx: root.page === "control" ? 1 : 0
+                Smart.SpringVal { id: tabPillX; target: pageBox.pad + pageBox.tabIdx * pageBox.halfW; stiffness: 420; damping: 0.56; eps: 0.3 }
+                onWidthChanged: if (width > 20 && !tabPillX.moving) tabPillX.snap(pad + tabIdx * halfW)
+
+                Rectangle {
+                    x: tabPillX.value
+                    y: pageBox.pad
+                    width: pageBox.halfW
+                    height: pageBox.height - pageBox.pad * 2
+                    radius: Math.max(root.s(8), pageBox.radius - pageBox.pad)
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0.0; color: root.cAccent }
+                        GradientStop { position: 1.0; color: root.cAccent2 }
+                    }
+                }
+
+                Row {
                     anchors.fill: parent
-                    anchors.margins: root.s(5)
-                    cornerRadius: root.s(10)
-                    fontPixelSize: root.s(13)
-                    options: ["󰕮  " + I18n.t("syspanel.pages.overview"), "󰘮  " + I18n.t("syspanel.pages.control")]
-                    accentColor: Qt.lighter(ThemeBackend.blue, 1.55)
-                    baseColor: ThemeBackend.surface1
-                    textColor: ThemeBackend.text
-                    activeTextColor: ThemeBackend.crust
-                    currentIndex: root.page === "control" ? 1 : 0
-                    onValueChanged: (idx, val) => { root.page = idx === 1 ? "control" : "overview"; }
-                    // the page can be reset from code (reopen); keep the switch in step with it
-                    Connections { target: root; function onPageChanged() { pageSwitch.currentIndex = root.page === "control" ? 1 : 0; } }
+                    anchors.margins: pageBox.pad
+                    Repeater {
+                        model: [
+                            { id: "overview", ic: "󰕮", name: I18n.t("syspanel.pages.overview") },
+                            { id: "control",  ic: "󰘮", name: I18n.t("syspanel.pages.control") }
+                        ]
+                        Item {
+                            required property var modelData
+                            required property int index
+                            readonly property bool cur: index === pageBox.tabIdx
+                            width: pageBox.halfW
+                            height: parent.height
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: root.s(7)
+                                Text {
+                                    text: modelData.ic
+                                    font.family: ThemeBackend.iconFont
+                                    font.pixelSize: root.s(14)
+                                    color: cur ? root.cOnAccent : ThemeBackend.subtext0
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                Text {
+                                    text: modelData.name
+                                    font.family: ThemeBackend.fontFamily
+                                    font.pixelSize: root.s(12)
+                                    font.bold: cur
+                                    color: cur ? root.cOnAccent : ThemeBackend.text
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (root.page !== modelData.id) {
+                                        root.page = modelData.id;
+                                        Sounds.playSfx("reusables/iconbutton/click.wav");
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -593,300 +742,317 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
-                // ================= Overview =================
-                Item {
+                // ================= Overview (Style A: 3 Wave Dials + 7 Icon-Only Tiles + Smart Notifications) =================
+                ColumnLayout {
                     id: overviewPage
                     anchors.fill: parent
+                    anchors.margins: root.s(4)
                     visible: root.page === "overview"
                     opacity: root.pageFade
+                    spacing: root.s(9)
 
-                    ColumnLayout {
-                        id: topStack
-                        anchors.top: parent.top
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        spacing: root.s(5)
+                    // ---- layer 1: brightness + volume + mic (3 Expressive Wave Dials) ----
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: false
+                        Layout.preferredHeight: root.s(138)
+                        Layout.maximumHeight: root.s(138)
+                        spacing: root.s(8)
+                        opacity: root.introSliders
+                        transform: Translate { x: root.rowSlideDistance * (1.0 - root.introSliders) }
 
-                        // ---- layer 1: brightness + volume ----
-                        RowLayout {
+                        WaveDial {
                             Layout.fillWidth: true
-                            Layout.fillHeight: false
-                            Layout.preferredHeight: root.s(124)
-                            spacing: root.s(5)
-                            opacity: root.introSliders
-                            transform: Translate { x: root.rowSlideDistance * (1.0 - root.introSliders) }
-
-                            WaveDial {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                Layout.preferredWidth: 1
-                                active: root.levelsActive
-                                icon: root.briLevel > 66 ? "󰃠" : (root.briLevel > 33 ? "󰃟" : "󰃞")
-                                accent: root.briColor
-                                value: root.briLevel
-                                onAdjusted: (v) => root.applyBrightness(v)
-                                onDragStarted: briSyncDelay.stop()
-                                onDragFinished: briSyncDelay.restart()
-                                onClicked: {
-                                    briCmdThrottle.stop();
-                                    briCmdThrottle.targetPct = -1;
-                                    let target = root.briLevel > 0 ? 0 : 100;
-                                    root.briLevel = target;
-                                    root.isDraggingBri = true;
-                                    briSyncDelay.restart();
-                                    Quickshell.execDetached(["bash", Caching.qsDir + "/../scripts/brightness.sh", "set", root.briToActual(target).toString()]);
-                                }
-                            }
-
-                            WaveDial {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                Layout.preferredWidth: 1
-                                active: root.levelsActive
-                                icon: root.sysMuted || root.volLevel === 0 ? "󰖁" : (root.volLevel > 50 ? "󰕾" : "󰖀")
-                                accent: root.volColor
-                                muted: root.sysMuted
-                                value: root.volLevel
-                                onAdjusted: (v) => root.applyVolume(v)
-                                onDragStarted: volSyncDelay.stop()
-                                onDragFinished: volSyncDelay.restart()
-                                onClicked: { if (Audio.defaultSink) Audio.toggleMute(Audio.defaultSink); }
-                            }
-
-                            WaveDial {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                Layout.preferredWidth: 1
-                                active: root.levelsActive
-                                icon: root.sysMicMuted ? "󰍭" : "󰍬"
-                                accent: root.micColor
-                                muted: root.sysMicMuted
-                                value: root.micLevel
-                                onAdjusted: (v) => root.applyMic(v)
-                                onDragStarted: micSyncDelay.stop()
-                                onDragFinished: micSyncDelay.restart()
-                                onClicked: { if (Audio.defaultSource) Audio.toggleMute(Audio.defaultSource); }
+                            Layout.fillHeight: true
+                            Layout.preferredWidth: 1
+                            active: root.levelsActive
+                            icon: root.briLevel > 66 ? "󰃠" : (root.briLevel > 33 ? "󰃟" : "󰃞")
+                            mutedIcon: "󰃞"
+                            geoShape: "star6"
+                            accent: root.cAccent
+                            accent2: root.cAccent2
+                            value: root.briLevel
+                            onAdjusted: (v) => root.applyBrightness(v)
+                            onDragStarted: briSyncDelay.stop()
+                            onDragFinished: briSyncDelay.restart()
+                            onStepped: Sounds.playSfx("reusables/draggable/tick.wav", 0.6)
+                            onLockedFull: Sounds.playSfx("reusables/draggable/lock.wav")
+                            onClicked: {
+                                briCmdThrottle.stop();
+                                briCmdThrottle.targetPct = -1;
+                                let target = root.briLevel > 5 ? 0 : 100;
+                                root.briLevel = target;
+                                root.isDraggingBri = true;
+                                briSyncDelay.restart();
+                                Sounds.playSfx(target > 0 ? "reusables/switch/sfx.wav" : "reusables/toggle/sfx.wav");
+                                Quickshell.execDetached(["bash", Caching.qsDir + "/../scripts/brightness.sh", "set", root.briToActual(target).toString()]);
                             }
                         }
 
-                        // ---- layer 2: Wi-Fi, Bluetooth, Airplane ----
-                        RowLayout {
+                        WaveDial {
                             Layout.fillWidth: true
-                            Layout.fillHeight: false
-                            Layout.preferredHeight: root.s(44)
-                            spacing: root.s(5)
-                            opacity: root.introQuickActions
-                            transform: Translate { x: root.rowSlideDistance * (1.0 - root.introQuickActions) }
-
-                            QuickActionBtn {
-                                iconText: isActive ? "󰤨" : "󰤮"
-                                activeColor: ThemeBackend.blue
-                                isActive: root.wifiRadioEnabled
-                                onLeftClicked: {
-                                    Sounds.playSfx("system/quick_click.wav");
-                                    Networking.wifiEnabled = !Networking.wifiEnabled;
-                                }
-                                onRightClicked: {
-                                    closeSequence.start();
-                                    Quickshell.execDetached(["bash", Caching.anserinDir + "/scripts/qs_manager.sh", "toggle"].concat(["blankpanel", "network"]));
-                                }
-                            }
-
-                            QuickActionBtn {
-                                iconText: isActive ? "󰂯" : "󰂲"
-                                activeColor: ThemeBackend.mauve
-                                isActive: root.btRadioEnabled
-                                onLeftClicked: {
-                                    Sounds.playSfx("system/quick_click.wav");
-                                    if (Bluetooth.defaultAdapter) {
-                                        Bluetooth.defaultAdapter.enabled = !Bluetooth.defaultAdapter.enabled;
-                                    }
-                                }
-                                onRightClicked: {
-                                    closeSequence.start();
-                                    Quickshell.execDetached(["bash", Caching.anserinDir + "/scripts/qs_manager.sh", "toggle"].concat(["blankpanel", "network"]));
-                                }
-                            }
-
-                            QuickActionBtn {
-                                iconText: "󰀝"
-                                activeColor: ThemeBackend.red
-                                isActive: root.airplaneOn
-                                onLeftClicked: {
-                                    Sounds.playSfx("system/quick_click.wav");
-                                    let enableAirplane = !isActive;
-                                    root.airplaneOn = enableAirplane;
-                                    if (enableAirplane) {
-                                        root.btStateBeforeAirplane = root.btRadioEnabled;
-                                        root.wifiStateBeforeAirplane = root.wifiRadioEnabled;
-                                        Networking.wifiEnabled = false;
-                                        if (Bluetooth.defaultAdapter) Bluetooth.defaultAdapter.enabled = false;
-                                    } else {
-                                        let restoreWifi = root.wifiStateBeforeAirplane;
-                                        let restoreBt = root.btStateBeforeAirplane;
-                                        if (!restoreWifi && !restoreBt) {
-                                            restoreWifi = true;
-                                        }
-                                        Networking.wifiEnabled = restoreWifi;
-                                        if (Bluetooth.defaultAdapter) Bluetooth.defaultAdapter.enabled = restoreBt;
-                                    }
+                            Layout.fillHeight: true
+                            Layout.preferredWidth: 1
+                            active: root.levelsActive
+                            icon: root.volLevel > 50 ? "󰕾" : "󰖀"
+                            mutedIcon: "󰖁"
+                            geoShape: "clover4"
+                            accent: root.cAccent
+                            accent2: root.cAccent2
+                            muted: root.sysMuted
+                            value: root.volLevel
+                            onAdjusted: (v) => root.applyVolume(v)
+                            onDragStarted: volSyncDelay.stop()
+                            onDragFinished: volSyncDelay.restart()
+                            onStepped: Sounds.playSfx("reusables/draggable/tick.wav", 0.6)
+                            onLockedFull: Sounds.playSfx("reusables/draggable/lock.wav")
+                            onClicked: {
+                                if (Audio.defaultSink) {
+                                    Sounds.playSfx(root.sysMuted ? "reusables/switch/sfx.wav" : "reusables/toggle/sfx.wav");
+                                    Audio.toggleMute(Audio.defaultSink);
                                 }
                             }
                         }
 
-                        // ---- layer 3: Night light, Caffeine, Screenshot, Record ----
-                        RowLayout {
+                        WaveDial {
                             Layout.fillWidth: true
-                            Layout.fillHeight: false
-                            Layout.preferredHeight: root.s(44)
-                            spacing: root.s(5)
-                            opacity: root.introQuickActions
-                            transform: Translate { x: root.rowSlideDistance * (1.0 - root.introQuickActions) }
-
-                            QuickActionBtn {
-                                id: nightLightBtn
-                                iconText: "󰖔"
-                                activeColor: ThemeBackend.peach
-
-                                function updateState() {
-                                    let anyEnabled = false;
-                                    if (typeof BlueLight !== "undefined" && typeof BlueLight.isAnyEnabled === "function") {
-                                        anyEnabled = BlueLight.isAnyEnabled();
-                                    } else if (typeof Config !== "undefined") {
-                                        let ds = Config.getSetting("display", {"monitors": {}});
-                                        let mons = (ds && ds.monitors) ? ds.monitors : {};
-                                        for (let mName in mons) {
-                                            if (mons[mName] && mons[mName].enabled) {
-                                                anyEnabled = true;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    isActive = anyEnabled;
+                            Layout.fillHeight: true
+                            Layout.preferredWidth: 1
+                            active: root.levelsActive
+                            icon: "󰍬"
+                            mutedIcon: "󰍭"
+                            geoShape: "cookie6"
+                            accent: root.cAccent
+                            accent2: root.cAccent2
+                            muted: root.sysMicMuted
+                            value: root.micLevel
+                            onAdjusted: (v) => root.applyMic(v)
+                            onDragStarted: micSyncDelay.stop()
+                            onDragFinished: micSyncDelay.restart()
+                            onStepped: Sounds.playSfx("reusables/draggable/tick.wav", 0.6)
+                            onLockedFull: Sounds.playSfx("reusables/draggable/lock.wav")
+                            onClicked: {
+                                if (Audio.defaultSource) {
+                                    Sounds.playSfx(root.sysMicMuted ? "reusables/switch/sfx.wav" : "reusables/toggle/sfx.wav");
+                                    Audio.toggleMute(Audio.defaultSource);
                                 }
+                            }
+                        }
+                    }
 
-                                Component.onCompleted: updateState()
+                    // ---- layer 2: Wi-Fi, Bluetooth (slashWhenOff: true), Airplane (slashWhenOff: false) ----
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: false
+                        Layout.preferredHeight: root.s(54)
+                        Layout.maximumHeight: root.s(54)
+                        spacing: root.s(8)
+                        opacity: root.introQuickActions
+                        transform: Translate { x: root.rowSlideDistance * (1.0 - root.introQuickActions) }
 
-                                Connections {
-                                    target: typeof Config !== "undefined" ? Config : null
-                                    enabled: root.visible
-                                    ignoreUnknownSignals: true
-                                    function onSettingsLoaded() {
-                                        nightLightBtn.updateState();
-                                    }
+                        QuickActionBtn {
+                            iconText: "󰤨"
+                            slashWhenOff: true
+                            activeColor: root.cAccent
+                            activeColor2: root.cAccent2
+                            isActive: root.wifiRadioEnabled
+                            onLeftClicked: {
+                                const next = !Networking.wifiEnabled;
+                                Sounds.playSfx(next ? "reusables/switch/sfx.wav" : "reusables/toggle/sfx.wav");
+                                Networking.wifiEnabled = next;
+                            }
+                            onRightClicked: {
+                                Sounds.playSfx("system/quick_click.wav");
+                                closeSequence.start();
+                                Quickshell.execDetached(["bash", Caching.anserinDir + "/scripts/qs_manager.sh", "toggle", "blankpanel", "network"]);
+                            }
+                        }
+
+                        QuickActionBtn {
+                            iconText: "󰂯"
+                            slashWhenOff: true
+                            activeColor: root.cAccent
+                            activeColor2: root.cAccent2
+                            isActive: root.btRadioEnabled
+                            onLeftClicked: {
+                                if (Bluetooth.defaultAdapter) {
+                                    const next = !Bluetooth.defaultAdapter.enabled;
+                                    Sounds.playSfx(next ? "reusables/switch/sfx.wav" : "reusables/toggle/sfx.wav");
+                                    Bluetooth.defaultAdapter.enabled = next;
                                 }
+                            }
+                            onRightClicked: {
+                                Sounds.playSfx("system/quick_click.wav");
+                                closeSequence.start();
+                                Quickshell.execDetached(["bash", Caching.anserinDir + "/scripts/qs_manager.sh", "toggle", "blankpanel", "network"]);
+                            }
+                        }
 
-                                Connections {
-                                    target: typeof BlueLight !== "undefined" ? BlueLight : null
-                                    enabled: root.visible
-                                    ignoreUnknownSignals: true
-                                    function onSettingsChanged() {
-                                        nightLightBtn.updateState();
-                                    }
+                        QuickActionBtn {
+                            iconText: "󰀝"
+                            slashWhenOff: false
+                            activeColor: "#ff8c8c"
+                            activeColor2: "#ffb4a2"
+                            isActive: root.airplaneOn
+                            onLeftClicked: {
+                                let enableAirplane = !isActive;
+                                Sounds.playSfx(enableAirplane ? "reusables/switch/sfx.wav" : "reusables/toggle/sfx.wav");
+                                root.airplaneOn = enableAirplane;
+                                if (enableAirplane) {
+                                    root.btStateBeforeAirplane = root.btRadioEnabled;
+                                    root.wifiStateBeforeAirplane = root.wifiRadioEnabled;
+                                    Networking.wifiEnabled = false;
+                                    if (Bluetooth.defaultAdapter) Bluetooth.defaultAdapter.enabled = false;
+                                } else {
+                                    let restoreWifi = root.wifiStateBeforeAirplane;
+                                    let restoreBt = root.btStateBeforeAirplane;
+                                    if (!restoreWifi && !restoreBt) restoreWifi = true;
+                                    Networking.wifiEnabled = restoreWifi;
+                                    if (Bluetooth.defaultAdapter) Bluetooth.defaultAdapter.enabled = restoreBt;
                                 }
+                            }
+                        }
+                    }
 
-                                onLeftClicked: {
-                                    Sounds.playSfx("system/quick_click.wav");
-                                    let target = !nightLightBtn.isActive;
-                                    nightLightBtn.isActive = target;
+                    // ---- layer 3: Night Light, Caffeine, Screenshot, Record (NO slashWhenOff) ----
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: false
+                        Layout.preferredHeight: root.s(52)
+                        Layout.maximumHeight: root.s(52)
+                        spacing: root.s(8)
+                        opacity: root.introQuickActions
+                        transform: Translate { x: root.rowSlideDistance * (1.0 - root.introQuickActions) }
 
-                                    let monNames = [];
-                                    let ds = typeof Config !== "undefined" ? Config.getSetting("display", {"monitors": {}}) : {"monitors": {}};
+                        QuickActionBtn {
+                            id: nightLightBtn
+                            iconText: "󰖔"
+                            slashWhenOff: false
+                            activeColor: "#f5b971"
+                            activeColor2: "#f79d65"
+
+                            function updateState() {
+                                let anyEnabled = false;
+                                if (typeof BlueLight !== "undefined" && typeof BlueLight.isAnyEnabled === "function") {
+                                    anyEnabled = BlueLight.isAnyEnabled();
+                                } else if (typeof Config !== "undefined") {
+                                    let ds = Config.getSetting("display", {"monitors": {}});
                                     let mons = (ds && ds.monitors) ? ds.monitors : {};
-                                    for (let m in mons) {
-                                        if (monNames.indexOf(m) === -1) {
-                                            monNames.push(m);
-                                        }
+                                    for (let mName in mons) {
+                                        if (mons[mName] && mons[mName].enabled) { anyEnabled = true; break; }
                                     }
-                                    if (typeof Quickshell !== "undefined" && Quickshell.screens) {
-                                        for (let i = 0; i < Quickshell.screens.length; i++) {
-                                            let scr = Quickshell.screens[i];
-                                            if (scr && scr.name && monNames.indexOf(scr.name) === -1) {
-                                                monNames.push(scr.name);
-                                            }
-                                        }
-                                    }
-
-                                    if (monNames.length > 0) {
-                                        for (let i = 0; i < monNames.length; i++) {
-                                            BlueLight.setEnabled(monNames[i], target);
-                                        }
-                                    } else {
-                                        BlueLight.setEnabled("", target);
-                                    }
-                                    nightLightBtn.updateState();
                                 }
-
-                                onRightClicked: {
-                                    closeSequence.start();
-                                    Quickshell.execDetached(["bash", Caching.anserinDir + "/scripts/qs_manager.sh", "toggle", "guide", "display"]);
-                                }
+                                isActive = anyEnabled;
                             }
 
-                            QuickActionBtn {
-                                id: coffeeBtn
-                                activeColor: Qt.tint(ThemeBackend.peach, "#5c3016")
+                            Component.onCompleted: updateState()
 
-                                isActive: Caffeine.enabled
-                                // on hover a timed Keep Awake shows the time left; one with no end (Forever) keeps its icon
-                                readonly property bool showsTime: isActive && isHovered && !Caffeine.forever
-                                iconText: showsTime ? Caffeine.remainingTimeString : "󰅶"
-                                customFontSize: showsTime ? root.s(12) : 0
-                                customFontFamily: showsTime ? ThemeBackend.fontFamily : ""
-                                function updateState() { Caffeine.updateRemaining(); }
-                                onLeftClicked: {
-                                    Sounds.playSfx("system/quick_click.wav");
-                                    Caffeine.toggle();
-                                }
-                                onRightClicked: {
-                                    Sounds.playSfx("system/quick_click.wav");
-                                    Caffeine.extend();
-                                }
+                            Connections {
+                                target: typeof Config !== "undefined" ? Config : null
+                                enabled: root.visible
+                                ignoreUnknownSignals: true
+                                function onSettingsLoaded() { nightLightBtn.updateState(); }
+                            }
+                            Connections {
+                                target: typeof BlueLight !== "undefined" ? BlueLight : null
+                                enabled: root.visible
+                                ignoreUnknownSignals: true
+                                function onSettingsChanged() { nightLightBtn.updateState(); }
                             }
 
-                            QuickActionBtn {
-                                iconText: "󰹑"
-                                activeColor: ThemeBackend.sapphire
-                                onLeftClicked: {
-                                    Sounds.playSfx("system/quick_click.wav");
-                                    root.launchCapture("photo");
-                                }
-                            }
-
-                            QuickActionBtn {
-                                id: recordBtn
-                                isActive: root.isRecording
-                                activeColor: ThemeBackend.red
-                                iconText: isActive ? root.recTimeText : "󰑊"
-                                customFontSize: isActive ? root.s(12) : 0
-                                customFontFamily: isActive ? ThemeBackend.fontFamily : ""
-                                onLeftClicked: {
-                                    Sounds.playSfx("system/quick_click.wav");
-                                    if (root.isRecording) {
-                                        // the screenshot script stops a running recording when called again
-                                        Quickshell.execDetached(["bash", Caching.anserinDir + "/scripts/screenshot.sh"]);
-                                        recRecheck.restart();
-                                    } else {
-                                        root.launchCapture("video");
+                            onLeftClicked: {
+                                let target = !nightLightBtn.isActive;
+                                Sounds.playSfx(target ? "reusables/switch/sfx.wav" : "reusables/toggle/sfx.wav");
+                                nightLightBtn.isActive = target;
+                                let monNames = [];
+                                let ds = typeof Config !== "undefined" ? Config.getSetting("display", {"monitors": {}}) : {"monitors": {}};
+                                let mons = (ds && ds.monitors) ? ds.monitors : {};
+                                for (let m in mons) if (monNames.indexOf(m) === -1) monNames.push(m);
+                                if (typeof Quickshell !== "undefined" && Quickshell.screens) {
+                                    for (let i = 0; i < Quickshell.screens.length; i++) {
+                                        let scr = Quickshell.screens[i];
+                                        if (scr && scr.name && monNames.indexOf(scr.name) === -1) monNames.push(scr.name);
                                     }
                                 }
+                                if (monNames.length > 0) {
+                                    for (let i = 0; i < monNames.length; i++) BlueLight.setEnabled(monNames[i], target);
+                                } else {
+                                    BlueLight.setEnabled("", target);
+                                }
+                                nightLightBtn.updateState();
+                            }
+
+                            onRightClicked: {
+                                Sounds.playSfx("system/quick_click.wav");
+                                closeSequence.start();
+                                Quickshell.execDetached(["bash", Caching.anserinDir + "/scripts/qs_manager.sh", "toggle", "guide", "display"]);
                             }
                         }
 
+                        QuickActionBtn {
+                            id: coffeeBtn
+                            iconText: "󰅶"
+                            slashWhenOff: false
+                            activeColor: "#e6b87d"
+                            activeColor2: root.cAccent2
+                            isActive: Caffeine.enabled
+                            readonly property bool showsTime: isActive && isHovered && !Caffeine.forever
+                            dynamicText: showsTime ? Caffeine.remainingTimeString : ""
+                            function updateState() { Caffeine.updateRemaining(); }
+                            onLeftClicked: {
+                                const next = !Caffeine.enabled;
+                                Sounds.playSfx(next ? "reusables/switch/sfx.wav" : "reusables/toggle/sfx.wav");
+                                Caffeine.toggle();
+                            }
+                            onRightClicked: {
+                                Sounds.playSfx("network/tick-1.wav");
+                                Caffeine.extend();
+                            }
+                        }
+
+                        QuickActionBtn {
+                            iconText: "󰹑"
+                            slashWhenOff: false
+                            activeColor: root.cAccent
+                            activeColor2: root.cAccent2
+                            onLeftClicked: {
+                                Sounds.playSfx("system/quick_click.wav");
+                                root.launchCapture("photo");
+                            }
+                        }
+
+                        QuickActionBtn {
+                            id: recordBtn
+                            iconText: "󰑊"
+                            slashWhenOff: false
+                            isActive: root.isRecording
+                            activeColor: "#ff6b6b"
+                            activeColor2: "#ff9e7d"
+                            dynamicText: isActive ? root.recTimeText : ""
+                            onLeftClicked: {
+                                Sounds.playSfx(root.isRecording ? "reusables/toggle/sfx.wav" : "reusables/switch/sfx.wav");
+                                if (root.isRecording) {
+                                    Quickshell.execDetached(["bash", Caching.anserinDir + "/scripts/screenshot.sh"]);
+                                    recRecheck.restart();
+                                } else {
+                                    root.launchCapture("video");
+                                }
+                            }
+                        }
                     }
 
                     Timer { id: recRecheck; interval: 1500; onTriggered: { if (root.recDir !== "") recCheck.running = true; } }
 
-                    // ---- notifications: fill the page under the quick actions ----
+                    // ---- layer 4: Original NotificationBox (DuckNest + DND + group expand/collapse + swipe dismiss) ----
                     NotificationBox {
                         id: notifBox
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        height: Math.max(root.s(56), overviewPage.height - topStack.implicitHeight - root.s(5))
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
                         cornerRadius: root.boxRadius
                         cardRadius: root.cardRadius
-                        baseColor: Qt.darker(ThemeBackend.surface0, 1.04)
+                        baseColor: ThemeBackend.mantle
+                        borderColor: root.darkMode ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.07)
+                        borderWidth: 1
                         rootContext: root
                         opacity: root.introNotifs
                         transform: Translate { x: root.rowSlideDistance * (1.0 - root.introNotifs) }
@@ -900,12 +1066,13 @@ Item {
                     visible: root.page === "control"
                     opacity: root.pageFade
 
-                    // Settings live only while the Control tab is open: the dial and board cards (board/)
+                    // Settings live only while the Control tab is open
                     Loader {
                         id: controlLoader
                         anchors.fill: parent
+                        asynchronous: true
                         active: root.visible && root.page === "control"
-                        sourceComponent: boardControl
+                        sourceComponent: smartControl
                         function showRequested() {
                             if (!item || root.requestedSettings === "") return;
                             item.gotoKey(root.requestedSettings);
@@ -914,9 +1081,10 @@ Item {
                         onLoaded: showRequested()
                         Connections { target: root; function onRequestedSettingsChanged() { controlLoader.showRequested(); } }
                     }
+                    // the Smart Home Control (smart/SmartControl.qml: Antigravity's approved design on the real settings)
                     Component {
-                        id: boardControl
-                        Board.BoardSettings {
+                        id: smartControl
+                        Smart.SmartControl {
                             active: root.visible && root.page === "control"
                             onCloseRequested: closeSequence.start()
                         }

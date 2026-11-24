@@ -7,6 +7,7 @@ Item {
     id: root
 
     required property var rootObj
+    property bool showHeader: true
     readonly property string selectedStyle: Real.SddmTheming.appliedStyle
 
     objectName: "sddm-styles"
@@ -20,6 +21,7 @@ Item {
         spacing: root.rootObj.s(12)
 
         Text {
+            visible: root.showHeader
             text: "SDDM"
             color: Real.ThemeBackend.text
             font.family: Real.ThemeBackend.fontFamily

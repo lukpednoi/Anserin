@@ -80,8 +80,10 @@ PanelWindow {
         return "bottom";
     }
 
+    property bool _ready: false
+
     onBarPositionChanged: {
-        ClipboardController.hide();
+        if (_ready) ClipboardController.hide();
     }
 
     property bool isSideAttached: attachEdge === "left" || attachEdge === "right"
@@ -546,20 +548,24 @@ PanelWindow {
         }
     }
 
+    function handleOpened() {
+        searchInput.clear();
+        filterDebounceTimer.stop();
+        if (clipboardWindow.isDirty || clipboardWindow.allFetchedClips.length === 0) {
+            clipboardWindow.isDirty = false;
+            refreshClips();
+        } else {
+            executeClipFilter("");
+        }
+        clipboardWindow.grabInputFocus();
+        focusTimer.restart();
+        focusRetryTimer.restart();
+        focusFinalTimer.restart();
+    }
+
     onIsVisibleChanged: {
         if (isVisible) {
-            searchInput.clear();
-            filterDebounceTimer.stop();
-            if (clipboardWindow.isDirty || clipboardWindow.allFetchedClips.length === 0) {
-                clipboardWindow.isDirty = false;
-                refreshClips();
-            } else {
-                executeClipFilter("");
-            }
-            clipboardWindow.grabInputFocus();
-            focusTimer.restart();
-            focusRetryTimer.restart();
-            focusFinalTimer.restart();
+            clipboardWindow.handleOpened();
         } else {
             clipList.resetScroll();
             clipboardWindow.expandedClipId = "";
@@ -569,6 +575,11 @@ PanelWindow {
             focusFinalTimer.stop();
             keyboardNavTimer.stop();
         }
+    }
+
+    Component.onCompleted: {
+        Qt.callLater(() => { clipboardWindow._ready = true; });
+        if (clipboardWindow.isVisible) Qt.callLater(clipboardWindow.handleOpened);
     }
 
     MouseArea {

@@ -7,13 +7,9 @@ import Quickshell.Io
 import Quickshell.Widgets
 import "../"
 import "../bar"
-import "../media" as Media
-import "../network" as Network
-import "../network/orbit" as Orbit
 import "."
-import "pages" as Pages
-import "smartweather" as SmartWeather
 import "../reusables"
+import "../controlcenter/smart" as Smart
 
 // Panel on the left screen edge, joined to the screen frame like the Control Center. Opened by hovering the
 // middle of that edge, and hides again when the pointer leaves, using the Control Center's auto-hide settings.
@@ -29,6 +25,27 @@ Item {
     enabled: visible
 
     function s(v) { return Scaler.s(v); }
+
+    // Style B (Kinetic Light-Rail) palette + spring trackers
+    readonly property bool darkMode: (0.2126 * ThemeBackend.base.r + 0.7152 * ThemeBackend.base.g + 0.0722 * ThemeBackend.base.b) < 0.5
+    readonly property color cAccent: ThemeBackend.mauve
+    readonly property color cAccent2: ThemeBackend.peach
+    readonly property color cOnAccent: {
+        const lum = 0.2126 * cAccent.r + 0.7152 * cAccent.g + 0.0722 * cAccent.b;
+        return lum > 0.52 ? "#0b0e14" : "#ffffff";
+    }
+    Smart.SpringVal { id: railPulse; target: 0.0; stiffness: 180; damping: 0.55; eps: 0.005 }
+    readonly property real activeRailTargetY: {
+        if (root.fileMode) {
+            if (activePlaceHighlight.slot) return placeColumn.y + activePlaceHighlight.slot.y + activePlaceHighlight.slot.height * 0.5;
+            return placeColumn.y + root.s(22);
+        }
+        if (activeModuleHighlight.slot) return moduleColumn.y + activeModuleHighlight.slot.y + activeModuleHighlight.slot.height * 0.5;
+        return moduleColumn.y + root.s(22);
+    }
+    Smart.SpringVal { id: railY; target: root.activeRailTargetY; stiffness: 380; damping: 0.58; eps: 0.3 }
+    // While the panel slides in/out, snap the rail directly instead of running CPU Canvas repaints mid-slide.
+    onActiveRailTargetYChanged: if (!root.visible || root.introContent < 0.99) railY.snap(root.activeRailTargetY)
 
     readonly property var settings: Config.getSetting("controlcenter", null)
     readonly property bool autoHideEnabled: !settings || settings.autohide !== false
@@ -64,7 +81,7 @@ Item {
     readonly property int launcherPageIndex: pageOf("launcher")
     readonly property int timerPageIndex: pageOf("timer")
     readonly property string screenName: typeof masterWindow !== "undefined" && masterWindow.screen ? masterWindow.screen.name : ""
-    // the Launcher page's search field has focus: the panel stays open while Mo types
+    // the Launcher page's search field has focus: the panel stays open while the user types
     property bool launcherTyping: false
 
     // ---------- the File page (the folder button right of the pencil) ----------
@@ -87,13 +104,15 @@ Item {
     property var fileHistory: []
     property var fileFuture: []
     property var fileClip: null            // cut or copied: { mode: "copy" | "move", paths: [...] }
-    property bool fileTyping: false        // renaming: the panel stays open while Mo types
+    property bool fileTyping: false        // renaming: the panel stays open while the user types
     // the pages keep running while they fade out under the File page
     readonly property bool pagesShown: visible && fileT < 1
     NumberAnimation { id: fileSlide; target: root; property: "fileT"; duration: 320; easing.type: Easing.OutCubic }
     function toggleFile() {
         if (!visible) return;
         fileMode = !fileMode;
+        cornerShape.change();
+        railPulse.snapAndGo(1.0, 0.0);
         fileSlide.stop();
         fileSlide.to = fileMode ? 1 : 0;
         fileSlide.restart();
@@ -210,15 +229,25 @@ Item {
     }
     property int page: 0
     property real pagePos: 0
-    // Built on the first open and kept: only the shown page runs, and it opens instantly the next time.
+    // Built on demand per page: only the opening page loads on first open (no 9-page simultaneous freeze),
+    // and each extra page loads the first time the user visits it and stays cached afterwards.
     property bool built: false
+    property var visitedPages: ({})
+    function markVisited(id) {
+        if (!id || visitedPages[id]) return;
+        const next = Object.assign({}, visitedPages);
+        next[id] = true;
+        visitedPages = next;
+    }
     // quiet: wheel clicks and swipes change the page without the switch sound; clicks keep it.
     function setPage(next, quiet) {
         next = Math.max(0, Math.min(pageCount - 1, next));
         if (next === page) return;
+        markVisited(order[next]);
         page = next;
-        if (!quiet) Sounds.playSfx("reusables/switch/sfx.wav");
+        if (!quiet) Sounds.playSfx("reusables/iconbutton/click.wav");
         cornerShape.change();
+        railPulse.snapAndGo(1.0, 0.0);
         pageSlide.stop();
         pageSlide.to = next;
         pageSlide.restart();
@@ -240,8 +269,10 @@ Item {
             const asked = typeof masterWindow !== "undefined" ? pageOf(masterWindow.activeArg) : -1;
             const starred = asked !== -1 ? asked : pageOf(PanelLayout.star);
             if (starred !== -1) { pageSlide.stop(); page = starred; pagePos = starred; }
+            markVisited(order[page]);
             built = true;
             hoverSeen = panelHover.hovered;
+            Qt.callLater(() => railY.snap(root.activeRailTargetY));
             closeSequence.stop();
             if (PanelLayout.expandFromCapsule) {
                 PanelLayout.expandFromCapsule = false;
@@ -294,8 +325,8 @@ Item {
         introContent = 0;
         intro.restart();
     }
-    // Hyprland's layer fade-in (layersIn, about 0.18 s) is over by then
-    Timer { id: unfoldSafety; interval: 220; onTriggered: root.reveal() }
+    // Let the mapped surface paint 2-3 frames before taking over the workspace dots (no 220 ms frozen pause)
+    Timer { id: unfoldSafety; interval: 45; onTriggered: root.reveal() }
     SequentialAnimation {
         id: closeSequence
         NumberAnimation { target: root; property: "introContent"; to: 0; duration: 260; easing.type: Easing.InCubic }
@@ -391,7 +422,7 @@ Item {
             GlassFill { id: chromeGlass; anchors.fill: parent; field: chromeField; tintColor: ThemeBackend.surface0; tintAmount: ThemeBackend.glassTint; sharp: true; frost: ThemeBackend.glassFrost; rim: 0.9; z: -1 }
 
             ShapePath {
-                fillColor: chromeGlass.active ? "transparent" : ThemeBackend.surface0
+                fillColor: chromeGlass.active ? "transparent" : (root.darkMode ? Qt.darker(ThemeBackend.surface0, 1.38) : Qt.lighter(ThemeBackend.surface0, 1.04))
                 strokeWidth: -1
                 startX: chrome.r; startY: 0
                 PathLine { x: chrome.width - chrome.r; y: 0 }
@@ -407,9 +438,9 @@ Item {
                 PathLine { x: 0; y: chrome.r }
                 PathArc { x: chrome.r; y: 0; radiusX: chrome.r; radiusY: chrome.r }
             }
-            // the sidebar part in a darker tone, so topbar and sidebar read as two zones
+            // subtle darker recessed sidebar channel (Style B)
             ShapePath {
-                fillColor: chromeGlass.active ? "transparent" : Qt.darker(ThemeBackend.surface0, 1.22)
+                fillColor: chromeGlass.active ? "transparent" : (root.darkMode ? Qt.rgba(0.0, 0.0, 0.0, 0.26) : Qt.rgba(0.0, 0.0, 0.0, 0.05))
                 strokeWidth: -1
                 startX: chrome.width - chrome.sideW; startY: chrome.topH
                 PathLine { x: chrome.width; y: chrome.topH }
@@ -419,37 +450,157 @@ Item {
                 PathArc { x: chrome.width - chrome.sideW; y: chrome.height - chrome.r; radiusX: chrome.r; radiusY: chrome.r }
                 PathLine { x: chrome.width - chrome.sideW; y: chrome.topH }
             }
+
+            // Style B (Kinetic Light-Rail): glowing inner-L fiber-optic rail tracing Topbar -> concave fillet -> active sidebar slot + crisp outer hairline rim
+            Canvas {
+                id: railCanvas
+                anchors.fill: parent
+                visible: root.visible
+                readonly property var _k: [
+                    root.cAccent.toString(), root.cAccent2.toString(), root.darkMode,
+                    railY.value, railPulse.value, width, height, chrome.r
+                ]
+                on_KChanged: if (root.visible) requestPaint()
+                onVisibleChanged: if (visible) requestPaint()
+                onPaint: {
+                    const ctx = getContext("2d");
+                    ctx.reset();
+                    if (width <= 12 || height <= 12) return;
+
+                    const w = width, h = height;
+                    const topH = chrome.topH, sideW = chrome.sideW, r = chrome.r;
+                    const sx = w - sideW;
+
+                    function traceL() {
+                        ctx.beginPath();
+                        ctx.moveTo(r, 0);
+                        ctx.lineTo(w - r, 0);
+                        ctx.arcTo(w, 0, w, r, r);
+                        ctx.lineTo(w, h - r);
+                        ctx.arcTo(w, h, w - r, h, r);
+                        ctx.lineTo(sx + r, h);
+                        ctx.arcTo(sx, h, sx, h - r, r);
+                        ctx.lineTo(sx, topH + r);
+                        ctx.arcTo(sx, topH, sx - r, topH, r);
+                        ctx.lineTo(r, topH);
+                        ctx.arcTo(0, topH, 0, topH - r, r);
+                        ctx.lineTo(0, r);
+                        ctx.arcTo(0, 0, r, 0, r);
+                        ctx.closePath();
+                    }
+
+                    const acc = root.cAccent;
+                    const acc2 = root.cAccent2;
+                    const pulse = railPulse.value;
+
+                    ctx.save();
+                    traceL();
+                    ctx.clip();
+
+                    const slotMidY = Math.max(topH + r + root.s(8), railY.value - chrome.y);
+                    const railGrad = ctx.createLinearGradient(w * 0.25, topH, sx, slotMidY + root.s(40));
+                    railGrad.addColorStop(0.0, "transparent");
+                    railGrad.addColorStop(0.45, Qt.rgba(acc2.r, acc2.g, acc2.b, 0.45 + pulse * 0.40));
+                    railGrad.addColorStop(0.85, Qt.rgba(acc.r, acc.g, acc.b, 0.92));
+                    railGrad.addColorStop(1.0, "transparent");
+
+                    // Pass 1: soft outer luminous halo
+                    ctx.beginPath();
+                    ctx.moveTo(r + root.s(40), topH - 1.5);
+                    ctx.lineTo(sx - r, topH - 1.5);
+                    ctx.arcTo(sx + 1.5, topH - 1.5, sx + 1.5, topH + r, r + 1.5);
+                    ctx.lineTo(sx + 1.5, Math.min(h - r, slotMidY + root.s(42)));
+                    ctx.lineWidth = root.s(7);
+                    ctx.lineCap = "round";
+                    ctx.strokeStyle = Qt.rgba(acc.r, acc.g, acc.b, 0.18 + pulse * 0.22);
+                    ctx.stroke();
+
+                    // Pass 2: crisp inner fiber-optic gradient beam
+                    ctx.beginPath();
+                    ctx.moveTo(r + root.s(60), topH - 1.5);
+                    ctx.lineTo(sx - r, topH - 1.5);
+                    ctx.arcTo(sx + 1.5, topH - 1.5, sx + 1.5, topH + r, r + 1.5);
+                    ctx.lineTo(sx + 1.5, Math.min(h - r, slotMidY + root.s(34)));
+                    ctx.lineWidth = root.s(2.4);
+                    ctx.strokeStyle = railGrad;
+                    ctx.stroke();
+
+                    ctx.restore();
+
+                    // Crisp outer L-shape hairline rim
+                    traceL();
+                    ctx.lineWidth = 1.3;
+                    ctx.strokeStyle = root.darkMode ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.10);
+                    ctx.stroke();
+                }
+            }
         }
 
-        // In the topbar's rounded corner over the sidebar, as far from the top edge as from the right edge.
-        MorphShape {
-            id: cornerShape
+        // In the topbar's rounded corner over the sidebar, with Style B halo pulse ring and clickable morph.
+        Item {
+            id: cornerHub
             opacity: root.contentShown
-            x: chrome.x + chrome.width - chrome.topH / 2 - width / 2
-            y: chrome.y + (chrome.topH - height) / 2
-            width: root.s(28)
-            height: root.s(28)
-            active: root.visible
+            x: chrome.x + chrome.width - chrome.sideW * 0.5 - width * 0.5
+            y: chrome.y + chrome.topH * 0.5 - height * 0.5
+            width: root.s(36)
+            height: root.s(36)
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: root.s(34) + railPulse.value * root.s(10)
+                height: width
+                radius: width * 0.5
+                color: "transparent"
+                border.width: 1.4
+                border.color: Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.35 + railPulse.value * 0.5)
+            }
+
+            MorphShape {
+                id: cornerShape
+                anchors.centerIn: parent
+                width: root.s(26)
+                height: root.s(26)
+                color: root.cAccent
+                color2: root.cAccent2
+                active: root.visible && root.introContent > 0.95
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    cornerShape.change();
+                    railPulse.snapAndGo(1.0, 0.0);
+                    Sounds.playSfx("system/quick_click.wav");
+                }
+            }
         }
 
-        // Edit panel, at the left end of the topbar.
-        Rectangle {
+        // Edit panel, at the left end of the topbar (spring bounce + accent hover).
+        Item {
             id: editButton
             opacity: root.contentShown
             x: chrome.x + (chrome.topH - width) / 2
             y: chrome.y + (chrome.topH - height) / 2
             width: root.s(32); height: width
-            radius: width / 2
-            color: editMa.containsMouse ? ThemeBackend.surface1 : "transparent"
-            scale: editMa.pressed ? 0.9 : 1
-            Behavior on color { ColorAnimation { duration: 150 } }
-            Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutQuart } }
+            Smart.SpringVal { id: edSc; target: editMa.pressed ? 0.86 : (editMa.containsMouse ? 1.08 : 1.0); stiffness: 520; damping: 0.42; eps: 0.001 }
+            scale: edSc.value
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: editMa.containsMouse
+                    ? Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.18)
+                    : (root.darkMode ? Qt.rgba(1, 1, 1, 0.05) : Qt.rgba(0, 0, 0, 0.06))
+                border.width: editMa.containsMouse ? 1 : 0
+                border.color: Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.42)
+                Behavior on color { ColorAnimation { duration: 150 } }
+            }
             Text {
                 anchors.centerIn: parent
                 text: "󰏫"
                 font.family: ThemeBackend.iconFont
-                font.pixelSize: root.s(16)
-                color: editMa.containsMouse ? ThemeBackend.text : ThemeBackend.subtext0
+                font.pixelSize: root.s(15)
+                color: editMa.containsMouse ? root.cAccent : ThemeBackend.subtext0
             }
             MouseArea {
                 id: editMa
@@ -457,6 +608,7 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
+                    edSc.kick(1.2);
                     Sounds.playSfx("reusables/clickbutton/click.wav");
                     if (typeof masterWindow !== "undefined" && masterWindow.switchWidget) masterWindow.switchWidget("hidden", "");
                     PanelLayout.startEdit(root.screenName);
@@ -464,24 +616,34 @@ Item {
             }
         }
 
-        // The File page, right of the pencil (the pencil's look and feedback); open, it shows an open folder.
-        Rectangle {
+        // The File page toggle, right of the pencil: morphs circle <-> squircle with accent gradient when File mode is ON.
+        Item {
             id: folderButton
             opacity: root.contentShown
-            x: editButton.x + editButton.width + root.s(4)
+            x: editButton.x + editButton.width + root.s(6)
             y: editButton.y
             width: root.s(32); height: width
-            radius: width / 2
-            color: folderMa.containsMouse ? ThemeBackend.surface1 : "transparent"
-            scale: folderMa.pressed ? 0.9 : 1
-            Behavior on color { ColorAnimation { duration: 150 } }
-            Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutQuart } }
+            Smart.SpringVal { id: flSc; target: folderMa.pressed ? 0.86 : (folderMa.containsMouse ? 1.08 : 1.0); stiffness: 520; damping: 0.42; eps: 0.001 }
+            Smart.SpringVal { id: flGeoM; target: root.fileMode ? 1.0 : 0.0; stiffness: 420; damping: 0.44; eps: 0.002 }
+            scale: flSc.value
+            Smart.SmartGeoShape {
+                anchors.fill: parent
+                fromShape: "circle"
+                toShape: "squircle"
+                morph: flGeoM.value
+                fill: root.fileMode
+                    ? root.cAccent
+                    : (folderMa.containsMouse
+                        ? Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.18)
+                        : (root.darkMode ? Qt.rgba(1, 1, 1, 0.05) : Qt.rgba(0, 0, 0, 0.06)))
+                fill2: root.fileMode ? root.cAccent2 : "transparent"
+            }
             Text {
                 anchors.centerIn: parent
                 text: root.fileMode ? "󰝰" : "󰉋"
                 font.family: ThemeBackend.iconFont
-                font.pixelSize: root.s(16)
-                color: folderMa.containsMouse || root.fileMode ? ThemeBackend.text : ThemeBackend.subtext0
+                font.pixelSize: root.s(15)
+                color: root.fileMode ? root.cOnAccent : (folderMa.containsMouse ? root.cAccent : ThemeBackend.subtext0)
             }
             MouseArea {
                 id: folderMa
@@ -489,7 +651,8 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                    Sounds.playSfx("reusables/clickbutton/click.wav");
+                    flSc.kick(1.25);
+                    Sounds.playSfx(root.fileMode ? "reusables/toggle/sfx.wav" : "reusables/switch/sfx.wav");
                     root.toggleFile();
                 }
             }
@@ -530,7 +693,7 @@ Item {
             transform: Translate { x: -crumbs.width * 0.3 * pathZone.fullT }
             x: folderButton.x + folderButton.width + root.s(10)
             y: chrome.y
-            width: cornerShape.x - root.s(10) - x
+            width: cornerHub.x - root.s(10) - x
             height: chrome.topH
             orientation: ListView.Horizontal
             clip: true
@@ -702,21 +865,24 @@ Item {
                     visible: root.fileT < 1
                     transform: Translate { y: root.fileT * sideClip.height }
 
-        // Behind the module of the page in use.
+        // Style B: Illuminated rounded-square capsule behind the active module
         Rectangle {
+            id: activeModuleHighlight
             readonly property int cell: PanelLayout.cells.indexOf(root.order[root.page] || "-")
             readonly property Item slot: cell >= 0 && moduleRepeater.count > cell ? moduleRepeater.itemAt(cell) : null
             readonly property real slotY: slot ? moduleColumn.y + slot.y : 0
             visible: slot !== null
             opacity: root.contentShown
-            x: moduleColumn.x + root.s(6)
-            y: slotY - root.s(6)
-            width: moduleColumn.width - root.s(12)
-            height: slot ? slot.height + root.s(12) : 0
-            radius: ThemeBackend.clampedBorderRadius
-            color: Qt.alpha(ThemeBackend.mauve, 0.22)
-            Behavior on y { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
-            Behavior on height { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+            x: moduleColumn.x + root.s(9)
+            y: slotY - root.s(5)
+            width: moduleColumn.width - root.s(17)
+            height: slot ? slot.height + root.s(10) : 0
+            radius: Math.min(ThemeBackend.clampedBorderRadius, root.s(14))
+            color: Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.22)
+            border.width: 1.4
+            border.color: root.cAccent
+            Behavior on y { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+            Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
         }
 
         // Liquid Glass: a lens slides to the module under the pointer (not the page already in use)
@@ -795,6 +961,7 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: root.s(40)
                         height: item ? item.implicitHeight : 0
+                        asynchronous: true
                         active: root.built && !moduleSlot.empty
                         enabled: moduleSlot.info.live === true
                         source: moduleSlot.info.face || "SideIconFace.qml"
@@ -837,6 +1004,7 @@ Item {
                     transform: Translate { y: (root.fileT - 1) * sideClip.height }
 
                     Rectangle {
+                        id: activePlaceHighlight
                         readonly property int cell: {
                             for (let i = 0; i < root.filePlaces.length; i++)
                                 if (root.filePlaces[i].path === root.filePath) return i;
@@ -846,13 +1014,15 @@ Item {
                         readonly property Item slot: cell >= 0 && placeRepeater.count > cell ? placeRepeater.itemAt(cell)
                                                    : devCell >= 0 && devRepeater.count > devCell ? devRepeater.itemAt(devCell) : null
                         opacity: slot ? 1 : 0
-                        x: placeColumn.x + root.s(6)
-                        y: placeColumn.y + (slot ? slot.y : 0) - root.s(6)
-                        width: placeColumn.width - root.s(12)
-                        height: root.s(44) + root.s(12)
-                        radius: ThemeBackend.clampedBorderRadius
-                        color: Qt.alpha(ThemeBackend.mauve, 0.22)
-                        Behavior on y { enabled: root.fileT === 1; NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                        x: placeColumn.x + root.s(9)
+                        y: placeColumn.y + (slot ? slot.y : 0) - root.s(4)
+                        width: placeColumn.width - root.s(17)
+                        height: root.s(44) + root.s(8)
+                        radius: Math.min(ThemeBackend.clampedBorderRadius, root.s(14))
+                        color: Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.22)
+                        border.width: 1.4
+                        border.color: root.cAccent
+                        Behavior on y { enabled: root.fileT === 1; NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
                         Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                     }
                     GlassLens {
@@ -990,6 +1160,22 @@ Item {
                     }
                 }
             }
+            // Style B: Glowing spring vertical pill indicator hugging the left inner edge of the sidebar!
+            Rectangle {
+                id: lightRailPill
+                visible: root.contentShown > 0.05 && (root.fileMode ? activePlaceHighlight.slot !== null : activeModuleHighlight.slot !== null)
+                opacity: root.contentShown
+                x: chrome.x + chrome.width - chrome.sideW + root.s(1.5)
+                y: Math.max(root.s(8), Math.min(sideClip.height - height - root.s(8), railY.value - sideClip.y - height * 0.5))
+                width: root.s(3)
+                height: root.s(26)
+                radius: width * 0.5
+                gradient: Gradient {
+                    orientation: Gradient.Vertical
+                    GradientStop { position: 0.0; color: root.cAccent }
+                    GradientStop { position: 1.0; color: root.cAccent2 }
+                }
+            }
         }
 
         // Wheel clicks and swipes over the whole sidebar, empty space included, change the page; over the
@@ -1061,186 +1247,72 @@ Item {
                 Repeater {
                     model: root.order
                     Loader {
+                        id: pageLoader
                         required property string modelData
                         required property int index
+                        readonly property bool inView: root.pagesShown && Math.abs(index - root.pagePos) < 1
+                        readonly property bool isCurrent: root.pagesShown && root.page === index
+                        readonly property string pageUrl: ({
+                            music: "pages/MusicHostPage.qml",
+                            weather: "pages/WeatherHostPage.qml",
+                            network: "pages/NetworkHostPage.qml",
+                            launcher: "../launcher/LauncherContent.qml",
+                            timer: "pages/TimerHostPage.qml",
+                            system: "pages/SystemPage.qml",
+                            user: "pages/UserPage.qml",
+                            wallpaper: "pages/WallpaperPage.qml",
+                            calculator: "pages/CalculatorHostPage.qml"
+                        })[modelData] || ""
                         width: parent.width
                         height: parent.height
                         y: (index - root.pagePos) * parent.height
                         asynchronous: true
-                        active: root.built
+                        active: root.built && (Math.abs(index - root.pagePos) < 1.05 || !!root.visitedPages[modelData])
                         visible: Math.abs(index - root.pagePos) < 1
-                        sourceComponent: ({ music: musicPage, weather: weatherPage, network: networkPage, launcher: launcherPage,
-                                            timer: timerPage, system: systemPage, user: userPage,
-                                            wallpaper: wallpaperPage, calculator: calculatorPage })[modelData] || null
+                        function loadNow() {
+                            if (!active || pageUrl === "") return;
+                            const props = modelData === "wallpaper" ? { panel: root } : {};
+                            setSource(Qt.resolvedUrl(pageUrl), props);
+                        }
+                        Component.onCompleted: loadNow()
+                        onActiveChanged: loadNow()
+                        onLoaded: {
+                            if (!item) return;
+                            if ("panel" in item && modelData !== "wallpaper") item.panel = root;
+                            if ("screenName" in item) item.screenName = Qt.binding(() => root.screenName);
+                            if (modelData === "weather" || modelData === "network") {
+                                item.active = Qt.binding(() => pageLoader.inView);
+                            } else if ("active" in item) {
+                                item.active = Qt.binding(() => pageLoader.isCurrent);
+                            }
+                            if (modelData === "launcher") {
+                                item.autoFocus = false;
+                                item.searchFocusedChanged.connect(() => { root.launcherTyping = item.searchFocused; });
+                                item.closeRequested.connect(() => {
+                                    if (typeof masterWindow !== "undefined" && masterWindow.switchWidget) masterWindow.switchWidget("hidden", "");
+                                });
+                            }
+                        }
                     }
                 }
             }
 
-            // the File page, in place of the pages while the folder button is on
+            // the File page, in place of the pages while the folder button is on (compiled only when opened)
             Loader {
                 id: fileLoader
                 anchors.fill: parent
                 active: root.fileMode || root.fileT > 0
                 visible: root.fileT > 0
                 opacity: root.fileT
+                asynchronous: true
                 transform: Translate { y: -root.s(24) * (1 - root.fileT) }
-                sourceComponent: FilePage { panel: root; active: root.visible && root.fileMode }
-                onLoaded: if (root.fileMode) item.forceActiveFocus()
-            }
-        }
-
-        Component {
-            id: musicPage
-            Item {
-                Media.MusicPopup {
-                    readonly property real factor: 0.9
-                    anchors.centerIn: parent
-                    width: root.s(625) * factor
-                    height: root.s(565) * factor
-                    sizeFactor: factor
-                    playIntro: false
-                    visible: true
+                onActiveChanged: {
+                    if (active) setSource(Qt.resolvedUrl("FilePage.qml"), { panel: root });
                 }
-            }
-        }
-
-        // Weather in the style chosen in Edit panel: Classic (the orbit) or Dashboard (the animated weather scene and the
-        // day's hourly cards), both on WeatherPage with the month and the day's readings below, or Smart (the whole page
-        // a Smart Mirror sky, SmartWeatherPage)
-        Component {
-            id: weatherPage
-            Item {
-                id: weatherHost
-                readonly property bool shown: root.pagesShown && Math.abs(root.pagePos - root.pageOf("weather")) < 1
-                readonly property string style: PanelLayout.style("weather")
-                WeatherPage {
-                    anchors.fill: parent
-                    visible: weatherHost.style !== "smart"
-                    active: weatherHost.shown && visible
-                    dashboard: weatherHost.style === "dashboard"
-                }
-                // Smart: drawn at its design size (the page's 565 × 525) and scaled to the page
-                Loader {
-                    active: weatherHost.style === "smart"
-                    width: 565; height: 525
-                    scale: weatherHost.width / 565
-                    transformOrigin: Item.TopLeft
-                    sourceComponent: SmartWeather.SmartWeatherPage {
-                        running: weatherHost.shown
-                        liveTime: true
-                        cornerRadius: Math.min(ThemeBackend.borderRadius, 20) / Math.max(0.01, weatherHost.width / 565)
-                        showArc: Config.getSetting("panel.smartWeather.arc", true) !== false
-                    }
-                }
-            }
-        }
-
-        // Network in the style chosen in Edit panel. Classic: the Network popup at 78%, so its 720 × 600 fits the page;
-        // it only scans while it is shown. Radar and Gargantua (network/orbit/NetworkStyleShell): drawn at the page's
-        // design size and scaled to it, created as the page comes into view (each opening plays their entrance) and
-        // destroyed a moment after it has gone, so they leave nothing running.
-        Component {
-            id: networkPage
-            Item {
-                id: networkHost
-                readonly property string style: PanelLayout.style("network")
-                readonly property bool inView: root.pagesShown && Math.abs(root.pagePos - root.pageOf("network")) < 1
-                Loader {
-                    anchors.fill: parent
-                    active: networkHost.style === "classic"
-                    sourceComponent: Item {
-                        Network.NetworkPopup {
-                            readonly property real factor: 0.78
-                            anchors.centerIn: parent
-                            width: root.s(720) * factor
-                            height: root.s(600) * factor
-                            sizeFactor: factor
-                            visible: true
-                        }
-                    }
-                }
-                Timer { id: networkRelease; interval: 400 }
-                onInViewChanged: if (!inView) networkRelease.restart()
-                // kept while Gargantua is switching the radio (PanelLayout.networkPowerBusy), so closing the panel
-                // mid-charge still finishes it; destroyed once that is done
-                Loader {
-                    active: networkHost.style !== "classic" && (networkHost.inView || networkRelease.running || PanelLayout.networkPowerBusy)
-                    width: 565; height: 525
-                    scale: networkHost.width / 565
-                    transformOrigin: Item.TopLeft
-                    sourceComponent: Orbit.NetworkStyleShell {
-                        style: networkHost.style
-                        shown: networkHost.inView
-                    }
-                }
-            }
-        }
-
-        // The launcher's own search, tabs and results; opening an item or Esc closes the panel.
-        Component {
-            id: launcherPage
-            LauncherContent {
-                active: root.pagesShown && root.page === root.launcherPageIndex
-                autoFocus: false
-                onSearchFocusedChanged: root.launcherTyping = searchFocused
-                onCloseRequested: {
-                    if (typeof masterWindow !== "undefined" && masterWindow.switchWidget) masterWindow.switchWidget("hidden", "");
-                }
-            }
-        }
-
-        // The Quick Actions Timer (Timer, Stopwatch, Pomodoro), sharing its state with Quick Actions through TimerState.
-        // The Loader is the root here so the Timer finds the scale, edge and focus it reads from its host.
-        Component {
-            id: timerPage
-            Item {
-                Loader {
-                    readonly property real factor: 1.3
-                    property var scaleFunc: v => root.s(v) * factor
-                    property string activeEdge: "left"
-                    property bool isCurrentTarget: root.pagesShown && root.page === root.timerPageIndex
-                    anchors.centerIn: parent
-                    width: root.s(380) * factor
-                    height: root.s(330) * factor
-                    source: "../quickactions/actions/Timer.qml"
-                }
-            }
-        }
-
-        // System monitor and battery, in the style chosen in Edit panel; fed every second while shown.
-        Component {
-            id: systemPage
-            Pages.SystemPage { active: root.pagesShown && root.page === root.pageOf("system") }
-        }
-
-        // The user, the machine and the power actions, in the style chosen in Edit panel.
-        Component {
-            id: userPage
-            Pages.UserPage { active: root.pagesShown && root.page === root.pageOf("user"); screenName: root.screenName }
-        }
-
-        // The wallpapers one to a row under Select Wallpaper's colour squares; a pick flies to the screen's middle.
-        Component {
-            id: wallpaperPage
-            Pages.WallpaperPage { panel: root; active: root.pagesShown && root.page === root.pageOf("wallpaper") }
-        }
-
-        // The Quick Actions Calculator (Normal, Advanced, Converter), as the Timer page hosts the Timer: the Loader is
-        // its root, giving it the scale, edge and focus it reads. Advanced is wider, so it is drawn a little smaller;
-        // it keeps the mode and history Quick Actions saved.
-        Component {
-            id: calculatorPage
-            Item {
-                Loader {
-                    readonly property real factor: !item ? 1.3 : item.converter ? 1.1 : item.advanced ? 0.95 : 1.3
-                    property var scaleFunc: v => root.s(v) * factor
-                    property string activeEdge: "left"
-                    property bool isCurrentTarget: root.pagesShown && root.page === root.pageOf("calculator")
-                    anchors.centerIn: parent
-                    width: item ? item.baseW : root.s(380) * factor
-                    // Converter's rows run longer than its box: it takes the page's height
-                    height: item && item.converter ? parent.height - root.s(28) : (item ? item.baseL : root.s(350) * factor)
-                    source: "../quickactions/actions/Calculator.qml"
+                onLoaded: {
+                    if (!item) return;
+                    item.active = Qt.binding(() => root.visible && root.fileMode);
+                    if (root.fileMode) item.forceActiveFocus();
                 }
             }
         }

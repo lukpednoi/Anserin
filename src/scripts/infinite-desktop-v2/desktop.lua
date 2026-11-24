@@ -45,7 +45,7 @@ return function(options)
             else legacy_zoom = saved.base_zoom end
         end
         for id, record in pairs(originals) do
-            assert(type(id) == "number" and type(record) == "table" and type(record.floating) == "boolean", "Invalid recovery record")
+            assert((type(id) == "number" or type(id) == "string") and type(record) == "table" and type(record.floating) == "boolean", "Invalid recovery record")
             for _, key in ipairs({"x", "y", "w", "h", "workspace", "monitor"}) do
                 assert(type(record[key]) == "number" and math.abs(record[key]) < math.huge, "Invalid recovery position")
             end
@@ -527,7 +527,7 @@ return function(options)
     end
 
     local function bind(key, callback, flags)
-        flags = flags or {}; flags.description = "Mo inf desktop: " .. key
+        flags = flags or {}; flags.description = "Anserin inf desktop: " .. key
         hl.bind(key, callback, flags)
     end
     local function super_down() return hl.is_key_down("Super_L") or hl.is_key_down("Super_R") end

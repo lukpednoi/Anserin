@@ -106,8 +106,10 @@ PanelWindow {
         return "modular";
     }
 
+    property bool _ready: false
+
     onBarStyleChanged: {
-        TrayMenuController.hide();
+        if (_ready) TrayMenuController.hide();
     }
 
     property bool isFill: barStyle === "fill"
@@ -186,6 +188,11 @@ PanelWindow {
         } else if (!activeItem) {
             TrayMenuController.hide();
         }
+    }
+
+    Component.onCompleted: {
+        if (isVisible && !activeItem) TrayMenuController.hide();
+        Qt.callLater(() => { trayMenuWindow._ready = true; });
     }
 
     property var activeMenuHandle: activeItem ? activeItem.menu : null

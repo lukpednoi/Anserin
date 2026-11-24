@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import QtQuick.Shapes
 import "../../"
 import "../"
 
@@ -13,6 +14,7 @@ Item {
     property string buttonText: ""
     property string subText: ""
     property string buttonIcon: ""
+    property string iconPath: ""          // a 24x24 SVG path drawn in the icon's place and colour (for logos no font has)
     property string iconFont: ThemeBackend.iconFont
     property int iconFontSize: 15
     property int textFontSize: 12
@@ -98,12 +100,26 @@ Item {
 
             Text {
                 id: iconLabel
-                visible: root.buttonIcon !== ""
-                text: root.buttonIcon
+                visible: root.buttonIcon !== "" || root.iconPath !== ""
+                // with iconPath a clear glyph keeps the same width as the other buttons' icons
+                text: root.iconPath !== "" ? "󰚩" : root.buttonIcon
                 font.family: root.iconFont
                 font.pixelSize: root.iconFontSize
-                color: root.displayTextColor
+                color: root.iconPath !== "" ? "transparent" : root.displayTextColor
                 Layout.alignment: Qt.AlignVCenter
+
+                Shape {
+                    visible: root.iconPath !== ""
+                    anchors.centerIn: parent
+                    width: 24; height: 24
+                    scale: root.iconFontSize / 24
+                    preferredRendererType: Shape.CurveRenderer
+                    ShapePath {
+                        strokeColor: "transparent"
+                        fillColor: root.displayTextColor
+                        PathSvg { path: root.iconPath }
+                    }
+                }
             }
 
             ColumnLayout {
