@@ -78,10 +78,13 @@ Column {
         if (!p || !p.details) return [];
         return String(p.details).split(/\n\s*\n/).map(s => s.replace(/\s*\n\s*/g, " ").trim()).filter(s => s !== "");
     }
-    function postImageUrl(p) {
-        if (!p || !p.image || !page.openVersion) return "";
+    function postImages(p) {
+        if (!p || !page.openVersion) return [];
         const v = (Updates.versions || []).find(x => x.version === page.openVersion.version) || page.openVersion;
-        return Updates.imageUrl(v, p);
+        return Updates.postImages(v, p);
+    }
+    function hasAnyImage(p) {
+        return !!(p && ((p.images && p.images.length > 0) || p.image));
     }
     function openPostDetail(v, p) {
         openVersion = v;
@@ -206,7 +209,7 @@ Column {
                             spacing: 7
                             Rectangle { height: 18; width: lrTag.implicitWidth + 12; radius: 9; color: lrRow.tInfo.color
                                 Text { id: lrTag; anchors.centerIn: parent; text: lrRow.tInfo.name; font.family: page.app.uiFont; font.pixelSize: 9; font.bold: true; color: "#0b0e14" } }
-                            Text { visible: !!(lrRow.modelData.image); text: "󰋩"; font.family: page.app.iconFont; font.pixelSize: 11; color: page.app.cSub; anchors.verticalCenter: parent.verticalCenter }
+                            Text { visible: page.hasAnyImage(lrRow.modelData); text: "󰋩"; font.family: page.app.iconFont; font.pixelSize: 11; color: page.app.cSub; anchors.verticalCenter: parent.verticalCenter }
                         }
                         Text { width: parent.width; wrapMode: Text.WordWrap; text: lrRow.modelData.title || ""; font.family: page.app.uiFont; font.pixelSize: 12; font.weight: Font.DemiBold; color: page.app.cText }
                         Text { visible: !!(lrRow.modelData.resources && lrRow.modelData.resources.ram); text: lrRow.modelData.resources ? ("RAM " + (lrRow.modelData.resources.ram || "") + " · Disk " + (lrRow.modelData.resources.disk || "")) : ""; font.family: page.app.uiFont; font.pixelSize: 10; color: page.app.cSub }
@@ -257,7 +260,7 @@ Column {
                             spacing: 7
                             Rectangle { height: 18; width: hTag.implicitWidth + 12; radius: 9; color: hRow.tInfo.color
                                 Text { id: hTag; anchors.centerIn: parent; text: hRow.tInfo.name; font.family: page.app.uiFont; font.pixelSize: 9; font.bold: true; color: "#0b0e14" } }
-                            Text { visible: !!(hRow.modelData.image); text: "󰋩"; font.family: page.app.iconFont; font.pixelSize: 11; color: page.app.cSub; anchors.verticalCenter: parent.verticalCenter }
+                            Text { visible: page.hasAnyImage(hRow.modelData); text: "󰋩"; font.family: page.app.iconFont; font.pixelSize: 11; color: page.app.cSub; anchors.verticalCenter: parent.verticalCenter }
                         }
                         Text { width: parent.width; wrapMode: Text.WordWrap; text: hRow.modelData.title || ""; font.family: page.app.uiFont; font.pixelSize: 12; font.weight: Font.Medium; color: page.app.cText }
                     }
@@ -277,7 +280,7 @@ Column {
         readonly property var p: page.openPost
         readonly property var v: page.openVersion
         readonly property var tInfo: page.tagInfo(p ? p.tag : "feature")
-        readonly property string imgUrl: page.postImageUrl(p)
+        readonly property var imgs: page.postImages(p)
         readonly property var resItems: page.resourceItems(p ? p.resources : null)
         readonly property var detailParas: page.detailParagraphs(p)
         readonly property bool needsUpdate: v !== null && v.version !== page.installedVer && v.version === page.latestVer
@@ -318,14 +321,168 @@ Column {
                     Text { text: postDetailView.v ? ("v" + postDetailView.v.version + "  ·  " + page.formatDate(postDetailView.v.date)) : ""; font.family: page.app.uiFont; font.pixelSize: 11; font.weight: Font.Medium; color: page.app.cSub }
                 }
 
+                // Single crisp 16:9 image OR smooth full-width horizontal carousel (e.g. Before / After)
                 Item {
-                    visible: postDetailView.imgUrl !== "" && fullPostImg.status !== Image.Error
-                    width: parent.width; height: width * 9 / 16
-                    Rectangle { id: pImgMask; anchors.fill: parent; radius: 13; visible: false; layer.enabled: true }
-                    Rectangle { anchors.fill: parent; radius: 13; color: page.app.cTile }
-                    Image { id: fullPostImg; anchors.fill: parent; visible: false; source: postDetailView.imgUrl; fillMode: Image.PreserveAspectCrop; smooth: true }
-                    MultiEffect { anchors.fill: parent; source: fullPostImg; maskEnabled: true; maskSource: pImgMask; visible: fullPostImg.status === Image.Ready }
-                    Rectangle { anchors.fill: parent; radius: 13; color: "transparent"; border.width: 1; border.color: Qt.rgba(1, 1, 1, 0.12) }
+                    id: mediaGallery
+                    visible: postDetailView.imgs.length > 0
+                    width: parent.width
+                    readonly property var items: postDetailView.imgs
+                    readonly property bool multi: items.length > 1
+                    property int activeIdx: 0
+                    readonly property real gap: 10
+                    readonly property real cardW: width
+                    readonly property real cardH: Math.round(cardW * 9 / 16)
+                    readonly property real maxOff: Math.max(0, (items.length - 1) * (cardW + gap))
+                    readonly property real targetOff: multi ? (activeIdx * (cardW + gap)) : 0
+                    property real dragDx: 0
+                    property bool dragging: false
+                    property real animOff: targetOff
+                    Behavior on animOff {
+                        enabled: !mediaGallery.dragging
+                        NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+                    }
+                    height: cardH + (multi ? 34 : 0)
+
+                    onItemsChanged: {
+                        activeIdx = 0;
+                        dragDx = 0;
+                        dragging = false;
+                    }
+                    function goTo(idx) {
+                        const clamped = Math.max(0, Math.min(items.length - 1, idx));
+                        if (clamped !== activeIdx) {
+                            activeIdx = clamped;
+                            page.app.sfx.playSwitch();
+                        }
+                    }
+
+                    Item {
+                        id: clipBox
+                        width: parent.width
+                        height: mediaGallery.cardH
+                        clip: true
+
+                        Row {
+                            id: slideRow
+                            x: -Math.max(-24, Math.min(mediaGallery.maxOff + 24, mediaGallery.animOff - mediaGallery.dragDx))
+                            height: parent.height
+                            spacing: mediaGallery.gap
+
+                            Repeater {
+                                model: mediaGallery.items
+                                delegate: Item {
+                                    id: slideCard
+                                    required property var modelData
+                                    required property int index
+                                    width: mediaGallery.cardW
+                                    height: mediaGallery.cardH
+
+                                    Rectangle { id: sMask; anchors.fill: parent; radius: 13; visible: false; layer.enabled: true }
+                                    Rectangle { anchors.fill: parent; radius: 13; color: page.app.cTile }
+                                    Image {
+                                        id: sImg
+                                        anchors.fill: parent
+                                        visible: false
+                                        source: slideCard.modelData.url
+                                        fillMode: Image.PreserveAspectCrop
+                                        smooth: true
+                                        mipmap: true
+                                    }
+                                    MultiEffect {
+                                        anchors.fill: parent
+                                        source: sImg
+                                        maskEnabled: true
+                                        maskSource: sMask
+                                        visible: sImg.status === Image.Ready
+                                    }
+                                    Rectangle {
+                                        anchors.fill: parent; radius: 13; color: "transparent"
+                                        border.width: 1
+                                        border.color: Qt.rgba(1, 1, 1, 0.12)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Smooth horizontal drag (or click) without blocking vertical page scroll
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: mediaGallery.multi
+                            cursorShape: Qt.PointingHandCursor
+                            property real startX: 0
+                            property real startY: 0
+                            property bool lockedX: false
+                            onPressed: (e) => {
+                                startX = e.x;
+                                startY = e.y;
+                                lockedX = false;
+                                mediaGallery.dragDx = 0;
+                            }
+                            onPositionChanged: (e) => {
+                                const dx = e.x - startX;
+                                const dy = e.y - startY;
+                                if (!lockedX && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+                                    lockedX = true;
+                                    mediaGallery.dragging = true;
+                                }
+                                if (lockedX) mediaGallery.dragDx = dx;
+                            }
+                            onReleased: (e) => {
+                                const dx = e.x - startX;
+                                if (lockedX) {
+                                    mediaGallery.dragging = false;
+                                    mediaGallery.dragDx = 0;
+                                    if (dx < -34 && mediaGallery.activeIdx < mediaGallery.items.length - 1)
+                                        mediaGallery.goTo(mediaGallery.activeIdx + 1);
+                                    else if (dx > 34 && mediaGallery.activeIdx > 0)
+                                        mediaGallery.goTo(mediaGallery.activeIdx - 1);
+                                } else {
+                                    mediaGallery.goTo((mediaGallery.activeIdx + 1) % mediaGallery.items.length);
+                                }
+                                lockedX = false;
+                            }
+                            onCanceled: {
+                                mediaGallery.dragging = false;
+                                mediaGallery.dragDx = 0;
+                                lockedX = false;
+                            }
+                        }
+                    }
+
+                    // Bottom Before / After selector pills
+                    Row {
+                        visible: mediaGallery.multi
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
+                        spacing: 6
+
+                        Repeater {
+                            model: mediaGallery.items
+                            delegate: Rectangle {
+                                id: dotPill
+                                required property var modelData
+                                required property int index
+                                readonly property bool on: mediaGallery.activeIdx === index
+                                height: 24
+                                width: dotLbl.implicitWidth + 20
+                                radius: 12
+                                color: on ? page.app.cAccent : page.app.cTile
+                                border.width: on ? 0 : 1
+                                border.color: Qt.rgba(page.app.cAccent.r, page.app.cAccent.g, page.app.cAccent.b, 0.24)
+                                Behavior on color { ColorAnimation { duration: 180 } }
+                                Text {
+                                    id: dotLbl; anchors.centerIn: parent
+                                    text: dotPill.modelData.label !== "" ? dotPill.modelData.label : String(dotPill.index + 1)
+                                    font.family: page.app.uiFont; font.pixelSize: 10; font.bold: dotPill.on
+                                    color: dotPill.on ? page.app.cOnAccent : page.app.cText
+                                }
+                                MouseArea {
+                                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                    onClicked: mediaGallery.goTo(dotPill.index)
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Rectangle {

@@ -60,10 +60,33 @@ Item {
         return false;
     }
 
-    // a post's picture: from this checkout once installed, from GitHub before
+    // a post's picture: from this checkout when local or installed, from GitHub only for remote-only versions
+    function resolveImageUrl(version, relPath) {
+        if (!relPath) return "";
+        const s = String(relPath);
+        if (s.startsWith("http://") || s.startsWith("https://") || s.startsWith("file://")) return s;
+        const useLocal = version && (version.installed || version.remote === false) && rootDir !== "";
+        return useLocal ? ("file://" + rootDir + "/" + s) : (rawBase + s);
+    }
     function imageUrl(version, post) {
         if (!post || !post.image) return "";
-        return version && version.installed && rootDir !== "" ? "file://" + rootDir + "/" + post.image : rawBase + post.image;
+        return resolveImageUrl(version, post.image);
+    }
+    function postImages(version, post) {
+        if (!post) return [];
+        const list = post.images;
+        if (list && list.length > 0) {
+            const out = [];
+            for (let i = 0; i < list.length; i++) {
+                const it = list[i];
+                const rel = typeof it === "string" ? it : (it && it.src ? it.src : "");
+                const url = resolveImageUrl(version, rel);
+                if (url) out.push({ label: (it && it.label) ? String(it.label) : "", url: url });
+            }
+            if (out.length > 0) return out;
+        }
+        const single = imageUrl(version, post);
+        return single ? [{ label: "", url: single }] : [];
     }
 
     // ---------- actions ----------
