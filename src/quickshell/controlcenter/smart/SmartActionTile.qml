@@ -18,13 +18,14 @@ Item {
     property color subColor: "#9aa2b0"
     property string uiFont: "Noto Sans"
     property string iconFont: "Symbols Nerd Font Mono"
+    property bool interactive: true      // false: a read-only fact (no hover, press or click), the pill holds the value
 
     signal triggered()
 
     implicitHeight: 54
     height: implicitHeight
 
-    SpringVal { id: scSp; target: ma.pressed ? 0.96 : (hov.hovered ? 1.015 : 1.0); stiffness: 540; damping: 0.44; eps: 0.001 }
+    SpringVal { id: scSp; target: !act.interactive ? 1.0 : (ma.pressed ? 0.96 : (hov.hovered ? 1.015 : 1.0)); stiffness: 540; damping: 0.44; eps: 0.001 }
     scale: scSp.value
 
     Rectangle {
@@ -80,9 +81,9 @@ Item {
         }
     }
 
-    HoverHandler { id: hov }
+    HoverHandler { id: hov; enabled: act.interactive }
     MouseArea {
-        id: ma; anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+        id: ma; anchors.fill: parent; cursorShape: Qt.PointingHandCursor; enabled: act.interactive
         onClicked: { scSp.kick(0.75); act.triggered(); }
     }
 }

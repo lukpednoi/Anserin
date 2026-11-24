@@ -71,6 +71,10 @@ anserin -ver
 
 Anserin also starts on its own when you log in to Hyprland.
 
+## Wallpapers
+
+Want a starter set of still and video wallpapers? Download them from **[Anserin-Wallpapers](https://github.com/lukpednoi/Anserin-Wallpapers)** and copy what you want into `~/Pictures/Wallpapers`.
+
 ## Uninstall
 
 ```bash

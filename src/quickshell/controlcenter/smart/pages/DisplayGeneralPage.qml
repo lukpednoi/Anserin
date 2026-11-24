@@ -46,26 +46,14 @@ Column {
         const t = Object.assign({}, tempDrag); delete t[name]; tempDrag = t;
     }
 
-    property var scaleShown: ({})
-    function monScales(m) {
-        const dims = m.dimensions ? m.dimensions.split("x") : ["1920", "1080"];
-        return dlogic.validScalesForResolution(parseInt(dims[0]) || 1920, parseInt(dims[1]) || 1080);
+    // UI Scale is only shown: each screen keeps the scale set for it in the compositor (Anserin never changes it)
+    function scaleText(m) {
+        const sc = m.scale !== undefined ? m.scale : 1.0;
+        const dims = m.dimensions ? m.dimensions.split("x") : [];
+        const w = parseInt(dims[0]) || 0, h = parseInt(dims[1]) || 0;
+        const text = sc.toFixed(3).replace(/0+$/, '').replace(/\.$/, '.0') + "×";
+        return w > 0 && h > 0 ? text + "  ·  " + Math.round(w / sc) + "×" + Math.round(h / sc) : text;
     }
-    function monScale(m) { return scaleShown[m.name] !== undefined ? scaleShown[m.name] : (m.scale !== undefined ? m.scale : 1.0); }
-    function monScaleFrac(m) {
-        const sc = monScales(m); if (sc.length < 2) return 0;
-        let i = sc.indexOf(monScale(m)); if (i < 0) i = Math.max(0, sc.indexOf(dlogic.nearestValidScaleFromList(sc, monScale(m))));
-        return i / (sc.length - 1);
-    }
-    function moveScale(m, frac) {
-        const sc = monScales(m); if (sc.length === 0) return;
-        const v = sc[Math.round(frac * (sc.length - 1))];
-        if (v === monScale(m)) return;
-        const t = Object.assign({}, scaleShown); t[m.name] = v; scaleShown = t;
-        dlogic.scaleMoved(m.name, v);
-    }
-    function scaleText(m) { return monScale(m).toFixed(3).replace(/0+$/, '').replace(/\.$/, '.0') + "×"; }
-    onMonitorsChanged: scaleShown = ({})
 
     function widgetsOf(name) { return wlogic.monitorWidgetsMap && wlogic.monitorWidgetsMap[name] ? wlogic.monitorWidgetsMap[name] : []; }
     property var showWidgetPresetsFor: ({})
@@ -124,12 +112,9 @@ Column {
                 onMoved: (v) => page.moveTemp(monCard.mon, v)
                 onReleased: page.releaseTemp(monCard.mon)
             }
-            SSlider {
-                icon: "󰍍"; title: "UI Scale"; value: page.monScaleFrac(monCard.modelData)
-                step: 1 / Math.max(1, page.monScales(monCard.modelData).length - 1)
-                valueText: page.scaleText(monCard.modelData)
-                onMoved: (v) => page.moveScale(monCard.modelData, v)
-                onReleased: dlogic.scaleReleased()
+            SAction {
+                width: parent.width; interactive: false
+                icon: "󰍍"; title: "UI Scale"; actionText: page.scaleText(monCard.modelData)
             }
         }
     }

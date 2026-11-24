@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "0.1.2",
+      "date": "2026-11-23",
+      "posts": [
+        {
+          "id": "ui-scale-read-only",
+          "tag": "removed",
+          "title": "UI Scale now follows your display settings",
+          "details": "Control Center → Display no longer changes your monitor's scale. It now shows the scale and logical size your screen already uses.\n\nEach monitor keeps the scale set in your compositor config (Hyprland, Niri or Sway), so Anserin fits every screen resolution without overriding it."
+        }
+      ]
+    },
+    {
       "version": "0.1.1",
       "date": "2026-11-22",
       "posts": [
