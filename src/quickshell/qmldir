@@ -24,6 +24,9 @@ PopoutManager 1.0 popouts/PopoutManager.qml
 SideMusicPopout 1.0 popouts/SideMusicPopout.qml
 TrayBase 1.0 popouts/TrayBase.qml
 DesktopMenu 1.0 popouts/DesktopMenu.qml
+MusicBarCapsule 1.0 popouts/MusicBarCapsule.qml
+MusicBarWave 1.0 popouts/MusicBarWave.qml
+MusicBar 1.0 popouts/MusicBar.qml
 
 WidgetLoader 1.0 widgets/WidgetLoader.qml
 WidgetRedactor 1.0 widgets/WidgetRedactor.qml

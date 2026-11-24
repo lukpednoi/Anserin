@@ -32,6 +32,8 @@ Column {
     readonly property var wsStyles: ["pills", "numbers", "pacman"]
     readonly property int wsStyleIdx: Math.max(0, wsStyles.indexOf(bs.workspacesStyle || "pills"))
     readonly property bool musicSpinRecord: Config.getSetting("bar.musicSpinningRecord", (bs.musicStyle || "full") === "record")
+    readonly property bool musicBarEnabled: Config.getSetting("panel.musicBar.enabled", false) === true
+    readonly property string musicBarPos: Config.getSetting("panel.musicBar.position", "top") === "bottom" ? "bottom" : "top"
 
     readonly property bool showDate: bs.timeShowDate !== undefined ? bs.timeShowDate : (bs.showDate !== undefined ? bs.showDate : true)
     readonly property string timeFormat: bs.time && bs.time.format !== undefined ? bs.time.format : "HH:mm:ss"
@@ -203,6 +205,36 @@ Column {
             }
         }
         SToggle { width: parent.width; icon: "󰀥"; title: "Spinning record"; geoShape: "clover4"; checked: page.musicSpinRecord; onToggled: (v) => { Config.setSetting("bar.musicSpinningRecord", v); page.app.sfx.playToggle(v); } }
+        Rectangle {
+            id: musicBarPreviewBox
+            width: parent.width; height: 76; radius: 14; color: page.app.cTile; clip: true
+            border.width: 1
+            border.color: page.musicBarEnabled
+                ? Qt.rgba(page.app.cAccent.r, page.app.cAccent.g, page.app.cAccent.b, 0.35)
+                : Qt.rgba(page.app.cText.r, page.app.cText.g, page.app.cText.b, 0.10)
+            MusicBarCapsule {
+                id: previewPill
+                anchors.centerIn: parent
+                preview: true
+                liveActive: page.visible
+                maxWidth: musicBarPreviewBox.width - 20
+                waveHeight: 16
+                scale: Math.min(1, (musicBarPreviewBox.width - 16) / Math.max(1, width))
+                opacity: page.musicBarEnabled ? 1.0 : 0.65
+            }
+        }
+        SToggle {
+            width: parent.width; icon: "󰲸"; title: "Music bar"; geoShape: "pentagon"
+            checked: page.musicBarEnabled
+            onToggled: (v) => { Config.setSetting("panel.musicBar.enabled", v); page.app.sfx.playToggle(v); }
+        }
+        SChoice {
+            visible: page.musicBarEnabled
+            width: parent.width; icon: "󰆾"; title: "Music bar position"
+            options: ["Top", "Bottom"]
+            currentIndex: page.musicBarPos === "bottom" ? 1 : 0
+            onPicked: (idx) => { Config.setSetting("panel.musicBar.position", idx === 1 ? "bottom" : "top"); page.app.sfx.playSwitch(); }
+        }
     }
 
     SCard {

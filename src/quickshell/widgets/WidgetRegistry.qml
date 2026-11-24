@@ -647,7 +647,9 @@ QtObject {
                 "material":       { file: "faces/clock/ClockFaceMaterial.qml",       icon: "4", label: I18n.t("widgets.variants.material") },
                 "materialAnalog": { file: "faces/clock/ClockFaceMaterialAnalog.qml", icon: "5", label: I18n.t("widgets.variants.materialAnalog") },
                 "lumen":          { file: "faces/clock/ClockFaceMaterialLumen.qml",  icon: "6", label: I18n.t("widgets.variants.lumen") },
-                "stretched":      { file: "faces/clock/ClockFaceStretched.qml",      icon: "8", label: "Stretched" }
+                "stretched":      { file: "faces/clock/ClockFaceStretched.qml",      icon: "8", label: "Stretched" },
+                "flip":           { file: "faces/clock/ClockFaceFlip.qml",           icon: "9", label: "Flip" },
+                "flip":           { file: "faces/clock/ClockFaceFlip.qml",           icon: "9", label: "Flip" }
             }
         },
         "music": {

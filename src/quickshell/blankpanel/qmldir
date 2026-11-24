@@ -8,4 +8,5 @@ EditorChoices 1.0 EditorChoices.qml
 MusicStyleEditor 1.0 MusicStyleEditor.qml
 FilePage 1.0 FilePage.qml
 SmartWeatherEditor 1.0 SmartWeatherEditor.qml
+SmartSystemEditor 1.0 SmartSystemEditor.qml
 GargantuaEditor 1.0 GargantuaEditor.qml
