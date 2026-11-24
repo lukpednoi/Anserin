@@ -527,7 +527,7 @@ return function(options)
     end
 
     local function bind(key, callback, flags)
-        flags = flags or {}; flags.description = "Mo inf desktop: " .. key
+        flags = flags or {}; flags.description = "Anserin inf desktop: " .. key
         hl.bind(key, callback, flags)
     end
     local function super_down() return hl.is_key_down("Super_L") or hl.is_key_down("Super_R") end

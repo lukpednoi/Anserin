@@ -45,7 +45,7 @@ Item {
         if (activeTabId === tabId) activeTabId = list.length > 0 ? list[list.length - 1] : "terminal";
     }
 
-    // Everything the panel does goes through the terminal, typed as Mo would type it.
+    // Everything the panel does goes through the terminal, typed as the user would type it.
     // Commands that need an argument are only typed; the rest run at once.
     readonly property var argCommands: ["/rename", "/export", "/memory", "/add-dir"]
     function typeIntoTerminal(text, run) {

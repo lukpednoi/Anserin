@@ -64,8 +64,11 @@ PanelWindow {
         return "modular";
     }
 
+    property bool _ready: false
+    Component.onCompleted: Qt.callLater(() => { sideMusicPopout._ready = true; })
+
     onBarStyleChanged: {
-        SideMusicController.hide();
+        if (_ready) SideMusicController.hide();
     }
 
     property bool isFill: barStyle === "fill"

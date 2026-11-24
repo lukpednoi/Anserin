@@ -7,12 +7,7 @@ import Quickshell.Io
 import Quickshell.Widgets
 import "../"
 import "../bar"
-import "../media" as Media
-import "../network" as Network
-import "../network/orbit" as Orbit
 import "."
-import "pages" as Pages
-import "smartweather" as SmartWeather
 import "../reusables"
 import "../controlcenter/smart" as Smart
 
@@ -49,6 +44,8 @@ Item {
         return moduleColumn.y + root.s(22);
     }
     Smart.SpringVal { id: railY; target: root.activeRailTargetY; stiffness: 380; damping: 0.58; eps: 0.3 }
+    // While the panel slides in/out, snap the rail directly instead of running CPU Canvas repaints mid-slide.
+    onActiveRailTargetYChanged: if (!root.visible || root.introContent < 0.99) railY.snap(root.activeRailTargetY)
 
     readonly property var settings: Config.getSetting("controlcenter", null)
     readonly property bool autoHideEnabled: !settings || settings.autohide !== false
@@ -84,7 +81,7 @@ Item {
     readonly property int launcherPageIndex: pageOf("launcher")
     readonly property int timerPageIndex: pageOf("timer")
     readonly property string screenName: typeof masterWindow !== "undefined" && masterWindow.screen ? masterWindow.screen.name : ""
-    // the Launcher page's search field has focus: the panel stays open while Mo types
+    // the Launcher page's search field has focus: the panel stays open while the user types
     property bool launcherTyping: false
 
     // ---------- the File page (the folder button right of the pencil) ----------
@@ -107,7 +104,7 @@ Item {
     property var fileHistory: []
     property var fileFuture: []
     property var fileClip: null            // cut or copied: { mode: "copy" | "move", paths: [...] }
-    property bool fileTyping: false        // renaming: the panel stays open while Mo types
+    property bool fileTyping: false        // renaming: the panel stays open while the user types
     // the pages keep running while they fade out under the File page
     readonly property bool pagesShown: visible && fileT < 1
     NumberAnimation { id: fileSlide; target: root; property: "fileT"; duration: 320; easing.type: Easing.OutCubic }
@@ -232,12 +229,21 @@ Item {
     }
     property int page: 0
     property real pagePos: 0
-    // Built on the first open and kept: only the shown page runs, and it opens instantly the next time.
+    // Built on demand per page: only the opening page loads on first open (no 9-page simultaneous freeze),
+    // and each extra page loads the first time the user visits it and stays cached afterwards.
     property bool built: false
+    property var visitedPages: ({})
+    function markVisited(id) {
+        if (!id || visitedPages[id]) return;
+        const next = Object.assign({}, visitedPages);
+        next[id] = true;
+        visitedPages = next;
+    }
     // quiet: wheel clicks and swipes change the page without the switch sound; clicks keep it.
     function setPage(next, quiet) {
         next = Math.max(0, Math.min(pageCount - 1, next));
         if (next === page) return;
+        markVisited(order[next]);
         page = next;
         if (!quiet) Sounds.playSfx("reusables/iconbutton/click.wav");
         cornerShape.change();
@@ -263,6 +269,7 @@ Item {
             const asked = typeof masterWindow !== "undefined" ? pageOf(masterWindow.activeArg) : -1;
             const starred = asked !== -1 ? asked : pageOf(PanelLayout.star);
             if (starred !== -1) { pageSlide.stop(); page = starred; pagePos = starred; }
+            markVisited(order[page]);
             built = true;
             hoverSeen = panelHover.hovered;
             Qt.callLater(() => railY.snap(root.activeRailTargetY));
@@ -318,8 +325,8 @@ Item {
         introContent = 0;
         intro.restart();
     }
-    // Hyprland's layer fade-in (layersIn, about 0.18 s) is over by then
-    Timer { id: unfoldSafety; interval: 220; onTriggered: root.reveal() }
+    // Let the mapped surface paint 2-3 frames before taking over the workspace dots (no 220 ms frozen pause)
+    Timer { id: unfoldSafety; interval: 45; onTriggered: root.reveal() }
     SequentialAnimation {
         id: closeSequence
         NumberAnimation { target: root; property: "introContent"; to: 0; duration: 260; easing.type: Easing.InCubic }
@@ -448,11 +455,13 @@ Item {
             Canvas {
                 id: railCanvas
                 anchors.fill: parent
+                visible: root.visible
                 readonly property var _k: [
                     root.cAccent.toString(), root.cAccent2.toString(), root.darkMode,
                     railY.value, railPulse.value, width, height, chrome.r
                 ]
-                on_KChanged: requestPaint()
+                on_KChanged: if (root.visible) requestPaint()
+                onVisibleChanged: if (visible) requestPaint()
                 onPaint: {
                     const ctx = getContext("2d");
                     ctx.reset();
@@ -553,7 +562,7 @@ Item {
                 height: root.s(26)
                 color: root.cAccent
                 color2: root.cAccent2
-                active: root.visible
+                active: root.visible && root.introContent > 0.95
             }
 
             MouseArea {
@@ -952,6 +961,7 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: root.s(40)
                         height: item ? item.implicitHeight : 0
+                        asynchronous: true
                         active: root.built && !moduleSlot.empty
                         enabled: moduleSlot.info.live === true
                         source: moduleSlot.info.face || "SideIconFace.qml"
@@ -1237,186 +1247,72 @@ Item {
                 Repeater {
                     model: root.order
                     Loader {
+                        id: pageLoader
                         required property string modelData
                         required property int index
+                        readonly property bool inView: root.pagesShown && Math.abs(index - root.pagePos) < 1
+                        readonly property bool isCurrent: root.pagesShown && root.page === index
+                        readonly property string pageUrl: ({
+                            music: "pages/MusicHostPage.qml",
+                            weather: "pages/WeatherHostPage.qml",
+                            network: "pages/NetworkHostPage.qml",
+                            launcher: "../launcher/LauncherContent.qml",
+                            timer: "pages/TimerHostPage.qml",
+                            system: "pages/SystemPage.qml",
+                            user: "pages/UserPage.qml",
+                            wallpaper: "pages/WallpaperPage.qml",
+                            calculator: "pages/CalculatorHostPage.qml"
+                        })[modelData] || ""
                         width: parent.width
                         height: parent.height
                         y: (index - root.pagePos) * parent.height
                         asynchronous: true
-                        active: root.built
+                        active: root.built && (Math.abs(index - root.pagePos) < 1.05 || !!root.visitedPages[modelData])
                         visible: Math.abs(index - root.pagePos) < 1
-                        sourceComponent: ({ music: musicPage, weather: weatherPage, network: networkPage, launcher: launcherPage,
-                                            timer: timerPage, system: systemPage, user: userPage,
-                                            wallpaper: wallpaperPage, calculator: calculatorPage })[modelData] || null
+                        function loadNow() {
+                            if (!active || pageUrl === "") return;
+                            const props = modelData === "wallpaper" ? { panel: root } : {};
+                            setSource(Qt.resolvedUrl(pageUrl), props);
+                        }
+                        Component.onCompleted: loadNow()
+                        onActiveChanged: loadNow()
+                        onLoaded: {
+                            if (!item) return;
+                            if ("panel" in item && modelData !== "wallpaper") item.panel = root;
+                            if ("screenName" in item) item.screenName = Qt.binding(() => root.screenName);
+                            if (modelData === "weather" || modelData === "network") {
+                                item.active = Qt.binding(() => pageLoader.inView);
+                            } else if ("active" in item) {
+                                item.active = Qt.binding(() => pageLoader.isCurrent);
+                            }
+                            if (modelData === "launcher") {
+                                item.autoFocus = false;
+                                item.searchFocusedChanged.connect(() => { root.launcherTyping = item.searchFocused; });
+                                item.closeRequested.connect(() => {
+                                    if (typeof masterWindow !== "undefined" && masterWindow.switchWidget) masterWindow.switchWidget("hidden", "");
+                                });
+                            }
+                        }
                     }
                 }
             }
 
-            // the File page, in place of the pages while the folder button is on
+            // the File page, in place of the pages while the folder button is on (compiled only when opened)
             Loader {
                 id: fileLoader
                 anchors.fill: parent
                 active: root.fileMode || root.fileT > 0
                 visible: root.fileT > 0
                 opacity: root.fileT
+                asynchronous: true
                 transform: Translate { y: -root.s(24) * (1 - root.fileT) }
-                sourceComponent: FilePage { panel: root; active: root.visible && root.fileMode }
-                onLoaded: if (root.fileMode) item.forceActiveFocus()
-            }
-        }
-
-        Component {
-            id: musicPage
-            Item {
-                Media.MusicPopup {
-                    readonly property real factor: 0.9
-                    anchors.centerIn: parent
-                    width: root.s(625) * factor
-                    height: root.s(565) * factor
-                    sizeFactor: factor
-                    playIntro: false
-                    visible: true
+                onActiveChanged: {
+                    if (active) setSource(Qt.resolvedUrl("FilePage.qml"), { panel: root });
                 }
-            }
-        }
-
-        // Weather in the style chosen in Edit panel: Classic (the orbit) or Dashboard (the animated weather scene and the
-        // day's hourly cards), both on WeatherPage with the month and the day's readings below, or Smart (the whole page
-        // a Smart Mirror sky, SmartWeatherPage)
-        Component {
-            id: weatherPage
-            Item {
-                id: weatherHost
-                readonly property bool shown: root.pagesShown && Math.abs(root.pagePos - root.pageOf("weather")) < 1
-                readonly property string style: PanelLayout.style("weather")
-                WeatherPage {
-                    anchors.fill: parent
-                    visible: weatherHost.style !== "smart"
-                    active: weatherHost.shown && visible
-                    dashboard: weatherHost.style === "dashboard"
-                }
-                // Smart: drawn at its design size (the page's 565 × 525) and scaled to the page
-                Loader {
-                    active: weatherHost.style === "smart"
-                    width: 565; height: 525
-                    scale: weatherHost.width / 565
-                    transformOrigin: Item.TopLeft
-                    sourceComponent: SmartWeather.SmartWeatherPage {
-                        running: weatherHost.shown
-                        liveTime: true
-                        cornerRadius: Math.min(ThemeBackend.borderRadius, 20) / Math.max(0.01, weatherHost.width / 565)
-                        showArc: Config.getSetting("panel.smartWeather.arc", true) !== false
-                    }
-                }
-            }
-        }
-
-        // Network in the style chosen in Edit panel. Classic: the Network popup at 78%, so its 720 × 600 fits the page;
-        // it only scans while it is shown. Radar and Gargantua (network/orbit/NetworkStyleShell): drawn at the page's
-        // design size and scaled to it, created as the page comes into view (each opening plays their entrance) and
-        // destroyed a moment after it has gone, so they leave nothing running.
-        Component {
-            id: networkPage
-            Item {
-                id: networkHost
-                readonly property string style: PanelLayout.style("network")
-                readonly property bool inView: root.pagesShown && Math.abs(root.pagePos - root.pageOf("network")) < 1
-                Loader {
-                    anchors.fill: parent
-                    active: networkHost.style === "classic"
-                    sourceComponent: Item {
-                        Network.NetworkPopup {
-                            readonly property real factor: 0.78
-                            anchors.centerIn: parent
-                            width: root.s(720) * factor
-                            height: root.s(600) * factor
-                            sizeFactor: factor
-                            visible: true
-                        }
-                    }
-                }
-                Timer { id: networkRelease; interval: 400 }
-                onInViewChanged: if (!inView) networkRelease.restart()
-                // kept while Gargantua is switching the radio (PanelLayout.networkPowerBusy), so closing the panel
-                // mid-charge still finishes it; destroyed once that is done
-                Loader {
-                    active: networkHost.style !== "classic" && (networkHost.inView || networkRelease.running || PanelLayout.networkPowerBusy)
-                    width: 565; height: 525
-                    scale: networkHost.width / 565
-                    transformOrigin: Item.TopLeft
-                    sourceComponent: Orbit.NetworkStyleShell {
-                        style: networkHost.style
-                        shown: networkHost.inView
-                    }
-                }
-            }
-        }
-
-        // The launcher's own search, tabs and results; opening an item or Esc closes the panel.
-        Component {
-            id: launcherPage
-            LauncherContent {
-                active: root.pagesShown && root.page === root.launcherPageIndex
-                autoFocus: false
-                onSearchFocusedChanged: root.launcherTyping = searchFocused
-                onCloseRequested: {
-                    if (typeof masterWindow !== "undefined" && masterWindow.switchWidget) masterWindow.switchWidget("hidden", "");
-                }
-            }
-        }
-
-        // The Quick Actions Timer (Timer, Stopwatch, Pomodoro), sharing its state with Quick Actions through TimerState.
-        // The Loader is the root here so the Timer finds the scale, edge and focus it reads from its host.
-        Component {
-            id: timerPage
-            Item {
-                Loader {
-                    readonly property real factor: 1.3
-                    property var scaleFunc: v => root.s(v) * factor
-                    property string activeEdge: "left"
-                    property bool isCurrentTarget: root.pagesShown && root.page === root.timerPageIndex
-                    anchors.centerIn: parent
-                    width: root.s(380) * factor
-                    height: root.s(330) * factor
-                    source: "../quickactions/actions/Timer.qml"
-                }
-            }
-        }
-
-        // System monitor and battery, in the style chosen in Edit panel; fed every second while shown.
-        Component {
-            id: systemPage
-            Pages.SystemPage { active: root.pagesShown && root.page === root.pageOf("system") }
-        }
-
-        // The user, the machine and the power actions, in the style chosen in Edit panel.
-        Component {
-            id: userPage
-            Pages.UserPage { active: root.pagesShown && root.page === root.pageOf("user"); screenName: root.screenName }
-        }
-
-        // The wallpapers one to a row under Select Wallpaper's colour squares; a pick flies to the screen's middle.
-        Component {
-            id: wallpaperPage
-            Pages.WallpaperPage { panel: root; active: root.pagesShown && root.page === root.pageOf("wallpaper") }
-        }
-
-        // The Quick Actions Calculator (Normal, Advanced, Converter), as the Timer page hosts the Timer: the Loader is
-        // its root, giving it the scale, edge and focus it reads. Advanced is wider, so it is drawn a little smaller;
-        // it keeps the mode and history Quick Actions saved.
-        Component {
-            id: calculatorPage
-            Item {
-                Loader {
-                    readonly property real factor: !item ? 1.3 : item.converter ? 1.1 : item.advanced ? 0.95 : 1.3
-                    property var scaleFunc: v => root.s(v) * factor
-                    property string activeEdge: "left"
-                    property bool isCurrentTarget: root.pagesShown && root.page === root.pageOf("calculator")
-                    anchors.centerIn: parent
-                    width: item ? item.baseW : root.s(380) * factor
-                    // Converter's rows run longer than its box: it takes the page's height
-                    height: item && item.converter ? parent.height - root.s(28) : (item ? item.baseL : root.s(350) * factor)
-                    source: "../quickactions/actions/Calculator.qml"
+                onLoaded: {
+                    if (!item) return;
+                    item.active = Qt.binding(() => root.visible && root.fileMode);
+                    if (root.fileMode) item.forceActiveFocus();
                 }
             }
         }

@@ -5,7 +5,7 @@ import QtQuick
 // 2. The starburst glides smoothly left while "Claude Code" (Noto Serif) emerges letter by letter into a
 //    strictly centered [Starburst + Claude Code] lockup (zero clipping or left-shift jitter).
 // 3. After a crisp hold, a warm flare drops "Claude Code" smoothly and sweeps curved glowing spark arcs
-//    across the canvas as "[✦] Good morning, Mo" emerges centered with Clawd waving gently above the G.
+//    across the canvas as "[✦] Good morning, User" emerges centered with Clawd waving gently above the G.
 Item {
     id: hero
 
@@ -117,7 +117,7 @@ Item {
         }
         PauseAnimation { duration: 460 }
 
-        // Beat 3: Luminous flare drop + curved spark arcs -> "[✦] Good morning, Mo" + Clawd wave
+        // Beat 3: Luminous flare drop + curved spark arcs -> "[✦] Good morning, User" + Clawd wave
         ParallelAnimation {
             NumberAnimation { target: hero; property: "dropP"; from: 0; to: 1; duration: 200; easing.type: Easing.OutCubic }
             NumberAnimation { target: hero; property: "arcP"; from: 0; to: 1; duration: 500; easing.type: Easing.OutCubic }
@@ -355,7 +355,7 @@ Item {
         }
     }
 
-    // Beat 3 -> 4: Centered "[✦] Good morning, Mo" + Clawd perched neatly above G
+    // Beat 3 -> 4: Centered "[✦] Good morning, User" + Clawd perched neatly above G
     Item {
         id: greetStage
         anchors.fill: parent

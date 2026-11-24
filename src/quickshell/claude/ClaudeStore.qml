@@ -366,7 +366,7 @@ Item {
     }
 
     // ---------- sign-in: `claude auth status` / `claude auth login` ----------
-    property bool loggedIn: true             // assumed until the first check answers, so a signed-in Mo never sees a flash
+    property bool loggedIn: true             // assumed until the first check answers, so a signed-in user never sees a flash
     property bool authChecked: false
     property string loginUrl: ""
     readonly property bool loginRunning: loginProc.running

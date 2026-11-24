@@ -12,7 +12,8 @@ Item {
         property bool wantOpen: false
         property string sourceUrl: ""
         property int graceMs: 1500
-        property bool keepAlive: wantOpen
+        property bool keepAlive: false
+        Component.onCompleted: if (wantOpen) keepAlive = true
 
         onWantOpenChanged: {
             if (wantOpen) {
