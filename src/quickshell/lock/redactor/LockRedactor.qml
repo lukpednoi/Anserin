@@ -37,21 +37,7 @@ Scope {
         }
     }
 
-    IpcHandler {
-        target: "lock-redactor"
-
-        function open(mon: string): void {
-            root.open(mon);
-        }
-
-        function toggle(): void {
-            root.toggle("");
-        }
-
-        function close(): void {
-            root.close();
-        }
-    }
+    // IPC target "lock-redactor" is owned by Shell.qml so this editor stays unloaded until opened.
 
     Loader {
         id: windowLoader

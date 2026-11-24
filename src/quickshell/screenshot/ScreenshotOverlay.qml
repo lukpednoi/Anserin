@@ -74,26 +74,7 @@ PanelWindow {
     // Opened from the Screenshot or Record button: that mode only, without the photo/video switch.
     property bool modeLocked: false
 
-    IpcHandler {
-        target: "screenshotOverlay"
-
-        function toggle(img: string, editMode: string, audioPrefs: string, cGeom: string, cGeomVideo: string, cMode: string, cBackend: string, targetMon: string): void {
-            if (root.isActive) {
-                if (img && img !== "") Quickshell.execDetached(["bash", "-c", "rm -f " + img]);
-                root.deactivate();
-            } else {
-                root.activate(img, editMode, audioPrefs, cGeom, cGeomVideo, cMode, cBackend, targetMon);
-            }
-        }
-
-        function activate(img: string, editMode: string, audioPrefs: string, cGeom: string, cGeomVideo: string, cMode: string, cBackend: string, targetMon: string): void {
-            root.activate(img, editMode, audioPrefs, cGeom, cGeomVideo, cMode, cBackend, targetMon);
-        }
-
-        function deactivate(): void {
-            root.deactivate();
-        }
-    }
+    // IPC is owned by Shell.qml so this 1600-line overlay PanelWindow is loaded only while active.
 
     onIsActiveChanged: {
         if (root.isActive) {

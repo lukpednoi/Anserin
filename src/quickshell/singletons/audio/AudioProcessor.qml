@@ -16,13 +16,43 @@ Item {
         initialized = true;
         build.running = true;
     }
+    // At startup, only launch anserin-audio when Dynamic EQ is on or a non-flat EQ is saved;
+    // otherwise stay dormant (0 MB) until the user opens Equalizer or enables Dynamic EQ.
+    function initializeIfNeeded() {
+        if (initialized) return;
+        if (dynamicEq) {
+            initialize();
+            return;
+        }
+        eqStateProbe.reload();
+    }
     function synchronize() {
         if (!ready || control.running) return;
         control.requestedDynamic = dynamicEq;
         control.command = ["bash", Caching.qsDir + "/media/equalizer.sh", "init", dynamicEq ? "true" : "false"];
         control.running = true;
     }
-    onDynamicEqChanged: synchronize()
+    onDynamicEqChanged: {
+        if (dynamicEq && !initialized) initialize();
+        else synchronize();
+    }
+    FileView {
+        id: eqStateProbe
+        path: Caching.stateDir !== "" ? (Caching.stateDir + "/music/eq_state.json") : ""
+        onLoaded: {
+            if (root.initialized) return;
+            try {
+                const st = JSON.parse(text());
+                if (st && st.dyneq === true) { root.initialize(); return; }
+                const app = st && st.applied ? st.applied : null;
+                if (app) {
+                    for (let i = 1; i <= 10; i++) {
+                        if (Math.abs(Number(app["b" + i] || 0)) > 0.01) { root.initialize(); return; }
+                    }
+                }
+            } catch (e) {}
+        }
+    }
     Process {
         id: build
         command: ["make", "-C", Caching.qsDir + "/native/audio", "OUT=anserin-audio"]

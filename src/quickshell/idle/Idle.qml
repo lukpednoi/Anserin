@@ -33,7 +33,7 @@ Item {
 
     Process {
         id: screensaverProc
-        running: Caching.qsDir !== ""
+        running: Caching.qsDir !== "" && idleRoot.isIdleSystemActive
         command: ["python3", Caching.qsDir + "/idle/screensaver_inhibit.py"]
         stdout: SplitParser {
             onRead: data => idleRoot.isAppInhibited = data.trim() === "1"
@@ -41,14 +41,21 @@ Item {
         onExited: (exitCode, exitStatus) => {
             idleRoot.isAppInhibited = false;
             // 0 means python-jeepney is missing, no point in retrying
-            if (exitCode !== 0) screensaverRestartTimer.restart();
+            if (exitCode !== 0 && idleRoot.isIdleSystemActive) screensaverRestartTimer.restart();
+        }
+    }
+
+    onIsIdleSystemActiveChanged: {
+        if (!isIdleSystemActive) {
+            screensaverRestartTimer.stop();
+            isAppInhibited = false;
         }
     }
 
     Timer {
         id: screensaverRestartTimer
         interval: 10000
-        onTriggered: screensaverProc.running = true
+        onTriggered: if (Caching.qsDir !== "" && idleRoot.isIdleSystemActive) screensaverProc.running = true
     }
 
     property var allActions: {

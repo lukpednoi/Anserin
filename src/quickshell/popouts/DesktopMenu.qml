@@ -54,12 +54,20 @@ PanelWindow {
         target: DesktopMenuController
 
         function onMenuTriggered() {
-            rootContainer.forceActiveFocus();
-            closeAnim.stop();
-            openAnim.stop();
-            menuContainer.animProgress = 0.0;
-            openAnim.restart();
+            desktopMenuWindow.playOpenAnimation();
         }
+    }
+
+    function playOpenAnimation() {
+        rootContainer.forceActiveFocus();
+        closeAnim.stop();
+        openAnim.stop();
+        menuContainer.animProgress = 0.0;
+        openAnim.restart();
+    }
+
+    Component.onCompleted: {
+        if (desktopMenuWindow.isVisible) Qt.callLater(desktopMenuWindow.playOpenAnimation);
     }
 
     Connections {

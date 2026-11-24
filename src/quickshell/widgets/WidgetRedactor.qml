@@ -70,50 +70,7 @@ Scope {
     }
 
 
-    IpcHandler {
-        target: "redactor"
-
-        function activate(): void {
-            root.open("", "");
-        }
-
-        function open(mon: string, widgetId: string): void {
-            root.open(mon, widgetId);
-        }
-
-        function toggle(): void {
-            root.toggle("", "");
-        }
-
-        function close(): void {
-            root.close();
-        }
-    }
-
-    IpcHandler {
-        target: "widget-redactor"
-
-        function editLayout(context: string, mon: string): void {
-            if (context !== "lockscreen" && context !== "dashboard") return;
-            root.open(mon, "", context);
-        }
-
-        function activate(): void {
-            root.open("", "");
-        }
-
-        function open(mon: string, widgetId: string): void {
-            root.open(mon, widgetId);
-        }
-
-        function toggle(): void {
-            root.toggle("", "");
-        }
-
-        function close(): void {
-            root.close();
-        }
-    }
+    // IPC targets "redactor" and "widget-redactor" are owned by Shell.qml so this 2800-line editor stays unloaded until opened.
 
     Loader {
         id: redactorWindowLoader

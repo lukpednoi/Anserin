@@ -188,6 +188,10 @@ PanelWindow {
         }
     }
 
+    Component.onCompleted: {
+        if (isVisible && !activeItem) TrayMenuController.hide();
+    }
+
     property var activeMenuHandle: activeItem ? activeItem.menu : null
 
     QsMenuOpener {

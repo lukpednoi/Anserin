@@ -397,17 +397,14 @@ PanelWindow {
             item.visible = false;
             widgetCache[name] = item;
             builtWidgets = Object.keys(widgetCache).length;
-            if (name === "wallpaper") pristineWallpaper = true;
         }
         return item;
     }
 
     // A panel is built on its first open and kept while it is in use, so reopening it soon is instant. Once every panel
     // has been closed for a while they are all let go, giving back their pictures, textures and objects; the next open
-    // builds the panel again (the compiled component stays cached). The wallpaper picker is built again right away,
-    // hidden, as at start: unshown it holds almost nothing and its first open stays instant.
+    // builds the panel again (the compiled component stays cached).
     property int builtWidgets: 0
-    property bool pristineWallpaper: false
     function releaseHiddenWidgets() {
         if (masterWindow.currentActive !== "hidden" || masterWindow.targetActive !== "hidden" || masterWindow.isClosing
             || masterWindow.isVisible) return;
@@ -421,28 +418,21 @@ PanelWindow {
         builtWidgets = 0;
         Qt.callLater(function() {
             gc();
-            masterWindow.preloadWallpaper();
+            if (typeof Sounds !== "undefined") Sounds.trimMemory();
         });
-    }
-    function preloadWallpaper() {
-        if (masterWindow.currentActive !== "hidden") return;
-        let w = masterWindow.getLayout("wallpaper");
-        if (w) masterWindow.ensureWidgetItem("wallpaper", w);
     }
 
     Timer {
-        // a picker that was only preloaded, never shown, is left alone
         interval: 30000
         running: masterWindow.currentActive === "hidden" && masterWindow.targetActive === "hidden" && !masterWindow.isVisible
             && !masterWindow.isClosing
-            && masterWindow.builtWidgets > 0 && !(masterWindow.builtWidgets === 1 && masterWindow.pristineWallpaper)
+            && masterWindow.builtWidgets > 0
         onTriggered: masterWindow.releaseHiddenWidgets()
     }
 
     Component.onCompleted: {
         applyConfigSettings();
         reportWidgetState();
-        Qt.callLater(masterWindow.preloadWallpaper);
     }
 
     Component.onDestruction: {
@@ -491,8 +481,40 @@ PanelWindow {
 
     property real globalUiScale: 1.0
 
-    Notifs.NotificationPopups {
+    // Mount NotificationPopups PanelWindow only while active popups exist (+ short grace for dismiss animation).
+    Item {
         id: osdPopups
+        property bool wantOpen: NotificationManager.activePopupsModel.count > 0
+        property bool keepAlive: wantOpen
+
+        onWantOpenChanged: {
+            if (wantOpen) {
+                notifUnloadTimer.stop();
+                keepAlive = true;
+            } else if (keepAlive) {
+                notifUnloadTimer.restart();
+            }
+        }
+
+        Timer {
+            id: notifUnloadTimer
+            interval: 1200
+            repeat: false
+            onTriggered: {
+                if (!osdPopups.wantOpen) {
+                    osdPopups.keepAlive = false;
+                    Qt.callLater(function() {
+                        gc();
+                        if (typeof Sounds !== "undefined") Sounds.trimMemory();
+                    });
+                }
+            }
+        }
+
+        Loader {
+            active: osdPopups.wantOpen || osdPopups.keepAlive
+            sourceComponent: Notifs.NotificationPopups {}
+        }
     }
 
     function applyConfigSettings() {
@@ -898,7 +920,6 @@ PanelWindow {
 
         masterWindow.currentActive = newWidget;
         masterWindow.activeArg = arg;
-        if (newWidget === "wallpaper") masterWindow.pristineWallpaper = false;
 
         let finalW = (typeof cachedItem.targetMasterWidth === "number" && cachedItem.targetMasterWidth >= 50) ? cachedItem.targetMasterWidth : t.w;
         let finalH = (typeof cachedItem.targetMasterHeight === "number" && cachedItem.targetMasterHeight >= 50) ? cachedItem.targetMasterHeight : t.h;
