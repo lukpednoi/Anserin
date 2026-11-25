@@ -485,7 +485,8 @@ PanelWindow {
     Item {
         id: osdPopups
         property bool wantOpen: NotificationManager.activePopupsModel.count > 0
-        property bool keepAlive: wantOpen
+        property bool keepAlive: false
+        Component.onCompleted: if (wantOpen) keepAlive = true
 
         onWantOpenChanged: {
             if (wantOpen) {

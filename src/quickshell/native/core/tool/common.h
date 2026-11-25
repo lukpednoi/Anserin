@@ -21,5 +21,6 @@ int monitorsCommand(int argc, char **argv);
 int locksCommand(int argc, char **argv);
 int brightnessCommand(int argc, char **argv);
 int gammaCommand(int argc, char **argv);
+int reserveCommand(int argc, char **argv);
 
 } // namespace core

@@ -2013,7 +2013,7 @@ Item {
                             fillMode: Image.PreserveAspectCrop
                             source: delegateRoot.isVideo ? (delegateRoot.itemPosterUrl !== "" ? delegateRoot.itemPosterUrl : "") : (delegateRoot.itemThumbUrl || delegateRoot.itemFileUrl)
                             asynchronous: true
-                            cache: true
+                            cache: false
                             opacity: (status === Image.Ready && source.toString() !== "") ? 1.0 : 0.0
                             Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
                             sourceSize.width: Math.round((window.itemWidth * 1.5) + ((window.itemHeight + window.s(30)) * 0.35) + window.s(50))

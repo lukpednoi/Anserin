@@ -3,12 +3,13 @@ import Quickshell
 import Quickshell.Wayland
 import "../"
 
-// Anserin interface only: hovering the middle of a screen edge asks for that edge's panel.
+// Anserin interface fallback: standalone edge hover PanelWindow ONLY when ScreenEdges.modern is disabled
+// (when ScreenEdges.modern is true, ScreenBorder hosts both left & right edge triggers with zero extra GL contexts).
 Variants {
     id: root
     property string edge: "right"
     signal triggered(string screenName)
-    model: Quickshell.screens
+    model: ScreenEdges.modern ? [] : Quickshell.screens
 
     PanelWindow {
         required property var modelData

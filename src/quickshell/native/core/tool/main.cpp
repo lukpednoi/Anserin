@@ -24,6 +24,7 @@ int main(int argc, char **argv)
     if (cmd == "locks") return locksCommand(1, argv + 1);
     if (cmd == "brightness") return brightnessCommand(argc - 1, argv + 1);
     if (cmd == "gamma") return gammaCommand(argc - 1, argv + 1);
+    if (cmd == "reserve") return reserveCommand(argc - 1, argv + 1);
     if (cmd == "watch" && sub == "sysinfo") return sysinfoCommand(argc - 1, argv + 1);
     if (cmd == "watch" && sub == "locks") return locksCommand(argc - 1, argv + 1);
     if (cmd == "watch" && sub == "brightness") return brightnessCommand(argc - 1, argv + 1);
