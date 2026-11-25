@@ -108,6 +108,12 @@ Scope {
                     Region { item: rightPanelTrigger }
                 }
 
+                // Draw the glass/solid frame BEHIND the edge hover triggers so Liquid Glass never intercepts edge hover
+                ScreenFrame {
+                    anchors.fill: parent
+                    inset: scope.inset
+                }
+
                 ScreenEdgeTrigger { id: barTrigger; target: LauncherController.bars[window.screen.name] || null }
                 ScreenEdgeTrigger { id: dockTrigger; target: ScreenEdges.docks[window.screen.name] || null }
 
@@ -118,7 +124,7 @@ Scope {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 2
                     height: Math.max(160, Math.round(window.height * 0.3))
-                    HoverHandler { id: leftEdgeHover }
+                    HoverHandler { id: leftEdgeHover; blocking: false }
                     Timer {
                         interval: 150
                         running: leftEdgeHover.hovered
@@ -132,17 +138,12 @@ Scope {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 2
                     height: Math.max(160, Math.round(window.height * 0.3))
-                    HoverHandler { id: rightEdgeHover }
+                    HoverHandler { id: rightEdgeHover; blocking: false }
                     Timer {
                         interval: 150
                         running: rightEdgeHover.hovered
                         onTriggered: borderRoot.rightEdgeTriggered(scope.modelData.name)
                     }
-                }
-
-                ScreenFrame {
-                    anchors.fill: parent
-                    inset: scope.inset
                 }
             }
         }

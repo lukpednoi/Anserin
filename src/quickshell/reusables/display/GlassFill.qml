@@ -183,6 +183,7 @@ Item {
     HoverHandler {
         id: localPointer
         enabled: root.active && root.followBackdropHover
+        blocking: false
     }
     property real localHover: localPointer.hovered ? 1.0 : 0.0
     Behavior on localHover { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
