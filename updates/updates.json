@@ -1,6 +1,41 @@
 {
   "versions": [
     {
+      "version": "0.2.1",
+      "date": "2026-11-25",
+      "posts": [
+        {
+          "id": "thx-for-30star",
+          "tag": "special",
+          "title": "Thx for 30star",
+          "image": "docs/updates/0.2.1-30stars.jpg",
+          "details": "Anserin has reached 30 stars in just 10 days! I'm so happy that so many people are trying and using this shell.\n\nI'll keep working hard to make Anserin as stable and great as possible — thank you so much for trusting and using my shell."
+        },
+        {
+          "id": "lower-ram-60fps",
+          "tag": "improved",
+          "title": "49% lower RAM at full 60 fps & automatic idle cleanup",
+          "details": "Before: Anserin held 10 OpenGL windows (~552 MB PSS, 10 QSGRenderThreads, 40 Mesa GL threads), including 4 invisible 1x1 Qt/OpenGL border windows and 2 edge-hover windows, and panels kept cached images and hidden GPU resources after closing.\n\nNow: A pure-CPU Wayland layer-shell helper (anserin-core reserve, ~0.55 MB PSS, 0 GL) replaces the 4 invisible border windows without touching monitor scale or mode, left/right edge triggers share ScreenBorder, Music bar mounts only while a track is active, and closing panels clears image/QML caches and hidden window GPU resources after 30 s — cutting idle RAM to ~281 MB PSS (-49%) while keeping the full 60 fps threaded render loop.",
+          "resources": {
+            "ram": "~281 MB idle (down from ~552 MB)",
+            "cpu": "under 1% at rest",
+            "disk": "24 KB"
+          }
+        },
+        {
+          "id": "clean-shell-reload",
+          "tag": "improved",
+          "title": "Clean Reload shell without locking the screen",
+          "details": "Before: Reload shell used in-process forceReload, which could leave Mesa and Qt heap fragmented across repeated reloads.\n\nNow: Right-clicking Reload shell (or running anserin reload) cleanly restarts anserind in the background without locking the screen, reclaiming 100% of Mesa/Qt memory on every reload.",
+          "resources": {
+            "ram": "reclaims 100% heap on reload",
+            "cpu": "no extra",
+            "disk": "no extra"
+          }
+        }
+      ]
+    },
+    {
       "version": "0.2.0",
       "date": "2026-11-25",
       "posts": [

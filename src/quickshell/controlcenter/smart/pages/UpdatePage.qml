@@ -55,6 +55,7 @@ Column {
     SpringVal { id: updSlide; target: 0.0; stiffness: 320; damping: 0.68; eps: 0.2 }
 
     readonly property var tagStyles: ({
+        special:  { name: "Special",  color: "#4dabf7" },
         feature:  { name: "Feature",  color: "#ffd43b" },
         fixbug:   { name: "Fix bug",  color: "#51cf66" },
         improved: { name: "Improved", color: "#4dabf7" },
@@ -385,6 +386,9 @@ Column {
                                         visible: false
                                         source: slideCard.modelData.url
                                         fillMode: Image.PreserveAspectCrop
+                                        asynchronous: true
+                                        cache: false
+                                        sourceSize.width: Math.max(1, Math.round(mediaGallery.cardW * 2))
                                         smooth: true
                                         mipmap: true
                                     }
