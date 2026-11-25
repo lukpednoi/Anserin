@@ -348,6 +348,7 @@ Item {
     HoverHandler {
         id: pointer
         enabled: root.liquid && root.active
+        blocking: false
     }
 
     property real hoverAmount: pointer.hovered ? 1.0 : 0.0
