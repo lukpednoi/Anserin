@@ -1,6 +1,23 @@
 {
   "versions": [
     {
+      "version": "0.2.2",
+      "date": "2026-11-25",
+      "posts": [
+        {
+          "id": "liquid-glass-edge-panels",
+          "tag": "fixbug",
+          "title": "Fix left and right panels not opening in Liquid Glass mode",
+          "details": "Hovering the left or right screen edges now opens the Workspace Capsule / Left Panel and Control Center immediately when Liquid Glass mode is enabled.",
+          "report": {
+            "where": "ScreenBorder.qml, WallpaperBlur.qml and GlassFill.qml when Liquid Glass mode is active",
+            "wrong": "ScreenFrame sat above the edge hover strips and WallpaperBlur's HoverHandler defaulted to blocking: true in Qt 6, swallowing pointer hover events before the edge triggers could fire.",
+            "changed": "Moved ScreenFrame behind all edge triggers in ScreenBorder.qml and set blocking: false on the glass HoverHandlers in WallpaperBlur.qml, GlassFill.qml and ScreenBorder.qml."
+          }
+        }
+      ]
+    },
+    {
       "version": "0.2.1",
       "date": "2026-11-25",
       "posts": [
