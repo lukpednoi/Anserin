@@ -16,7 +16,8 @@ ShellRoot {
         property bool wantOpen: false
         property string sourceUrl: ""
         property int graceMs: 1500
-        property bool keepAlive: wantOpen
+        property bool keepAlive: false
+        Component.onCompleted: if (wantOpen) keepAlive = true
 
         onWantOpenChanged: {
             if (wantOpen) {
@@ -138,21 +139,25 @@ ShellRoot {
     }
 
     Main { id: mainWindow }
+    function openLeftEdge(screenName) {
+        if (mainWindow.currentActive === "blankpanel") return;
+        if (PanelLayout.workspaceOnly) PanelLayout.showCapsule(screenName);
+        else mainWindow.openFromEdge("blankpanel", screenName);
+    }
     EdgeBatteryTrigger { onTriggered: function(screenName) { mainWindow.openFromEdge("controlcenter", screenName); } }
-    // the left edge: the full panel, or in Workspace only the small workspace capsule first
+    // Fallback left-edge trigger for screens with no ScreenBorder
     EdgeBatteryTrigger {
         edge: "left"
-        onTriggered: function(screenName) {
-            if (mainWindow.currentActive === "blankpanel") return;
-            if (PanelLayout.workspaceOnly) PanelLayout.showCapsule(screenName);
-            else mainWindow.openFromEdge("blankpanel", screenName);
-        }
+        onTriggered: function(screenName) { openLeftEdge(screenName); }
     }
     Loader {
         active: PanelLayout.capsuleScreen !== ""
         sourceComponent: WorkspaceCapsule { checkEdge: done => mainWindow.checkPointerOnEdge("left", done) }
     }
-    ScreenBorder {}
+    ScreenBorder {
+        onLeftEdgeTriggered: function(screenName) { openLeftEdge(screenName); }
+        onRightEdgeTriggered: function(screenName) { mainWindow.openFromEdge("controlcenter", screenName); }
+    }
     // inf desktop: the still cursor shown while the canvas pans (only while the mode is on somewhere)
     Loader {
         active: TerminalAppearance.infiniteActive
@@ -350,11 +355,43 @@ ShellRoot {
     }
     PopoutManager {}
 
-    // Floating Music Bar capsule (Control → Panel → Music → "Music bar"): created ONLY when enabled
-    Loader {
-        active: !performanceMode && Config.getSetting("panel.musicBar.enabled", false) === true
-        source: "popouts/MusicBar.qml"
-        onLoaded: if (item) item.openMusicRequested.connect(() => mainWindow.switchWidget("music", ""))
+    // Floating Music Bar capsule (Control → Panel → Music → "Music bar"): mounted ONLY while enabled AND a track is present
+    // (+ 1.5 s grace for fade-out, then unloads its PanelWindow/GL context and trims freed heap pages).
+    Item {
+        id: musicBarHost
+        readonly property bool wantOpen: !performanceMode
+            && Config.getSetting("panel.musicBar.enabled", false) === true
+            && MprisController.activePlayer !== null
+            && String(MprisController.activePlayer.trackTitle || "").trim() !== ""
+        property bool keepAlive: false
+        Component.onCompleted: if (wantOpen) keepAlive = true
+        onWantOpenChanged: {
+            if (wantOpen) {
+                musicBarUnloadTimer.stop();
+                keepAlive = true;
+            } else if (keepAlive) {
+                musicBarUnloadTimer.restart();
+            }
+        }
+        Timer {
+            id: musicBarUnloadTimer
+            interval: 1500
+            repeat: false
+            onTriggered: {
+                if (!musicBarHost.wantOpen) {
+                    musicBarHost.keepAlive = false;
+                    Qt.callLater(function() {
+                        gc();
+                        if (typeof Sounds !== "undefined") Sounds.trimMemory();
+                    });
+                }
+            }
+        }
+        Loader {
+            active: musicBarHost.wantOpen || musicBarHost.keepAlive
+            source: active ? "popouts/MusicBar.qml" : ""
+            onLoaded: if (item) item.openMusicRequested.connect(() => mainWindow.switchWidget("music", ""))
+        }
     }
 
     Loader {

@@ -17,6 +17,7 @@ Item {
     property string source: ""
     property bool isGif: false
     property bool playing: true
+    property bool cache: true
     property int fillMode: Image.PreserveAspectCrop
 
     property bool interactive: false
@@ -85,6 +86,7 @@ Item {
                 fillMode: root.fillMode
                 sourceSize: Qt.size(parent.width, parent.height)
                 asynchronous: true
+                cache: root.cache
                 horizontalAlignment: Image.AlignHCenter
                 verticalAlignment: Image.AlignVCenter
             }

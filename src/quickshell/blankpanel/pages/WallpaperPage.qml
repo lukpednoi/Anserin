@@ -207,7 +207,7 @@ Item {
         spacing: page.s(8)
         model: shown
         boundsBehavior: Flickable.StopAtBounds
-        cacheBuffer: page.s(600)
+        cacheBuffer: page.s(300)
         onContentYChanged: if (!page.anchoring) page.litColor = page.bucketAtTop()
         onCountChanged: if (!page.anchoring) Qt.callLater(() => page.litColor = page.bucketAtTop())
 
@@ -237,7 +237,7 @@ Item {
                     source: rowItem.url
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
-                    cache: true
+                    cache: false
                     sourceSize.width: Math.max(1, tile.width)
                     opacity: status === Image.Ready ? 1 : 0
                     Behavior on opacity { NumberAnimation { duration: 200 } }

@@ -10,7 +10,11 @@
 
 #include <QCoreApplication>
 #include <QFileInfo>
+#include <QGuiApplication>
+#include <QPixmapCache>
 #include <QPointer>
+#include <QQmlEngine>
+#include <QQuickWindow>
 #include <QThreadPool>
 #include <QTimer>
 
@@ -232,8 +236,22 @@ SfxEngine::SfxEngine(QObject *parent)
 
 void SfxEngine::trimMemory()
 {
+    // Release scene-graph textures, FBOs and glyph atlases on hidden QQuickWindows (e.g. qs-master after idle).
+    // Never touches visible windows (wallpaper-bg, anserin-screen-border, etc.).
+    for (QWindow *win : QGuiApplication::topLevelWindows()) {
+        if (auto *qw = qobject_cast<QQuickWindow *>(win); qw && !qw->isVisible()) {
+            qw->releaseResources();
+        }
+    }
+    QPixmapCache::clear();
+    if (QQmlEngine *eng = qmlEngine(this)) {
+        eng->collectGarbage();
+        eng->trimComponentCache();
+    }
 #if defined(__GLIBC__)
     malloc_trim(0);
+    // Run a second trim shortly after so buffers freed asynchronously by QSG render threads return to the OS.
+    QTimer::singleShot(300, this, [] { malloc_trim(0); });
 #endif
 }
 

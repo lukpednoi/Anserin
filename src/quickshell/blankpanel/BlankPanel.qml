@@ -303,6 +303,13 @@ Item {
             awaitingUnfold = false;
             fromCapsule = false;
             unfoldSafety.stop();
+            // Release off-screen visited pages immediately on hide so heavy pages (Wallpaper, System, etc.)
+            // don't stay mounted; keep only the active page warm during Main's 30 s grace window.
+            pageSlide.stop();
+            pagePos = page;
+            const keep = {};
+            if (order[page]) keep[order[page]] = true;
+            visitedPages = keep;
         }
     }
 
@@ -1267,7 +1274,7 @@ Item {
                         height: parent.height
                         y: (index - root.pagePos) * parent.height
                         asynchronous: true
-                        active: root.built && (Math.abs(index - root.pagePos) < 1.05 || !!root.visitedPages[modelData])
+                        active: root.built && (Math.abs(index - root.pagePos) < 1 || !!root.visitedPages[modelData])
                         visible: Math.abs(index - root.pagePos) < 1
                         function loadNow() {
                             if (!active || pageUrl === "") return;

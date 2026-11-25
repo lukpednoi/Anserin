@@ -54,6 +54,7 @@ FocusScope {
                     x: root.browser.s(8); y: x
                     width: parent.width-2*x; height: parent.height-2*y
                     source: tile.thumbnail
+                    cache: false
                     cornerRadius: ThemeBackend.clampedBorderRadius
                     backgroundColor: ThemeBackend.mantle
                     interactive: !root.browser.isApplying && !root.browser.isScrollingBlocked
