@@ -43,7 +43,9 @@ Scope {
         Scope {
             id: scope
             required property var modelData
-            readonly property int inset: ScreenEdges.inset(modelData)
+            // Not tied to fullscreen: unmapping and re-mapping this layer on every fullscreen switch shows black
+            // edge lines until its first frame renders. A fullscreen window already covers the Top layer.
+            readonly property int inset: (ScreenEdges.modern && modelData && !Config.sessionLocked) ? ScreenEdges.thickness : 0
             readonly property string monName: String(modelData && modelData.name ? modelData.name : "")
             readonly property int resTop: Math.round(ScreenEdges.reserved(modelData, "top"))
             readonly property int resBottom: Math.round(ScreenEdges.reserved(modelData, "bottom"))
