@@ -63,10 +63,14 @@ Column {
 
     readonly property bool colorModeAvailable: Matugen.matugenActive && !Matugen.isRunning
     readonly property var themedAppNames: AppTheming.installedApps.map(x => x.name)
-    property var themedApps: AppTheming.installedApps.filter(x => AppTheming.enabledIds.indexOf(x.id) >= 0).map(x => x.name)
-    onThemedAppsChanged: {
-        const ids = AppTheming.installedApps.filter(x => themedApps.indexOf(x.name) >= 0).map(x => x.id);
-        if (ids.slice().sort().join() !== AppTheming.enabledIds.slice().sort().join() && !AppTheming.busy) AppTheming.setApps(ids);
+    // Derived from the saved theme.apps only. It is written back from the chip tap below, never from a change of
+    // this property: building the page while the app list is still loading produced an empty list, which was
+    // then saved as "no apps" and un-themed every app.
+    readonly property var themedApps: AppTheming.installedApps.filter(x => AppTheming.enabledIds.indexOf(x.id) >= 0).map(x => x.name)
+    function toggleThemedApp(label) {
+        if (!Config.dataReady) return;   // settings not read yet: enabledIds would be empty and the save would drop the rest
+        const entry = AppTheming.installedApps.find(x => x.name === label);
+        if (entry) AppTheming.setEnabled(entry.id, AppTheming.enabledIds.indexOf(entry.id) < 0);
     }
     property string themeSearch: ""
     onThemeSearchChanged: tl.themeSearchText = themeSearch
@@ -141,7 +145,7 @@ Column {
         }
         SChoice {
             width: parent.width; icon: "󰀻"; title: "Apps"; multi: true; options: page.themedAppNames; selectedList: page.themedApps
-            onMultiToggled: (lab) => { const c = page.themedApps.slice(); const i = c.indexOf(lab); if (i >= 0) c.splice(i, 1); else c.push(lab); page.themedApps = c; page.app.sfx.playClick(); }
+            onMultiToggled: (lab) => { page.toggleThemedApp(lab); page.app.sfx.playClick(); }
         }
     }
 
