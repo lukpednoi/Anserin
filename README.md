@@ -73,7 +73,10 @@ Anserin also starts on its own when you log in to Hyprland.
 
 ## Wallpapers
 
-Want a starter set of still and video wallpapers? Download them from **[Anserin-Wallpapers](https://github.com/lukpednoi/Anserin-Wallpapers)** and copy what you want into `~/Pictures/Wallpapers`.
+Anserin comes with three wallpapers. On first start it puts them in `~/Pictures/Wallpapers/Images` (only when that
+folder has no wallpapers yet) and sets one. Change it from Select Wallpaper.
+
+Want more still and video wallpapers? Download them from **[Anserin-Wallpapers](https://github.com/lukpednoi/Anserin-Wallpapers)** and copy what you want into `~/Pictures/Wallpapers`.
 
 ## Uninstall
 
