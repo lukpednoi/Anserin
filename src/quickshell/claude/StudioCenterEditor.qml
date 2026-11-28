@@ -212,7 +212,7 @@ Rectangle {
 
                 Item { Layout.fillWidth: true }
 
-                // fold the panel into its corner dome (the session keeps running; SUPER + C does the same)
+                // fold the panel into its corner dome (the session keeps running)
                 Rectangle {
                     id: foldBtn
                     Layout.preferredWidth: foldRow.implicitWidth + 20

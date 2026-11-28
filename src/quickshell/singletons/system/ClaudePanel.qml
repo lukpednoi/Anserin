@@ -5,7 +5,7 @@ import Quickshell.Io
 import Quickshell.Hyprland
 
 // The Claude Panel's switch (Shell.qml makes the panel only while `shown`). Opened from the desktop's right-click
-// menu or SUPER + C (`anserin ipc call claude toggle`): closed → opens with the launch streak from the bottom-left
+// menu (or `anserin ipc call claude toggle`): closed → opens with the launch streak from the bottom-left
 // corner; open → folds into the corner dome (the session keeps running); folded → opens again. ✕ closes it for good.
 Item {
     id: panel

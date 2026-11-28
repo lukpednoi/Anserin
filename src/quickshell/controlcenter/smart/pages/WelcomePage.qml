@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Effects
+import Quickshell.Io
 import ".."
 import "../../../"
 
@@ -24,6 +25,16 @@ Column {
     readonly property string diskText: (SystemInfo.diskUsedGb || 0) + " / " + (SystemInfo.diskTotalGb || 0) + " GB"
     readonly property int diskPct: SystemInfo.diskTotalGb ? Math.round(100 * SystemInfo.diskUsedGb / SystemInfo.diskTotalGb) : 0
     readonly property string installedVer: Updates.localVersion || ""
+
+    // Anserin's shortcuts as made on this machine (src/scripts/hypr-keybinds.py): keys the user's own binds leave free
+    property var shortcuts: []
+    FileView {
+        path: Caching.stateDir + "/keybinds.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: { try { page.shortcuts = JSON.parse(text()); } catch (e) { page.shortcuts = []; } }
+    }
 
     component SCard: SmartCard {
         cornerRadius: page.app.cornerRadius; darkMode: page.app.darkMode; liquidGlass: page.app.liquidGlass
@@ -114,6 +125,23 @@ Column {
                 Text { text: "󰊤"; font.family: page.app.iconFont; font.pixelSize: 12; color: page.app.cAccent; anchors.verticalCenter: parent.verticalCenter }
                 Text { text: "lukpednoi"; font.family: page.app.uiFont; font.pixelSize: 10; font.bold: true; color: page.app.cAccent; anchors.verticalCenter: parent.verticalCenter } }
             MouseArea { id: ghMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { page.app.sfx.playClick(); Qt.openUrlExternally("https://github.com/lukpednoi/Anserin"); } }
+        }
+    }
+
+    SCard {
+        visible: page.shortcuts.length > 0
+        title: "Shortcuts"; icon: "󰌌"; statusText: "FREE KEYS ONLY"
+        GridLayout {
+            width: parent.width; columns: 2; columnSpacing: 8; rowSpacing: 8
+            Repeater {
+                model: page.shortcuts
+                delegate: InfoTile {
+                    Layout.fillWidth: true; Layout.preferredWidth: 1
+                    icon: modelData.icon || "󰌌"; label: modelData.label || ""
+                    val: modelData.keys || ("No free key (" + modelData.wanted + " is yours)")
+                    accentVal: !!modelData.keys
+                }
+            }
         }
     }
 

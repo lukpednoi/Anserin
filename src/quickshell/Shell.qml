@@ -344,7 +344,7 @@ ShellRoot {
     }
 
     LazyOverlay { wantOpen: PolkitService.isActive; sourceUrl: Qt.resolvedUrl("polkit/Polkit.qml"); graceMs: 600 }
-    // Claude Panel (right-click menu / SUPER + C): made only while open or folded into its corner dome
+    // Claude Panel (right-click menu): made only while open or folded into its corner dome
     Loader {
         active: ClaudePanel.shown
         sourceComponent: ClaudeWelcomeOverlay {
