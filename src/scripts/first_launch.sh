@@ -16,8 +16,8 @@ check_status() {
         exit 0
     fi
 
-    touch "$FLAG_FILE"
-
+    # the flag is written when the guide opens (--open-guide), so a launch that never got past the lock screen
+    # shows it again next time
     WP_DIR=""
     if type get_setting >/dev/null 2>&1; then
         WP_DIR="$(get_setting "wallpaperDir" "")"
@@ -33,6 +33,7 @@ check_status() {
 }
 
 open_guide() {
+    mkdir -p "$STATE_DIR" && touch "$FLAG_FILE"
     local script_path="$ANSERIN_DIR/scripts/qs_manager.sh"
     if [ -f "$script_path" ]; then
         bash "$script_path" open guide

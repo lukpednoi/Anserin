@@ -40,10 +40,26 @@ Item {
         onTriggered: {
             root.firstLaunchStarted();
             root.startAnimations();
-            Quickshell.execDetached(["bash", root.helperScript, "--open-guide"]);
-            root.firstLaunchFinished();
+            root.guidePending = true;
+            root.openGuideWhenUnlocked();
         }
     }
+
+    // At login the shell starts behind its lock screen: the welcome guide waits for the unlock, so it is seen
+    // (first_launch.sh marks the first launch done only when the guide really opens).
+    property bool guidePending: false
+    function openGuideWhenUnlocked() {
+        if (!root.guidePending || Config.sessionLocked) return;
+        root.guidePending = false;
+        Quickshell.execDetached(["bash", root.helperScript, "--open-guide"]);
+        root.firstLaunchFinished();
+    }
+    Connections {
+        target: Config
+        function onSessionLockedChanged() { if (!Config.sessionLocked) guideAfterUnlock.restart(); }
+    }
+    // after the unlock animation, not on top of it
+    Timer { id: guideAfterUnlock; interval: 900; onTriggered: root.openGuideWhenUnlocked() }
     IpcHandler {
         target: "firstlaunch"
 
