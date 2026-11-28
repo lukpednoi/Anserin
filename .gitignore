@@ -6,6 +6,7 @@ settings.json
 seeds/
 seed*.json
 wallpapers/
+!/src/assets/wallpapers/
 avatars/
 __pycache__/
 *.pyc

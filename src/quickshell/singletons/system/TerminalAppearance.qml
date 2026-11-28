@@ -1,6 +1,7 @@
 pragma Singleton
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import "../../"
 
@@ -56,6 +57,20 @@ Item {
     function initialize() {
         debounce.restart();
         if (!fastfetchSync.running) fastfetchSync.running = true;
+        keybindsDebounce.restart();
+    }
+
+    // Anserin's shortcuts take only keys the user's own Hyprland binds leave free (src/scripts/hypr-keybinds.py): made
+    // at start and again after every Hyprland config reload (its own reload changes nothing, so it settles).
+    Process {
+        id: keybindsSync
+        command: ["python3", Caching.anserinDir + "/scripts/hypr-keybinds.py"]
+        stderr: StdioCollector { onStreamFinished: { if (text.trim()) console.warn(text.trim()); } }
+    }
+    Timer { id: keybindsDebounce; interval: 400; onTriggered: { if (!keybindsSync.running) keybindsSync.running = true; else restart(); } }
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) { if (event.name === "configreloaded") keybindsDebounce.restart(); }
     }
 
     function setFastfetchOption(key, value) {

@@ -14,7 +14,7 @@ PanelWindow {
     property real startHoleR: 25
     readonly property alias experience: experience
     signal finished()
-    // set when the shell made it (ClaudePanel singleton), so SUPER + C can fold and unfold it
+    // set when the shell made it (ClaudePanel singleton), so it can be folded and unfolded
     property var controller: null
     Component.onCompleted: {
         if (controller) controller.overlay = win;
@@ -37,18 +37,6 @@ PanelWindow {
     }
 
     PanelSfx { id: sfx }
-
-    // Where the panel is on the desktop (the card, or the folded dome), for SUPER + X: closing a window while the
-    // pointer is over the panel closes only the panel (config/terminal/desktop-profile.lua reads this file).
-    readonly property string rectPath: experience.store.runDir + "/panel-rect"
-    readonly property string rectText: experience.capturePointer && experience.exitP < 0.5
-        ? [Math.round((win.screen ? win.screen.x : 0) + experience.maskX), Math.round((win.screen ? win.screen.y : 0) + experience.maskY),
-           Math.round(experience.maskW), Math.round(experience.maskH)].join(" ") + "\n"
-        : ""
-    onRectTextChanged: rectTimer.restart()
-    Timer { id: rectTimer; interval: 40; onTriggered: rectFile.setText(win.rectText) }
-    FileView { id: rectFile; path: win.rectPath; printErrors: false; blockLoading: true; preload: false }
-    Component.onDestruction: Quickshell.execDetached(["rm", "-f", win.rectPath])
 
     ClaudeExperience {
         id: experience

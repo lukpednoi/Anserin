@@ -61,6 +61,14 @@ The layout, ASCII art and images in `config/fastfetch/` come from
 [mkhmtdots](https://github.com/mkhmtolzhas/mkhmtdots/tree/main/.config/fastfetch) by mkhmtolzhas, with paths changed
 for Anserin.
 
+### Wallpapers
+
+The three photos in `src/assets/wallpapers/` are resized copies of:
+
+- `anserin-teal-peaks.jpg`: [Daniel Leone](https://unsplash.com/photos/v7daTKlZzaw) on Unsplash (Unsplash License)
+- `anserin-purple-lake.jpg`: [Ken Cheung](https://unsplash.com/photos/KonWFWUaAuk) on Unsplash (Unsplash License)
+- `anserin-turquoise-lake.jpg`: [Rob Shumski](https://www.pexels.com/photo/1903702/) on Pexels (Pexels License)
+
 ### Logos in the README
 
 The Codex and Claude icons come from [LobeHub Icons](https://github.com/lobehub/lobe-icons) (MIT). They are

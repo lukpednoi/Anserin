@@ -142,7 +142,25 @@ ShellRoot {
                                         "HIST='" + histFile + "'; if [ -f \"$HIST\" ]; then if [ \"$(head -n 1 \"$HIST\" 2>/dev/null)\" != '" + savedName + "' ]; then grep -v -F -x '" + savedName + "' \"$HIST\" > \"$HIST.tmp\" 2>/dev/null || true; printf '%s\n' '" + savedName + "' | cat - \"$HIST.tmp\" > \"$HIST\"; rm -f \"$HIST.tmp\"; fi; else printf '%s\n' '" + savedName + "' > \"$HIST\"; fi"
                                     ]);
                                 }
+                            } else {
+                                // nothing saved for this screen yet (new install): use one of Anserin's own
+                                defaultWallpaperProcess.running = true;
                             }
+                        }
+                    }
+                }
+
+                Process {
+                    id: defaultWallpaperProcess
+                    running: false
+                    command: ["bash", Caching.anserinDir + "/scripts/wallpaper/default-wallpaper.sh",
+                        Config.getSetting("wallpaperDir", "") || Config.getSetting("wallpaper_dir", "")
+                            || Quickshell.env("WALLPAPER_DIR") || (Quickshell.env("HOME") + "/Pictures/Wallpapers"),
+                        Caching.anserinDir + "/assets/wallpapers"]
+                    stdout: StdioCollector {
+                        onStreamFinished: {
+                            let path = this.text.trim();
+                            if (path !== "" && barWindow.currentWallpaperPath === "") barWindow.changeWallpaper(path, "fade");
                         }
                     }
                 }

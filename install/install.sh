@@ -150,6 +150,12 @@ place_files() {
 # ---------- 3. Hyprland ----------
 hook_hyprland() {
     local target="" backup block
+    # Hyprland not started yet: begin from Hyprland's own default config, as Hyprland would make on its first start.
+    if [[ ! -f "$HYPR_DIR/hyprland.lua" && ! -f "$HYPR_DIR/hyprland.conf" && -f /usr/share/hypr/hyprland.lua ]]; then
+        mkdir -p "$HYPR_DIR"
+        cp /usr/share/hypr/hyprland.lua "$HYPR_DIR/hyprland.lua"
+        say "No Hyprland config yet: started one from Hyprland's default ($HYPR_DIR/hyprland.lua)."
+    fi
     if [[ -f "$HYPR_DIR/hyprland.lua" ]]; then
         target="$HYPR_DIR/hyprland.lua"
         # The profile adds Anserin's terminal, tiling and Infinite Desktop settings; pcall keeps Hyprland
