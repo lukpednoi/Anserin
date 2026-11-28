@@ -1,6 +1,34 @@
 {
   "versions": [
     {
+      "version": "0.2.3",
+      "date": "2026-11-28",
+      "posts": [
+        {
+          "id": "fresh-install-wallpaper",
+          "tag": "fixbug",
+          "title": "Fix black desktop after a fresh install",
+          "details": "A new install now starts with a wallpaper. Anserin comes with three wallpapers and puts them in ~/Pictures/Wallpapers/Images when that folder has none yet. Change them from Select Wallpaper.",
+          "report": {
+            "where": "WallpaperEngine.qml on first start (no saved wallpaper)",
+            "wrong": "The first launch only picked a wallpaper when wallpaperDir was set, and the default settings do not set it, so new users got a black desktop.",
+            "changed": "When a screen has no saved wallpaper, default-wallpaper.sh copies the bundled pictures into the wallpaper folder (never replacing files) and sets one."
+          }
+        },
+        {
+          "id": "shortcuts-from-your-binds",
+          "tag": "improved",
+          "title": "Shortcuts that keep your own keys",
+          "details": "Anserin now adds its shortcuts only on keys you do not use (else SUPER + ALT + the same key): Apps, Clipboard, Control Center, Wallpapers, Lock screen and Screenshot. Control Center > Welcome lists the keys you got. SUPER + C for the Claude Panel is gone, so it no longer clashes with Hyprland's close window. The welcome guide now opens after you unlock, clipboard history is recorded, and the installer starts a Hyprland config if you have none.",
+          "resources": {
+            "ram": "no extra",
+            "cpu": "runs once at start and after a Hyprland reload",
+            "disk": "~1.1 MB (wallpapers)"
+          }
+        }
+      ]
+    },
+    {
       "version": "0.2.2",
       "date": "2026-11-25",
       "posts": [
