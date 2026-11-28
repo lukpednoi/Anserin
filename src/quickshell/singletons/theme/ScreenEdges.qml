@@ -40,7 +40,9 @@ QtObject {
     }
 
     function reserved(screen, edge) {
-        let size = inset(screen);
+        // Not tied to fullscreen: fullscreen windows ignore reserved space, and changing it mid workspace-slide
+        // re-lays-out windows (black-line glitch on NVIDIA)
+        let size = (modern && screen && !Config.sessionLocked) ? thickness : 0;
         if (!size) return 0;
         const bar = LauncherController.bars[screen.name];
         if (bar && bar.visible && bar.barPosition === edge && !bar.autohide) size += bar.barHeight;
